@@ -1,0 +1,15 @@
+quarkus:
+  application:
+    name: ${project.artifactId}
+    version: ${project.version}
+
+  banner:
+    enabled: true
+
+  default-locale: pt_BR
+
+  http:
+    port: 8080
+
+  devservices:
+    enabled: false

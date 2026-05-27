@@ -1,0 +1,89 @@
+quarkus:
+  application:
+    name: ${project.artifactId}
+    version: ${project.version}
+
+  management:
+    enabled: true
+    port: 8090
+
+  banner:
+    enabled: true
+
+  default-locale: pt_BR
+
+  http:
+    port: 8080
+
+  devservices:
+    enabled: false
+
+  datasource:
+    username: ${POSTGRES_USERNAME:admin}
+    password: ${POSTGRES_PASSWORD:changeme}
+    reactive:
+      url: postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?search_path=oficina-mecanica
+
+  hibernate-orm:
+    physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+    schema-management:
+      strategy: update
+    database:
+      default-schema: oficina-mecanica
+    log:
+      sql: false
+      format-sql: true
+
+  otel:
+    sdk:
+      disabled: true
+    exporter:
+      otlp:
+        traces:
+          endpoint: http://${INFRA_HOST_OTEL:localhost:4317}
+        metrics:
+          endpoint: http://${INFRA_HOST_OTEL:localhost:4317}
+        logs:
+          endpoint: http://${INFRA_HOST_OTEL:localhost:4317}
+    traces:
+      sampler: parentbased_always_on
+    metrics:
+      enabled: true
+    logs:
+      enabled: true
+    resource:
+      attributes:
+        - "service.name=${quarkus.application.name}"
+        - "service.version=${quarkus.application.version}"
+
+  log:
+    console:
+      format: "%d{yyyy-MM-dd HH:mm:ss} %-5p [%c{2.}] req=%X{requestId} trace=%X{traceId} span=%X{spanId} %s%e%n"
+
+# ── Test profile ──────────────────────────────────────────────────────────────
+# Applied automatically by @QuarkusTest (profile = "test").
+# Quarkus DevServices spins up a real PostgreSQL container via Testcontainers.
+# No mocks — the full stack (HTTP → Service → Repository → PostgreSQL) is tested.
+# Requires Docker to be running.
+"%test":
+  quarkus:
+    devservices:
+      enabled: true          # re-enables Testcontainers for the test profile
+
+    datasource:
+      db-kind: postgresql
+      devservices:
+        init-script-path: db/init.sql    # creates the "customer" schema before Hibernate runs
+
+    hibernate-orm:
+      physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+      schema-management:
+        strategy: drop-and-create        # Hibernate drops/creates tables on every test run
+      database:
+        default-schema: oficina-mecanica
+      log:
+        sql: true
+
+    log:
+      console:
+        format: "%d{yyyy-MM-dd HH:mm:ss} %-5p [%c{2.}] %s%e%n"

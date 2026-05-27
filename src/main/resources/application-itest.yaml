@@ -1,0 +1,27 @@
+
+"%itest":
+  quarkus:
+    devservices:
+      enabled: true          # reativa o Testcontainers no profile test
+
+    datasource:
+      db-kind: postgresql
+      devservices:
+        init-script-path: db/init.sql   # cria o schema antes do Hibernate
+
+    hibernate-orm:
+      physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+      schema-management:
+        strategy: drop-and-create      # Hibernate cria as tabelas do zero a cada run
+      database:
+        default-schema: customer
+      log:
+        sql: true
+
+    otel:
+      sdk:
+        disabled: true
+
+    log:
+      console:
+        format: "%d{yyyy-MM-dd HH:mm:ss} %-5p [%c{2.}] %s%e%n"
