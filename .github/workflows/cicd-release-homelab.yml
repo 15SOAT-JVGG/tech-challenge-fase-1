@@ -48,7 +48,7 @@ jobs:
   # ── 1. Detecção de secrets no histórico do repositório ──────────────────────
   secrets_gitleaks:
     name: Secrets Scan (Gitleaks)
-    uses: airtonlima/reusable-workflows/.github/workflows/security-gitleaks.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-gitleaks.yml@main
     with:
       gitleaks_version: "8.24.3"
       fetch_depth: 0
@@ -58,7 +58,7 @@ jobs:
   # ── 2. SAST — análise estática de segurança ──────────────────────────────────
   sast_semgrep:
     name: SAST (Semgrep)
-    uses: airtonlima/reusable-workflows/.github/workflows/security-semgrep.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-semgrep.yml@main
     secrets: inherit
     with:
       config: p/ci
@@ -70,7 +70,7 @@ jobs:
   build:
     name: Build & Tests (Quarkus JVM)
     needs: [secrets_gitleaks, sast_semgrep]
-    uses: airtonlima/reusable-workflows/.github/workflows/build-java-quarkus-jvm.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/build-java-quarkus-jvm.yml@main
     with:
       environment_name: homelab
       java_version: "21"
@@ -88,7 +88,7 @@ jobs:
   sca_dependency_check:
     name: SCA (OWASP Dependency-Check)
     needs: [build]
-    uses: airtonlima/reusable-workflows/.github/workflows/security-sca-dependency-check.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-sca-dependency-check.yml@main
     with:
       project_name: ${{ github.event.repository.name }}
       scan_path: .
@@ -100,7 +100,7 @@ jobs:
   sonar:
     name: SonarQube Scan
     needs: [build, secrets_gitleaks, sast_semgrep, sca_dependency_check]
-    uses: airtonlima/reusable-workflows/.github/workflows/quality-sonarqube-scan.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/quality-sonarqube-scan.yml@main
     with:
       environment_name: homelab
       fetch_depth: 0
@@ -125,7 +125,7 @@ jobs:
     name: Compute Version
     #if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [build, sonar, sca_dependency_check]
-    uses: airtonlima/reusable-workflows/.github/workflows/release-semantic-version.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/release-semantic-version.yml@main
     secrets: inherit
 
   # ── 7. Build & Push da imagem Docker → GHCR ─────────────────────────────────
@@ -133,7 +133,7 @@ jobs:
     name: Build & Push Image (GHCR)
     #if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [build, version]
-    uses: airtonlima/reusable-workflows/.github/workflows/docker-build-push-ghcr.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/docker-build-push-ghcr.yml@main
     with:
       version_tag: ${{ needs.version.outputs.version_tag }}
       dockerfile: infra/docker/Dockerfile
@@ -144,18 +144,18 @@ jobs:
     name: Image Scan (Trivy)
     #if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [docker, version]
-    uses: airtonlima/reusable-workflows/.github/workflows/security-trivy-image-scan.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-trivy-image-scan.yml@main
     with:
       image_ref: ghcr.io/${{ github.repository }}:${{ needs.version.outputs.version_tag }}
 
   # ── 9. Deploy no Portainer via Tailscale VPN ─────────────────────────────────
   #   O stack no Portainer deve ter a imagem configurada com ${VERSION}:
-  #     image: ghcr.io/airtonlima/fiap-srv-oficina-mecanica:${VERSION}
+  #     image: ghcr.io/15SOAT-JVGG/fiap-srv-oficina-mecanica:${VERSION}
   deploy_dev:
     name: Deploy Dev (Portainer via Tailscale)
     #if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [docker, image_scan, version]
-    uses: airtonlima/reusable-workflows/.github/workflows/deploy-portainer-tailscale.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/deploy-portainer-tailscale.yml@main
     with:
       environment_name: homelab
       portainer_url: ${{ vars.PORTAINER_URL }}
@@ -176,5 +176,5 @@ jobs:
     #  github.ref == 'refs/heads/main' &&
     #  needs.version.outputs.release_needed == 'true'
     needs: [deploy_dev, version]
-    uses: airtonlima/reusable-workflows/.github/workflows/release-semantic-publish.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/release-semantic-publish.yml@main
     secrets: inherit
