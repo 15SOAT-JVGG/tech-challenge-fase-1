@@ -22,14 +22,14 @@ quarkus:
     username: ${POSTGRES_USERNAME:admin}
     password: ${POSTGRES_PASSWORD:changeme}
     reactive:
-      url: postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?search_path=oficina-mecanica
+      url: postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?search_path=oficina_mecanica
 
   hibernate-orm:
     physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
     schema-management:
       strategy: update
     database:
-      default-schema: oficina-mecanica
+      default-schema: oficina_mecanica
     log:
       sql: false
       format-sql: true
@@ -130,7 +130,7 @@ app:
       schema-management:
         strategy: drop-and-create        # Hibernate drops/creates tables on every test run
       database:
-        default-schema: oficina-mecanica
+        default-schema: oficina_mecanica
       log:
         sql: true
 
