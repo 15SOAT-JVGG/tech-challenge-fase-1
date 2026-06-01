@@ -16,7 +16,7 @@ import java.util.Map;
  */
 public class PostgresTestResource implements QuarkusTestResourceLifecycleManager {
 
-    private static final String SCHEMA = "oficina-mecanica";
+    private static final String SCHEMA = "oficina_mecanica";
 
     @SuppressWarnings("resource")
     private final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
