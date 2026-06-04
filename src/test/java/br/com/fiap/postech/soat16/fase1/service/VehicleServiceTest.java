@@ -1,0 +1,183 @@
+package br.com.fiap.postech.soat16.fase1.service;
+
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
+import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
+import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
+import br.com.fiap.postech.soat16.fase1.mapper.VehicleMapper;
+import br.com.fiap.postech.soat16.fase1.model.Vehicle;
+import br.com.fiap.postech.soat16.fase1.model.VehicleType;
+import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
+import io.smallrye.mutiny.Uni;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("VehicleService — Unit Tests")
+class VehicleServiceTest {
+
+    @Mock
+    private VehicleRepository vehicleRepository;
+
+    @Mock
+    private VehicleMapper vehicleMapper;
+
+    private VehicleService service;
+
+    private Vehicle entity;
+    private VehicleResponseDto response;
+    private VehicleRequestDto request;
+
+    @BeforeEach
+    void setUp() {
+        service = new VehicleService(vehicleRepository, vehicleMapper);
+        entity = new Vehicle(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+        response = new VehicleResponseDto(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO, null);
+        request = new VehicleRequestDto(null, null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+    }
+
+    @Nested
+    @DisplayName("listAll")
+    class ListAll {
+
+        @Test
+        @DisplayName("should return paginated response")
+        void shouldReturnPaginatedResponse() {
+            when(vehicleRepository.findPage(0, 10)).thenReturn(Uni.createFrom().item(List.of(entity)));
+            when(vehicleRepository.count()).thenReturn(Uni.createFrom().item(1L));
+            when(vehicleMapper.toResponse(entity)).thenReturn(response);
+
+            PageableResponseDto<VehicleResponseDto> result = service.listAll(null, 0, 10).await().indefinitely();
+
+            assertNotNull(result);
+            assertEquals(1, result.content().size());
+            assertEquals("ABC1234", result.content().get(0).licensePlate());
+        }
+
+        @Test
+        @DisplayName("should return empty page when no vehicles exist")
+        void shouldReturnEmptyPage() {
+            when(vehicleRepository.findPage(0, 10)).thenReturn(Uni.createFrom().item(List.of()));
+            when(vehicleRepository.count()).thenReturn(Uni.createFrom().item(0L));
+
+            PageableResponseDto<VehicleResponseDto> result = service.listAll(null, 0, 10).await().indefinitely();
+
+            assertNotNull(result);
+            assertTrue(result.content().isEmpty());
+        }
+    }
+
+    @Nested
+    @DisplayName("findById")
+    class FindById {
+
+        @Test
+        @DisplayName("should return vehicle response when found")
+        void shouldReturnVehicleWhenFound() {
+            when(vehicleRepository.findById(1L)).thenReturn(Uni.createFrom().item(entity));
+            when(vehicleMapper.toResponse(entity)).thenReturn(response);
+
+            VehicleResponseDto result = service.findById(1L).await().indefinitely();
+
+            assertNotNull(result);
+            assertEquals("ABC1234", result.licensePlate());
+            verify(vehicleRepository).findById(1L);
+        }
+
+        @Test
+        @DisplayName("should throw ResourceNotFoundException when not found")
+        void shouldThrowNotFoundWhenMissing() {
+            when(vehicleRepository.findById(99L)).thenReturn(Uni.createFrom().nullItem());
+
+            assertThrows(ResourceNotFoundException.class,
+                    () -> service.findById(99L).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("create")
+    class Create {
+
+        @Test
+        @DisplayName("should persist entity when license plate is unique")
+        void shouldPersistWhenPlateIsUnique() {
+            when(vehicleRepository.existsByLicensePlate("ABC1234")).thenReturn(Uni.createFrom().item(false));
+            when(vehicleMapper.toEntity(request, null)).thenReturn(entity);
+            when(vehicleRepository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+
+            assertDoesNotThrow(() -> service.create(request).await().indefinitely());
+            verify(vehicleRepository).persist(entity);
+        }
+
+        @Test
+        @DisplayName("should throw DuplicateLicensePlateException when plate already exists")
+        void shouldThrowDuplicateWhenPlateExists() {
+            when(vehicleRepository.existsByLicensePlate("ABC1234")).thenReturn(Uni.createFrom().item(true));
+
+            assertThrows(DuplicateLicensePlateException.class,
+                    () -> service.create(request).await().indefinitely());
+            verify(vehicleRepository, never()).persist(any(Vehicle.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("update")
+    class Update {
+
+        @Test
+        @DisplayName("should update entity and return response")
+        void shouldUpdateAndReturn() {
+            when(vehicleRepository.findById(1L)).thenReturn(Uni.createFrom().item(entity));
+            when(vehicleRepository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(vehicleMapper.toResponse(entity)).thenReturn(response);
+
+            VehicleResponseDto result = service.update(1L, request).await().indefinitely();
+
+            assertNotNull(result);
+            verify(vehicleMapper).updateEntity(entity, request);
+        }
+
+        @Test
+        @DisplayName("should throw ResourceNotFoundException when entity not found")
+        void shouldThrowNotFoundWhenMissing() {
+            when(vehicleRepository.findById(99L)).thenReturn(Uni.createFrom().nullItem());
+
+            assertThrows(ResourceNotFoundException.class,
+                    () -> service.update(99L, request).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("delete")
+    class Delete {
+
+        @Test
+        @DisplayName("should delete vehicle when found")
+        void shouldDeleteWhenFound() {
+            when(vehicleRepository.deleteById(1L)).thenReturn(Uni.createFrom().item(true));
+
+            assertDoesNotThrow(() -> service.delete(1L).await().indefinitely());
+        }
+
+        @Test
+        @DisplayName("should throw ResourceNotFoundException when vehicle not found")
+        void shouldThrowWhenNotFound() {
+            when(vehicleRepository.deleteById(99L)).thenReturn(Uni.createFrom().item(false));
+
+            assertThrows(ResourceNotFoundException.class,
+                    () -> service.delete(99L).await().indefinitely());
+        }
+    }
+}

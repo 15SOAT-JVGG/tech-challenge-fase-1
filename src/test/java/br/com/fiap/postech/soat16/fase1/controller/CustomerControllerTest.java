@@ -1,8 +1,8 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequest;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.Pagination;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
@@ -52,17 +52,17 @@ class CustomerControllerTest {
         @Test
         @DisplayName("should return paginated list when customers exist")
         void shouldReturnPaginatedListWhenCustomersExist() {
-            PageableRequest pageable = mock(PageableRequest.class);
+            PageableRequestDto pageable = mock(PageableRequestDto.class);
             when(pageable.getQ()).thenReturn(null);
             when(pageable.getPage()).thenReturn(0);
             when(pageable.getSize()).thenReturn(10);
 
-            Pagination pagination = new Pagination(0, 10, 1L, 1, false, false);
-            PageableResponse<CustomerResponse> page = new PageableResponse<>(List.of(response), pagination);
+            PaginationDto paginationDto = new PaginationDto(0, 10, 1L, 1, false, false);
+            PageableResponseDto<CustomerResponse> page = new PageableResponseDto<>(List.of(response), paginationDto);
 
             when(service.findAll(null, 0, 10)).thenReturn(Uni.createFrom().item(page));
 
-            PageableResponse<CustomerResponse> result = controller.findAll(pageable).await().indefinitely();
+            PageableResponseDto<CustomerResponse> result = controller.findAll(pageable).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
@@ -73,14 +73,14 @@ class CustomerControllerTest {
         @Test
         @DisplayName("should return empty page when no customers exist")
         void shouldReturnEmptyPageWhenNoCustomersExist() {
-            PageableRequest pageable = mock(PageableRequest.class);
+            PageableRequestDto pageable = mock(PageableRequestDto.class);
             when(pageable.getQ()).thenReturn(null);
             when(pageable.getPage()).thenReturn(0);
             when(pageable.getSize()).thenReturn(10);
 
-            when(service.findAll(null, 0, 10)).thenReturn(Uni.createFrom().item(PageableResponse.emptyList()));
+            when(service.findAll(null, 0, 10)).thenReturn(Uni.createFrom().item(PageableResponseDto.emptyList()));
 
-            PageableResponse<CustomerResponse> result = controller.findAll(pageable).await().indefinitely();
+            PageableResponseDto<CustomerResponse> result = controller.findAll(pageable).await().indefinitely();
 
             assertTrue(result.content().isEmpty());
         }
@@ -88,7 +88,7 @@ class CustomerControllerTest {
         @Test
         @DisplayName("should propagate exception from service")
         void shouldPropagateException() {
-            PageableRequest pageable = mock(PageableRequest.class);
+            PageableRequestDto pageable = mock(PageableRequestDto.class);
             when(pageable.getQ()).thenReturn(null);
             when(pageable.getPage()).thenReturn(0);
             when(pageable.getSize()).thenReturn(10);

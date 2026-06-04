@@ -1,6 +1,6 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
@@ -26,13 +26,13 @@ public class CustomerService {
     private final CustomerMapper mapper;
 
     @WithSession
-    public Uni<PageableResponse<CustomerResponse>> findAll(String q, int page, int size) {
+    public Uni<PageableResponseDto<CustomerResponse>> findAll(String q, int page, int size) {
         return Uni.combine().all()
                 .unis(repository.findPage(page, size), repository.count())
                 .asTuple()
                 .map(tuple -> {
                     var data = tuple.getItem1().stream().map(mapper::toResponse).toList();
-                    return PageableResponse.of(data, page, size, tuple.getItem2());
+                    return PageableResponseDto.of(data, page, size, tuple.getItem2());
                 });
     }
 

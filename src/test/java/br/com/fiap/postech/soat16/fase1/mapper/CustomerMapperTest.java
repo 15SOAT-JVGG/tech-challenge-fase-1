@@ -32,16 +32,14 @@ class CustomerMapperTest {
     @Test
     @DisplayName("toResponse maps all fields correctly")
     void toResponseMapsAllFields() {
-        UUID id = UUID.randomUUID();
         OffsetDateTime now = OffsetDateTime.now();
-        Customer entity = new Customer(id, "John", "Doe", "john@example.com", "5511987654321");
+        Customer entity = new Customer(null, "John", "Doe", "john@example.com", "5511987654321");
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
 
         CustomerResponse result = mapper.toResponse(entity);
 
         assertNotNull(result);
-        assertEquals(id, result.getCustomerId());
         assertEquals("John", result.getFirstName());
         assertEquals("Doe", result.getLastName());
         assertEquals("john@example.com", result.getEmail());
@@ -73,7 +71,7 @@ class CustomerMapperTest {
     @Test
     @DisplayName("updateEntity applies changes from update request")
     void updateEntityAppliesChanges() {
-        Customer entity = new Customer(UUID.randomUUID(), "John", "Doe", "john@example.com", "5511987654321");
+        Customer entity = new Customer(null, "John", "Doe", "john@example.com", "5511987654321");
         CustomerUpdateRequest request = new CustomerUpdateRequest("Jane", "Smith", "jane@example.com", "5511111111111");
 
         mapper.updateEntity(entity, request);

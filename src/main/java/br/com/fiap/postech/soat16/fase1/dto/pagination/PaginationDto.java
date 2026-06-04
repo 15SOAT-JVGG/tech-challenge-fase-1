@@ -1,6 +1,6 @@
 package br.com.fiap.postech.soat16.fase1.dto.pagination;
 
-public record Pagination(
+public record PaginationDto(
         int page,
         int size,
         long totalElements,

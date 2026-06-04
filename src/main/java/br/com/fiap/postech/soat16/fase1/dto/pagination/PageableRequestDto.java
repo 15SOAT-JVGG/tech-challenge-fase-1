@@ -4,8 +4,10 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.QueryParam;
+import lombok.Getter;
 
-public class PageableRequest {
+@Getter
+public class PageableRequestDto {
 
     @QueryParam("q")
     private String q;
@@ -20,16 +22,4 @@ public class PageableRequest {
     @QueryParam("size")
     @DefaultValue("10")
     private int size;
-
-    public String getQ() {
-        return q;
-    }
-
-    public int getPage() {
-        return page;
-    }
-
-    public int getSize() {
-        return size;
-    }
 }
