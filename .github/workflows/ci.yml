@@ -1,4 +1,4 @@
-name: Workflow Sandbox CI
+name: Workflow CI
 
 # Pipeline de validação para PRs — roda apenas CI, sem deploy.
 # Usado para validar qualidade antes do merge na main.
