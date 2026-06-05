@@ -2,8 +2,7 @@ package br.com.fiap.postech.soat16.fase1.dto.request;
 
 import br.com.fiap.postech.soat16.fase1.model.VehicleType;
 
-public record VehicleRequestDto(
-    Long id,
+public record VehicleDto(
     Long customerId,
     String licensePlate,
     String manufacturer,
@@ -14,7 +13,7 @@ public record VehicleRequestDto(
     VehicleType type
 ) {
 
-    public VehicleRequestDto {
+    public VehicleDto {
         if (licensePlate != null) {
             licensePlate = licensePlate.replace("-", "").toUpperCase();
         }

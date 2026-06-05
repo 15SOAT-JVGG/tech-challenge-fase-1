@@ -1,7 +1,9 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
 import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
@@ -38,14 +40,14 @@ class VehicleServiceTest {
 
     private Vehicle entity;
     private VehicleResponseDto response;
-    private VehicleRequestDto request;
+    private VehicleDto request;
 
     @BeforeEach
     void setUp() {
         service = new VehicleService(vehicleRepository, vehicleMapper);
         entity = new Vehicle(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
         response = new VehicleResponseDto(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO, null);
-        request = new VehicleRequestDto(null, null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+        request = new VehicleDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
     }
 
     @Nested
@@ -53,29 +55,76 @@ class VehicleServiceTest {
     class ListAll {
 
         @Test
-        @DisplayName("should return paginated response")
+        @DisplayName("should return paginated response with correct content")
         void shouldReturnPaginatedResponse() {
-            when(vehicleRepository.findPage(0, 10)).thenReturn(Uni.createFrom().item(List.of(entity)));
-            when(vehicleRepository.count()).thenReturn(Uni.createFrom().item(1L));
+            PageableRequestDto pageable = mock(PageableRequestDto.class);
+            VehicleFilterDto filter = mock(VehicleFilterDto.class);
+            when(pageable.getPage()).thenReturn(0);
+            when(pageable.getSize()).thenReturn(10);
+            when(vehicleRepository.findPageWithFilter(pageable, filter)).thenReturn(Uni.createFrom().item(List.of(entity)));
+            when(vehicleRepository.countWithFilter(filter)).thenReturn(Uni.createFrom().item(1L));
             when(vehicleMapper.toResponse(entity)).thenReturn(response);
 
-            PageableResponseDto<VehicleResponseDto> result = service.listAll(null, 0, 10).await().indefinitely();
+            PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
             assertEquals("ABC1234", result.content().get(0).licensePlate());
+            assertEquals("Toyota", result.content().get(0).manufacturer());
+        }
+
+        @Test
+        @DisplayName("should return correct pagination metadata")
+        void shouldReturnCorrectPaginationMetadata() {
+            PageableRequestDto pageable = mock(PageableRequestDto.class);
+            VehicleFilterDto filter = mock(VehicleFilterDto.class);
+            when(pageable.getPage()).thenReturn(0);
+            when(pageable.getSize()).thenReturn(5);
+            when(vehicleRepository.findPageWithFilter(pageable, filter)).thenReturn(Uni.createFrom().item(List.of(entity)));
+            when(vehicleRepository.countWithFilter(filter)).thenReturn(Uni.createFrom().item(12L));
+            when(vehicleMapper.toResponse(entity)).thenReturn(response);
+
+            PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
+
+            assertEquals(0, result.paginationDto().page());
+            assertEquals(5, result.paginationDto().size());
+            assertEquals(12L, result.paginationDto().totalElements());
+            assertEquals(3, result.paginationDto().totalPages());
+            assertFalse(result.paginationDto().hasPrevious());
+            assertTrue(result.paginationDto().hasNext());
         }
 
         @Test
         @DisplayName("should return empty page when no vehicles exist")
         void shouldReturnEmptyPage() {
-            when(vehicleRepository.findPage(0, 10)).thenReturn(Uni.createFrom().item(List.of()));
-            when(vehicleRepository.count()).thenReturn(Uni.createFrom().item(0L));
+            PageableRequestDto pageable = mock(PageableRequestDto.class);
+            VehicleFilterDto filter = mock(VehicleFilterDto.class);
+            when(pageable.getPage()).thenReturn(0);
+            when(pageable.getSize()).thenReturn(10);
+            when(vehicleRepository.findPageWithFilter(pageable, filter)).thenReturn(Uni.createFrom().item(List.of()));
+            when(vehicleRepository.countWithFilter(filter)).thenReturn(Uni.createFrom().item(0L));
 
-            PageableResponseDto<VehicleResponseDto> result = service.listAll(null, 0, 10).await().indefinitely();
+            PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
 
-            assertNotNull(result);
             assertTrue(result.content().isEmpty());
+            assertEquals(0L, result.paginationDto().totalElements());
+        }
+
+        @Test
+        @DisplayName("last page should not have next")
+        void lastPageShouldNotHaveNext() {
+            PageableRequestDto pageable = mock(PageableRequestDto.class);
+            VehicleFilterDto filter = mock(VehicleFilterDto.class);
+            when(pageable.getPage()).thenReturn(1);
+            when(pageable.getSize()).thenReturn(10);
+            when(vehicleRepository.findPageWithFilter(pageable, filter)).thenReturn(Uni.createFrom().item(List.of(entity)));
+            when(vehicleRepository.countWithFilter(filter)).thenReturn(Uni.createFrom().item(11L));
+            when(vehicleMapper.toResponse(entity)).thenReturn(response);
+
+            PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
+
+            assertTrue(result.paginationDto().hasPrevious());
+            assertFalse(result.paginationDto().hasNext());
         }
     }
 
@@ -92,7 +141,9 @@ class VehicleServiceTest {
             VehicleResponseDto result = service.findById(1L).await().indefinitely();
 
             assertNotNull(result);
+            assertEquals(1L, result.id());
             assertEquals("ABC1234", result.licensePlate());
+            assertEquals("Toyota", result.manufacturer());
             verify(vehicleRepository).findById(1L);
         }
 
@@ -103,6 +154,33 @@ class VehicleServiceTest {
 
             assertThrows(ResourceNotFoundException.class,
                     () -> service.findById(99L).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("findByLicensePlate")
+    class FindByLicensePlate {
+
+        @Test
+        @DisplayName("should return vehicle response when found")
+        void shouldReturnVehicleWhenFound() {
+            when(vehicleRepository.findByLicensePlate("ABC1234")).thenReturn(Uni.createFrom().item(entity));
+            when(vehicleMapper.toResponse(entity)).thenReturn(response);
+
+            VehicleResponseDto result = service.findByLicensePlate("ABC1234").await().indefinitely();
+
+            assertNotNull(result);
+            assertEquals("ABC1234", result.licensePlate());
+            verify(vehicleRepository).findByLicensePlate("ABC1234");
+        }
+
+        @Test
+        @DisplayName("should throw ResourceNotFoundException when license plate not found")
+        void shouldThrowNotFoundWhenMissing() {
+            when(vehicleRepository.findByLicensePlate("XYZ9999")).thenReturn(Uni.createFrom().nullItem());
+
+            assertThrows(ResourceNotFoundException.class,
+                    () -> service.findByLicensePlate("XYZ9999").await().indefinitely());
         }
     }
 
@@ -137,7 +215,7 @@ class VehicleServiceTest {
     class Update {
 
         @Test
-        @DisplayName("should update entity and return response")
+        @DisplayName("should update entity and return response with correct data")
         void shouldUpdateAndReturn() {
             when(vehicleRepository.findById(1L)).thenReturn(Uni.createFrom().item(entity));
             when(vehicleRepository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
@@ -146,7 +224,10 @@ class VehicleServiceTest {
             VehicleResponseDto result = service.update(1L, request).await().indefinitely();
 
             assertNotNull(result);
+            assertEquals(1L, result.id());
+            assertEquals("ABC1234", result.licensePlate());
             verify(vehicleMapper).updateEntity(entity, request);
+            verify(vehicleRepository).persist(entity);
         }
 
         @Test
@@ -156,6 +237,7 @@ class VehicleServiceTest {
 
             assertThrows(ResourceNotFoundException.class,
                     () -> service.update(99L, request).await().indefinitely());
+            verify(vehicleRepository, never()).persist(any(Vehicle.class));
         }
     }
 
@@ -169,6 +251,7 @@ class VehicleServiceTest {
             when(vehicleRepository.deleteById(1L)).thenReturn(Uni.createFrom().item(true));
 
             assertDoesNotThrow(() -> service.delete(1L).await().indefinitely());
+            verify(vehicleRepository).deleteById(1L);
         }
 
         @Test

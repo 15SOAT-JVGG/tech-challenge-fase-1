@@ -1,7 +1,9 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
 import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
@@ -20,31 +22,36 @@ import static java.lang.Boolean.TRUE;
 @AllArgsConstructor
 public class VehicleService {
 
-    public static final String VEICULO = "Veículo";
-
     private VehicleRepository vehicleRepository;
     private VehicleMapper vehicleMapper;
 
     @WithSession
-    public Uni<PageableResponseDto<VehicleResponseDto>> listAll(String q, int page, int size) {
+    public Uni<PageableResponseDto<VehicleResponseDto>> listAll(PageableRequestDto pageable, VehicleFilterDto filter) {
         return Uni.combine().all()
-                .unis(vehicleRepository.findPage(page, size), vehicleRepository.count())
+                .unis(vehicleRepository.findPageWithFilter(pageable, filter), vehicleRepository.countWithFilter(filter))
                 .asTuple().map(tuple -> {
                     var content = tuple.getItem1().stream().map(vehicleMapper::toResponse).toList();
                     var totalElements = tuple.getItem2();
-                    return PageableResponseDto.of(content, page, size, totalElements);
+                    return PageableResponseDto.of(content, pageable.getPage(), pageable.getSize(), totalElements);
                 });
     }
 
     @WithSession
     public Uni<VehicleResponseDto> findById(Long id) {
         return vehicleRepository.findById(id)
-                .onItem().ifNull().failWith(() -> new ResourceNotFoundException(VEICULO, id))
+                .onItem().ifNull().failWith(() -> new ResourceNotFoundException("Vehicle not found"))
+                .map(vehicleMapper::toResponse);
+    }
+
+    @WithSession
+    public Uni<VehicleResponseDto> findByLicensePlate(String licensePlate) {
+        return vehicleRepository.findByLicensePlate(licensePlate)
+                .onItem().ifNull().failWith(() -> new ResourceNotFoundException("Vehicle not found"))
                 .map(vehicleMapper::toResponse);
     }
 
     @WithTransaction
-    public Uni<Void> create(VehicleRequestDto dto) {
+    public Uni<Void> create(VehicleDto dto) {
         return vehicleRepository.existsByLicensePlate(dto.licensePlate())
                 .flatMap(exists -> {
                     if (TRUE.equals(exists)) {
@@ -56,11 +63,11 @@ public class VehicleService {
     }
 
     @WithTransaction
-    public Uni<VehicleResponseDto> update(Long id, VehicleRequestDto request) {
+    public Uni<VehicleResponseDto> update(Long id, VehicleDto request) {
         return vehicleRepository.findById(id)
                 .flatMap(entity -> {
                     if (entity == null) {
-                        throw new ResourceNotFoundException(VEICULO, id);
+                        throw new ResourceNotFoundException("Vehicle not found");
                     }
                     vehicleMapper.updateEntity(entity, request);
                     return vehicleRepository.persist(entity)
@@ -73,7 +80,7 @@ public class VehicleService {
         return vehicleRepository.deleteById(id)
                 .flatMap(deleted -> {
                     if (FALSE.equals(deleted)) {
-                        throw new ResourceNotFoundException(VEICULO, id);
+                        throw new ResourceNotFoundException("Vehicle not found");
                     }
                     return Uni.createFrom().voidItem();
                 });

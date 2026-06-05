@@ -2,7 +2,8 @@ package br.com.fiap.postech.soat16.fase1.controller.docs;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import io.smallrye.mutiny.Uni;
 import jakarta.validation.Valid;
@@ -30,7 +31,9 @@ public interface VehicleControllerDocs {
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = PageableResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid query parameters")
-    Uni<PageableResponseDto<VehicleResponseDto>> listAll(@BeanParam @Valid PageableRequestDto pageable);
+    Uni<PageableResponseDto<VehicleResponseDto>> listAll(
+            @BeanParam @Valid PageableRequestDto pageable,
+            @BeanParam VehicleFilterDto filter);
 
     @GET
     @Path("/{id}")
@@ -43,6 +46,17 @@ public interface VehicleControllerDocs {
             @Parameter(name = "id", description = "Vehicle identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") Long id);
 
+    @GET
+    @Path("/license-plate/{license_plate}")
+    @Operation(summary = "Get vehicle by license plate", description = "Returns a single vehicle by identifier.")
+    @APIResponse(responseCode = "200", description = "Vehicle found",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = VehicleResponseDto.class)))
+    @APIResponse(responseCode = "404", description = "Vehicle not found")
+    Uni<VehicleResponseDto> findByLicensePlate(
+            @Parameter(name = "license_plate", description = "Vehicle license plate", required = true, in = ParameterIn.PATH)
+            @PathParam("license_plate") String licensePlate);
+
     @POST
     @Operation(summary = "Register vehicle", description = "Creates a new vehicle record.")
     @APIResponse(responseCode = "201", description = "Vehicle created successfully",
@@ -52,7 +66,7 @@ public interface VehicleControllerDocs {
     @APIResponse(responseCode = "409", description = "License plate already registered")
     Uni<Response> create(
             @RequestBody(required = true, description = "Vehicle data for registration")
-            @Valid VehicleRequestDto body);
+            @Valid VehicleDto body);
 
     @PUT
     @Path("/{id}")
@@ -65,7 +79,7 @@ public interface VehicleControllerDocs {
             @Parameter(name = "id", description = "Vehicle identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") Long id,
             @RequestBody(required = true, description = "Updated vehicle data")
-            @Valid VehicleRequestDto body);
+            @Valid VehicleDto body);
 
     @DELETE
     @Path("/{id}")

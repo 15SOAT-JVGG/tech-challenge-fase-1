@@ -3,7 +3,8 @@ package br.com.fiap.postech.soat16.fase1.controller;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
 import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
@@ -34,13 +35,13 @@ class VehicleControllerTest {
     private VehicleController controller;
 
     private VehicleResponseDto response;
-    private VehicleRequestDto request;
+    private VehicleDto request;
 
     @BeforeEach
     void setUp() {
         controller = new VehicleController(vehicleService);
         response = new VehicleResponseDto(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO, null);
-        request = new VehicleRequestDto(null, null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+        request = new VehicleDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
     }
 
     @Nested
@@ -51,33 +52,29 @@ class VehicleControllerTest {
         @DisplayName("should return paginated list when vehicles exist")
         void shouldReturnPaginatedListWhenVehiclesExist() {
             PageableRequestDto pageable = mock(PageableRequestDto.class);
-            when(pageable.getQ()).thenReturn(null);
-            when(pageable.getPage()).thenReturn(0);
-            when(pageable.getSize()).thenReturn(10);
+            VehicleFilterDto filter = mock(VehicleFilterDto.class);
 
             PaginationDto paginationDto = new PaginationDto(0, 10, 1L, 1, false, false);
             PageableResponseDto<VehicleResponseDto> page = new PageableResponseDto<>(List.of(response), paginationDto);
-            when(vehicleService.listAll(null, 0, 10)).thenReturn(Uni.createFrom().item(page));
+            when(vehicleService.listAll(pageable, filter)).thenReturn(Uni.createFrom().item(page));
 
-            PageableResponseDto<VehicleResponseDto> result = controller.listAll(pageable).await().indefinitely();
+            PageableResponseDto<VehicleResponseDto> result = controller.listAll(pageable, filter).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
             assertEquals("ABC1234", result.content().get(0).licensePlate());
-            verify(vehicleService).listAll(null, 0, 10);
+            verify(vehicleService).listAll(pageable, filter);
         }
 
         @Test
         @DisplayName("should return empty page when no vehicles exist")
         void shouldReturnEmptyPageWhenNoVehiclesExist() {
             PageableRequestDto pageable = mock(PageableRequestDto.class);
-            when(pageable.getQ()).thenReturn(null);
-            when(pageable.getPage()).thenReturn(0);
-            when(pageable.getSize()).thenReturn(10);
+            VehicleFilterDto filter = mock(VehicleFilterDto.class);
 
-            when(vehicleService.listAll(null, 0, 10)).thenReturn(Uni.createFrom().item(PageableResponseDto.emptyList()));
+            when(vehicleService.listAll(pageable, filter)).thenReturn(Uni.createFrom().item(PageableResponseDto.emptyList()));
 
-            PageableResponseDto<VehicleResponseDto> result = controller.listAll(pageable).await().indefinitely();
+            PageableResponseDto<VehicleResponseDto> result = controller.listAll(pageable, filter).await().indefinitely();
 
             assertTrue(result.content().isEmpty());
         }
@@ -86,14 +83,12 @@ class VehicleControllerTest {
         @DisplayName("should propagate exception from service")
         void shouldPropagateException() {
             PageableRequestDto pageable = mock(PageableRequestDto.class);
-            when(pageable.getQ()).thenReturn(null);
-            when(pageable.getPage()).thenReturn(0);
-            when(pageable.getSize()).thenReturn(10);
+            VehicleFilterDto filter = mock(VehicleFilterDto.class);
 
-            when(vehicleService.listAll(null, 0, 10))
+            when(vehicleService.listAll(pageable, filter))
                     .thenReturn(Uni.createFrom().failure(new RuntimeException("DB error")));
 
-            assertThrows(RuntimeException.class, () -> controller.listAll(pageable).await().indefinitely());
+            assertThrows(RuntimeException.class, () -> controller.listAll(pageable, filter).await().indefinitely());
         }
     }
 
@@ -117,10 +112,38 @@ class VehicleControllerTest {
         @DisplayName("should propagate ResourceNotFoundException")
         void shouldPropagateNotFoundException() {
             when(vehicleService.findById(99L))
-                    .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Veículo", 99L)));
+                    .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Vehicle not found")));
 
             assertThrows(ResourceNotFoundException.class,
                     () -> controller.findById(99L).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /v1/vehicle/license-plate/{license_plate} — findByLicensePlate")
+    class FindByLicensePlate {
+
+        @Test
+        @DisplayName("should return vehicle when license plate is found")
+        void shouldReturnVehicleWhenFound() {
+            when(vehicleService.findByLicensePlate("ABC1234")).thenReturn(Uni.createFrom().item(response));
+
+            VehicleResponseDto result = controller.findByLicensePlate("ABC1234").await().indefinitely();
+
+            assertNotNull(result);
+            assertEquals("ABC1234", result.licensePlate());
+            assertEquals("Toyota", result.manufacturer());
+            verify(vehicleService).findByLicensePlate("ABC1234");
+        }
+
+        @Test
+        @DisplayName("should propagate ResourceNotFoundException when license plate not found")
+        void shouldPropagateNotFoundException() {
+            when(vehicleService.findByLicensePlate("XYZ9999"))
+                    .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Vehicle not found")));
+
+            assertThrows(ResourceNotFoundException.class,
+                    () -> controller.findByLicensePlate("XYZ9999").await().indefinitely());
         }
     }
 
@@ -169,7 +192,7 @@ class VehicleControllerTest {
         @DisplayName("should propagate ResourceNotFoundException")
         void shouldPropagateNotFoundException() {
             when(vehicleService.update(99L, request))
-                    .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Veículo", 99L)));
+                    .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Vehicle not found")));
 
             assertThrows(ResourceNotFoundException.class,
                     () -> controller.update(99L, request).await().indefinitely());
@@ -195,7 +218,7 @@ class VehicleControllerTest {
         @DisplayName("should propagate ResourceNotFoundException")
         void shouldPropagateNotFoundException() {
             when(vehicleService.delete(99L))
-                    .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Veículo", 99L)));
+                    .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Vehicle not found")));
 
             assertThrows(ResourceNotFoundException.class,
                     () -> controller.delete(99L).await().indefinitely());

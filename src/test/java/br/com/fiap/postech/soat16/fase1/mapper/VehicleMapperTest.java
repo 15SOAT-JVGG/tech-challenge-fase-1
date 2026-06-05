@@ -1,6 +1,6 @@
 package br.com.fiap.postech.soat16.fase1.mapper;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.model.VehicleType;
@@ -51,7 +51,7 @@ class VehicleMapperTest {
         @Test
         @DisplayName("should map all fields from dto to entity")
         void shouldMapDtoToEntity() {
-            VehicleRequestDto dto = new VehicleRequestDto(null, null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+            VehicleDto dto = new VehicleDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
 
             Vehicle result = mapper.toEntity(dto, null);
 
@@ -80,7 +80,7 @@ class VehicleMapperTest {
         @DisplayName("should overwrite all fields on existing entity")
         void shouldUpdateAllFields() {
             Vehicle entity = new Vehicle(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
-            VehicleRequestDto dto = new VehicleRequestDto(null, null, "XYZ9876", "Honda", "Civic", "Preto", 2022, 10000L, VehicleType.MOTO);
+            VehicleDto dto = new VehicleDto(null, "XYZ9876", "Honda", "Civic", "Preto", 2022, 10000L, VehicleType.MOTO);
 
             mapper.updateEntity(entity, dto);
 
