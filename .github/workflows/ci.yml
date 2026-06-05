@@ -79,6 +79,7 @@ jobs:
   sonar:
     name: SonarQube Scan
     needs: [sca_dependency_check]
+    if: ${{ inputs.skip_tests != true }}
     uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/quality-sonarqube-scan.yml@main
     with:
       environment_name: homelab
