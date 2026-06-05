@@ -8,9 +8,9 @@ on:
 
   pull_request:
     branches: [main]
-    types: [opened, synchronize, closed]
+    types: [opened, synchronize]
     paths-ignore:
-      - "*.md"
+      - "**/*.md"
 
 permissions:
   actions: read
@@ -52,17 +52,10 @@ jobs:
     needs: [secrets_gitleaks, sast_semgrep]
     uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/build-java-quarkus-jvm.yml@main
     with:
-      environment_name: homelab
       java_version: "21"
-      use_tailscale: true
+      use_tailscale: false
       upload_coverage: true
       maven_goals: "verify"
-    secrets:
-      NEXUS_URL: ${{ secrets.NEXUS_URL }}
-      NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
-      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
-      TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      TS_OAUTH_CLIENT_SECRET: ${{ secrets.TS_OAUTH_CLIENT_SECRET }}
 
   # ── 4. SCA — varredura de dependências com OWASP Dependency-Check ────────────
   sca_dependency_check:
@@ -79,7 +72,7 @@ jobs:
   # ── 5. Qualidade de código — SonarQube (via Tailscale) ───────────────────────
   sonar:
     name: SonarQube Scan
-    needs: [build, secrets_gitleaks, sast_semgrep, sca_dependency_check]
+    needs: [sca_dependency_check]
     uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/quality-sonarqube-scan.yml@main
     with:
       environment_name: homelab
