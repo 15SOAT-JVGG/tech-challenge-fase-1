@@ -85,6 +85,34 @@ Sobe um container PostgreSQL via Testcontainers e executa testes `*IT.java` + `*
 
 ---
 
+## Análise estática
+
+```shell
+./mvnw verify
+```
+
+Executa testes, cobertura JaCoCo e a análise estática local:
+
+- Spotless: imports, espaços finais e newline final
+- Checkstyle: estilo Java, nomenclatura e imports explícitos
+- PMD: regras leves para bugs prováveis e boas práticas de baixo ruído
+- SpotBugs: bytecode analysis em classes de aplicação, com prioridade média ou alta
+- JaCoCo: cobertura mínima de 70%, ignorando entidades, configs e mappers gerados
+
+Para corrigir automaticamente a camada segura de formatação:
+
+```shell
+./mvnw spotless:apply
+```
+
+Para rodar apenas os checks estáticos:
+
+```shell
+./mvnw spotless:check checkstyle:check pmd:check pmd:cpd-check spotbugs:check
+```
+
+---
+
 ## Build
 
 ### JAR
