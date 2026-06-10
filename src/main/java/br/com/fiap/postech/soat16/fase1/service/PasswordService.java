@@ -7,15 +7,16 @@ import io.quarkus.elytron.security.common.BcryptUtil;
 @ApplicationScoped
 public class PasswordService {
 
+    private static final String BCRYPT_PREFIX = "$2";
+
     public String hash(String rawPassword) {
         return BcryptUtil.bcryptHash(rawPassword);
     }
 
     public boolean matches(String rawPassword, String storedHash) {
-        try {
-            return BcryptUtil.matches(rawPassword, storedHash);
-        } catch (RuntimeException e) {
+        if (rawPassword == null || storedHash == null || !storedHash.startsWith(BCRYPT_PREFIX)) {
             return false;
         }
+        return BcryptUtil.matches(rawPassword, storedHash);
     }
 }

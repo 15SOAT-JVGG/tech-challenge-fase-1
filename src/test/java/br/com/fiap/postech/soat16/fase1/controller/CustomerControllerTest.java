@@ -1,5 +1,27 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+import jakarta.ws.rs.core.Response;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequest;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.Pagination;
@@ -9,22 +31,8 @@ import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicatePhoneNumberException;
 import br.com.fiap.postech.soat16.fase1.service.CustomerService;
+
 import io.smallrye.mutiny.Uni;
-import jakarta.ws.rs.core.Response;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CustomerController — Unit Tests")

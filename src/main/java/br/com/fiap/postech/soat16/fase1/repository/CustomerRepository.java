@@ -1,13 +1,15 @@
 package br.com.fiap.postech.soat16.fase1.repository;
 
+import java.util.List;
+import java.util.UUID;
+
+import jakarta.enterprise.context.ApplicationScoped;
+
 import br.com.fiap.postech.soat16.fase1.model.Customer;
+
 import io.quarkus.hibernate.reactive.panache.PanacheRepository;
 import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-
-import java.util.List;
-import java.util.UUID;
 
 @ApplicationScoped
 public class CustomerRepository implements PanacheRepository<Customer> {

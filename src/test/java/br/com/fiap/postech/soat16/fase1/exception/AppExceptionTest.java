@@ -1,11 +1,12 @@
 package br.com.fiap.postech.soat16.fase1.exception;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 @DisplayName("AppException hierarchy — Unit Tests")
 class AppExceptionTest {

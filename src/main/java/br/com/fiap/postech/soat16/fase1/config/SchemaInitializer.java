@@ -1,16 +1,17 @@
 package br.com.fiap.postech.soat16.fase1.config;
 
-import io.quarkus.logging.Log;
-import io.quarkus.runtime.StartupEvent;
-import io.vertx.mutiny.sqlclient.Pool;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
-import lombok.RequiredArgsConstructor;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
+
+import io.quarkus.logging.Log;
+import io.quarkus.runtime.StartupEvent;
+import io.vertx.mutiny.sqlclient.Pool;
+import lombok.RequiredArgsConstructor;
 
 @ApplicationScoped
 @RequiredArgsConstructor
@@ -19,7 +20,8 @@ public class SchemaInitializer {
     private final Pool pool;
 
     void onStart(@Observes StartupEvent event) {
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream("db/init.sql")) {
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        try (InputStream is = classLoader.getResourceAsStream("db/init.sql")) {
             if (is == null) {
                 Log.warn("db/init.sql not found on classpath — skipping schema initialization.");
                 return;
@@ -31,7 +33,7 @@ public class SchemaInitializer {
                     .forEach(stmt -> pool.query(stmt).execute().await().indefinitely());
             Log.info("Schema initialized from db/init.sql");
         } catch (IOException e) {
-            throw new RuntimeException("Failed to read db/init.sql", e);
+            throw new IllegalStateException("Failed to read db/init.sql", e);
         }
     }
 }
