@@ -36,6 +36,9 @@ quarkus:
       sql: false
       format-sql: true
 
+  flyway:
+    migrate-at-start: true
+
   otel:
     sdk:
       disabled: true
