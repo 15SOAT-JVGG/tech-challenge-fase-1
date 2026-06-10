@@ -111,6 +111,17 @@ Para rodar apenas os checks estáticos:
 ./mvnw spotless:check checkstyle:check pmd:check pmd:cpd-check spotbugs:check
 ```
 
+Relatórios gerados em `target`:
+
+- Testes unitários: `target/surefire-reports/`
+- JaCoCo: `target/jacoco-report/index.html`, `target/jacoco-report/jacoco.xml` e `target/jacoco-report/jacoco.csv`
+- Checkstyle: `target/checkstyle-result.xml`
+- PMD: `target/reports/pmd.html` e `target/pmd.xml`
+- CPD: `target/reports/cpd.html` e `target/cpd.xml`
+- SpotBugs: `target/spotbugsXml.xml`
+
+O Spotless não gera relatório separado; o resultado aparece no console durante `spotless:check`.
+
 ---
 
 ## Build
