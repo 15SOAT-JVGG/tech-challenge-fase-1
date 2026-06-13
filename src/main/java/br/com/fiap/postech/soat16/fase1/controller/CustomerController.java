@@ -20,7 +20,7 @@ import java.util.UUID;
 
 @ApplicationScoped
 @RequiredArgsConstructor
-@Path("/v1/customer")
+@Path("/v1/customers")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class CustomerController implements CustomerControllerDocs {
@@ -38,6 +38,13 @@ public class CustomerController implements CustomerControllerDocs {
     @Override
     public Uni<CustomerResponse> findById(@PathParam("id") UUID id) {
         return service.findById(id);
+    }
+
+    @GET
+    @Path("/by-document/{document}")
+    @Override
+    public Uni<CustomerResponse> findByDocument(@PathParam("document") String document) {
+        return service.findByDocument(document);
     }
 
     @POST
