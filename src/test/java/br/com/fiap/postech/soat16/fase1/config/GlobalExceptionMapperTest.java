@@ -2,7 +2,7 @@ package br.com.fiap.postech.soat16.fase1.config;
 
 import br.com.fiap.postech.soat16.fase1.dto.response.ApiErrorResponse;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
-import br.com.fiap.postech.soat16.fase1.exception.DuplicatePhoneNumberException;
+import br.com.fiap.postech.soat16.fase1.exception.DuplicateDocumentException;
 import br.com.fiap.postech.soat16.fase1.exception.ErrorType;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,13 +39,13 @@ class GlobalExceptionMapperTest {
     @Test
     @DisplayName("should map CONFLICT exception to HTTP 409")
     void shouldMap409ForConflictException() {
-        DuplicatePhoneNumberException ex = new DuplicatePhoneNumberException();
+        DuplicateDocumentException ex = new DuplicateDocumentException();
 
         Response response = mapper.toResponse(ex);
 
         assertEquals(409, response.getStatus());
         ApiErrorResponse body = (ApiErrorResponse) response.getEntity();
         assertEquals(ErrorType.CONFLICT, body.type());
-        assertEquals("PHONE_ALREADY_EXISTS", body.code());
+        assertEquals("DOCUMENT_ALREADY_EXISTS", body.code());
     }
 }
