@@ -5,8 +5,9 @@ import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
-import br.com.fiap.postech.soat16.fase1.exception.DuplicatePhoneNumberException;
+import br.com.fiap.postech.soat16.fase1.exception.DuplicateDocumentException;
 import br.com.fiap.postech.soat16.fase1.mapper.CustomerMapper;
+import br.com.fiap.postech.soat16.fase1.model.Document;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
@@ -45,18 +46,28 @@ public class CustomerService {
 
     @WithTransaction
     public Uni<Void> create(CustomerCreateRequest request) {
-        return repository.existsByPhoneNumber(request.getPhoneNumber())
-                .flatMap(exists -> {
-                    if (TRUE.equals(exists)) throw new DuplicatePhoneNumberException();
-                    return repository.persist(mapper.toEntity(request)).replaceWithVoid();
+        Document document = Document.of(request.getDocument());
+
+        return repository.existsByDocument(document.getValue())
+                .flatMap(docExists -> {
+                    if (TRUE.equals(docExists)) throw new DuplicateDocumentException();
+                    return repository.persist(mapper.toEntity(request, document)).replaceWithVoid();
                 });
+    }
+
+    @WithSession
+    public Uni<CustomerResponse> findByDocument(String rawDocument) {
+        Document document = Document.of(rawDocument);
+        return repository.findByDocument(document.getValue())
+                .onItem().ifNull().failWith(() -> new CustomerNotFoundException(rawDocument))
+                .map(mapper::toResponse);
     }
 
     @WithTransaction
     public Uni<CustomerResponse> update(UUID id, CustomerUpdateRequest request) {
         return repository.findByCustomerId(id)
+                .onItem().ifNull().failWith(() -> new CustomerNotFoundException(id))
                 .flatMap(entity -> {
-                    if (entity == null) throw new CustomerNotFoundException(id);
                     mapper.updateEntity(entity, request);
                     return repository.persist(entity).map(mapper::toResponse);
                 });

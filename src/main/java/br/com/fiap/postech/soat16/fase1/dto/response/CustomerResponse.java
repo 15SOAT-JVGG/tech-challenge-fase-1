@@ -24,6 +24,8 @@ public class CustomerResponse {
     private String lastName;
     private String email;
     private String phoneNumber;
+    private String document;
+    private String documentType;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

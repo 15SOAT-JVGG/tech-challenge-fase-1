@@ -26,8 +26,12 @@ public class CustomerRepository implements PanacheRepository<Customer> {
                 .invoke(deleted -> Log.infof("Customer deleted: id=%s deleted=%d", id, deleted));
     }
 
-    public Uni<Boolean> existsByPhoneNumber(String phoneNumber) {
-        return count("phoneNumber = ?1", phoneNumber)
+    public Uni<Customer> findByDocument(String document) {
+        return find("document = ?1", document).firstResult();
+    }
+
+    public Uni<Boolean> existsByDocument(String document) {
+        return count("document = ?1", document)
                 .map(total -> total > 0);
     }
 }
