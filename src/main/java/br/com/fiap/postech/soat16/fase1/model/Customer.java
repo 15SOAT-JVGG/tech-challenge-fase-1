@@ -1,14 +1,15 @@
 package br.com.fiap.postech.soat16.fase1.model;
 
-import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+import java.util.UUID;
+
 import jakarta.persistence.*;
+
+import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.util.UUID;
 
 @Getter
 @Setter

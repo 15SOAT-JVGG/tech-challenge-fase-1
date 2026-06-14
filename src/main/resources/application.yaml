@@ -21,6 +21,8 @@ quarkus:
   datasource:
     username: ${POSTGRES_USERNAME:admin}
     password: ${POSTGRES_PASSWORD:changeme}
+    jdbc:
+      url: jdbc:postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?currentSchema=oficina-mecanica
     reactive:
       url: postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?search_path=oficina_mecanica
 
@@ -33,6 +35,9 @@ quarkus:
     log:
       sql: false
       format-sql: true
+
+  flyway:
+    migrate-at-start: true
 
   otel:
     sdk:

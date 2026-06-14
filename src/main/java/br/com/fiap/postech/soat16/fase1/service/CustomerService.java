@@ -1,5 +1,11 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
+import static java.lang.Boolean.TRUE;
+
+import java.util.UUID;
+
+import jakarta.enterprise.context.ApplicationScoped;
+
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
@@ -8,15 +14,11 @@ import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicatePhoneNumberException;
 import br.com.fiap.postech.soat16.fase1.mapper.CustomerMapper;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
+
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
 import lombok.RequiredArgsConstructor;
-
-import java.util.UUID;
-
-import static java.lang.Boolean.TRUE;
 
 @ApplicationScoped
 @RequiredArgsConstructor
@@ -47,7 +49,9 @@ public class CustomerService {
     public Uni<Void> create(CustomerCreateRequest request) {
         return repository.existsByPhoneNumber(request.getPhoneNumber())
                 .flatMap(exists -> {
-                    if (TRUE.equals(exists)) throw new DuplicatePhoneNumberException();
+                    if (TRUE.equals(exists)) {
+                        throw new DuplicatePhoneNumberException();
+                    }
                     return repository.persist(mapper.toEntity(request)).replaceWithVoid();
                 });
     }
@@ -56,7 +60,9 @@ public class CustomerService {
     public Uni<CustomerResponse> update(UUID id, CustomerUpdateRequest request) {
         return repository.findByCustomerId(id)
                 .flatMap(entity -> {
-                    if (entity == null) throw new CustomerNotFoundException(id);
+                    if (entity == null) {
+                        throw new CustomerNotFoundException(id);
+                    }
                     mapper.updateEntity(entity, request);
                     return repository.persist(entity).map(mapper::toResponse);
                 });
@@ -66,7 +72,9 @@ public class CustomerService {
     public Uni<Void> delete(UUID id) {
         return repository.deleteByCustomerId(id)
                 .flatMap(deleted -> {
-                    if (deleted == 0) throw new CustomerNotFoundException(id);
+                    if (deleted == 0) {
+                        throw new CustomerNotFoundException(id);
+                    }
                     return Uni.createFrom().voidItem();
                 });
     }

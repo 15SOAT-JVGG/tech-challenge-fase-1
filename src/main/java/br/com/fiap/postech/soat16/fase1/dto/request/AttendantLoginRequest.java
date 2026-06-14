@@ -14,18 +14,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class CustomerCreateRequest {
-
-    @NotBlank(message = "first_name cannot be blank")
-    private String firstName;
-
-    @NotBlank(message = "last_name cannot be blank")
-    private String lastName;
+public class AttendantLoginRequest {
 
     @NotBlank(message = "email cannot be blank")
     @Email(message = "email must be a valid email address")
     private String email;
 
-    @NotBlank(message = "phone_number cannot be blank")
-    private String phoneNumber;
+    @NotBlank(message = "password cannot be blank")
+    private String password;
 }

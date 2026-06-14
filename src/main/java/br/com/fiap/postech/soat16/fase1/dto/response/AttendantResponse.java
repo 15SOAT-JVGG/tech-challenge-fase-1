@@ -18,13 +18,14 @@ import lombok.NoArgsConstructor;
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class CustomerResponse {
+public class AttendantResponse {
 
-    private UUID customerId;
+    private UUID attendantId;
     private String firstName;
     private String lastName;
     private String email;
     private String phoneNumber;
+    private Boolean active;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

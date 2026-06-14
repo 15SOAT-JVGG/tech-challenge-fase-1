@@ -2,6 +2,7 @@ package br.com.fiap.postech.soat16.fase1.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
@@ -14,7 +15,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class CustomerCreateRequest {
+public class AttendantUpdateRequest {
 
     @NotBlank(message = "first_name cannot be blank")
     private String firstName;
@@ -26,6 +27,8 @@ public class CustomerCreateRequest {
     @Email(message = "email must be a valid email address")
     private String email;
 
-    @NotBlank(message = "phone_number cannot be blank")
     private String phoneNumber;
+
+    @NotNull(message = "active cannot be null")
+    private Boolean active;
 }
