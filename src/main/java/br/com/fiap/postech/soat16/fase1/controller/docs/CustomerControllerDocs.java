@@ -1,20 +1,15 @@
 package br.com.fiap.postech.soat16.fase1.controller.docs;
 
-import java.util.UUID;
-
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
+import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
+import io.smallrye.mutiny.Uni;
 import jakarta.validation.Valid;
-import jakarta.ws.rs.BeanParam;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.PUT;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.ParameterIn;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
@@ -24,13 +19,7 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequest;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
-
-import io.smallrye.mutiny.Uni;
+import java.util.UUID;
 
 @Path("/v1/customer")
 @Produces(MediaType.APPLICATION_JSON)
@@ -42,9 +31,9 @@ public interface CustomerControllerDocs {
     @Operation(summary = "List customers", description = "Returns a paginated list of customers.")
     @APIResponse(responseCode = "200", description = "Customers retrieved successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
-                    schema = @Schema(implementation = PageableResponse.class)))
+                    schema = @Schema(implementation = PageableResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid query parameters")
-    Uni<PageableResponse<CustomerResponse>> findAll(@BeanParam @Valid PageableRequest pageable);
+    Uni<PageableResponseDto<CustomerResponse>> findAll(@BeanParam @Valid PageableRequestDto pageable);
 
     @GET
     @Path("/{id}")

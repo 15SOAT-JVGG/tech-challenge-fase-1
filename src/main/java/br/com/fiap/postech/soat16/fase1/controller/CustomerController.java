@@ -19,8 +19,8 @@ import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 
 import br.com.fiap.postech.soat16.fase1.controller.docs.CustomerControllerDocs;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequest;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
@@ -40,7 +40,7 @@ public class CustomerController implements CustomerControllerDocs {
 
     @GET
     @Override
-    public Uni<PageableResponse<CustomerResponse>> findAll(@BeanParam @Valid PageableRequest pageable) {
+    public Uni<PageableResponseDto<CustomerResponse>> findAll(@BeanParam @Valid PageableRequestDto pageable) {
         return service.findAll(pageable.getQ(), pageable.getPage(), pageable.getSize());
     }
 

@@ -24,14 +24,14 @@ quarkus:
     jdbc:
       url: jdbc:postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?currentSchema=oficina-mecanica
     reactive:
-      url: postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?search_path=oficina-mecanica
+      url: postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?search_path=oficina_mecanica
 
   hibernate-orm:
     physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
     schema-management:
       strategy: update
     database:
-      default-schema: oficina-mecanica
+      default-schema: oficina_mecanica
     log:
       sql: false
       format-sql: true
@@ -65,6 +65,56 @@ quarkus:
     console:
       format: "%d{yyyy-MM-dd HH:mm:ss} %-5p [%c{2.}] req=%X{requestId} trace=%X{traceId} span=%X{spanId} %s%e%n"
 
+  # ── OpenAPI / Swagger UI ──────────────────────────────────────────────────--
+  smallrye-openapi:
+    path: /q/openapi                 # spec em /q/openapi (JSON) e /q/openapi?format=yaml
+    info-title: API Oficina Mecânica
+    info-version: ${project.version}
+    info-description: API de gestão da oficina mecânica (15SOAT - Tech Challenge Fase 1)
+    info-license-name: Apache 2.0
+    info-license-url: https://www.apache.org/licenses/LICENSE-2.0.html
+    # Esquema Bearer JWT — habilita o botão "Authorize" no Swagger UI e adiciona
+    # o requirement de segurança às operações automaticamente (auto-add-security).
+    security-scheme: jwt
+    security-scheme-name: bearerAuth
+    security-scheme-description: Informe o token JWT obtido no endpoint de login.
+
+  swagger-ui:
+    path: /q/swagger-ui
+    title: API Oficina Mecânica
+    # Por padrão o Swagger UI só é servido em dev/test. Mantido acessível também no
+    # artefato empacotado durante a fase de desenvolvimento; em produção definir
+    # SWAGGER_UI_ENABLED=false para não expor a superfície da API (OWASP).
+    always-include: ${SWAGGER_UI_ENABLED:true}
+
+
+# ── JWT ─────────────────────────────────────────────────────────────────────--
+# Chaves externalizadas via env. Os defaults apontam para um par RSA SOMENTE de
+# desenvolvimento (src/main/resources/jwt). Em produção, sobrescrever
+# JWT_PRIVATE_KEY_LOCATION / JWT_PUBLIC_KEY_LOCATION para secrets montados
+# (ex.: file:/etc/jwt/privateKey.pem) e NUNCA usar as chaves versionadas.
+smallrye:
+  jwt:
+    sign:
+      key:
+        location: ${JWT_PRIVATE_KEY_LOCATION:jwt/privateKey.pem}
+
+mp:
+  jwt:
+    verify:
+      issuer: ${JWT_ISSUER:oficina-api}
+      publickey:
+        location: ${JWT_PUBLIC_KEY_LOCATION:jwt/publicKey.pem}
+
+app:
+  seed:
+    admin-username: ${APP_SEED_ADMIN_USERNAME:admin}
+    admin-password: ${APP_SEED_ADMIN_PASSWORD:}
+    mechanic-username: ${APP_SEED_MECHANIC_USERNAME:mecanico}
+    mechanic-password: ${APP_SEED_MECHANIC_PASSWORD:}
+  jwt:
+    expiration-hours: ${JWT_EXPIRATION_HOURS:8}
+
 # ── Test profile ──────────────────────────────────────────────────────────────
 # Applied automatically by @QuarkusTest (profile = "test").
 # Quarkus DevServices spins up a real PostgreSQL container via Testcontainers.
@@ -85,7 +135,7 @@ quarkus:
       schema-management:
         strategy: drop-and-create        # Hibernate drops/creates tables on every test run
       database:
-        default-schema: oficina-mecanica
+        default-schema: oficina_mecanica
       log:
         sql: true
 
