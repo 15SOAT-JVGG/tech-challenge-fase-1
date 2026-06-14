@@ -21,7 +21,14 @@ services:
       - oficina_mecanica_net
 
   srv-oficina-mecanica:
-    image: ghcr.io/airtonlima/fiap-srv-oficina-mecanica:${CUSTOMER_VERSION:-latest}
+    # Para uso local: rode ./mvnw package -DskipTests antes de subir o Compose.
+    # O Dockerfile multistage (infra/docker/Dockerfile) é usado pelo CI, que tem
+    # acesso ao Nexus interno. Aqui usamos o Dockerfile simples que copia os
+    # artefatos já compilados.
+    build:
+      context: ../../../..
+      dockerfile: src/main/docker/Dockerfile
+    image: ghcr.io/15soat-jvgg/fiap-srv-oficina-mecanica:${CUSTOMER_VERSION:-local}
     container_name: srv-oficina-mecanica
     restart: unless-stopped
     depends_on:
@@ -43,7 +50,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 40s
+      start_period: 60s
 
     networks:
       - oficina_mecanica_net

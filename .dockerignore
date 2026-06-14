@@ -1,4 +1,13 @@
+# ── Exclui tudo por padrão ────────────────────────────────────────────────────
 *
+
+# ── Fontes necessários para o build multistage ────────────────────────────────
+!src/
+!pom.xml
+!mvnw
+!.mvn/
+
+# ── Artefatos gerados (para Dockerfiles sem build stage) ──────────────────────
 !target/*-runner
 !target/*-runner.jar
 !target/lib/*
