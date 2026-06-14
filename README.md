@@ -27,7 +27,7 @@ model/             → Entidade JPA (Customer) e auditoria
 dto/
   request/         → CustomerCreateRequest, CustomerUpdateRequest
   response/        → CustomerResponse, ApiErrorResponse
-  pagination/      → PageableRequest, PageableResponse, Pagination
+  paginationDto/      → PageableRequest, PageableResponse, Pagination
 mapper/            → CustomerMapper (MapStruct)
 exception/         → AppException (base), exceções específicas, ErrorType/Code
 config/            → GlobalExceptionMapper, OpenApiConfig, SchemaInitializer

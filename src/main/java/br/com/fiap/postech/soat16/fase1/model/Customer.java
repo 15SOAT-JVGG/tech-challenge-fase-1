@@ -1,10 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.model;
 
 import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -22,10 +19,10 @@ import java.util.UUID;
 @NoArgsConstructor
 public class Customer extends AuditableEntity {
 
-    @EqualsAndHashCode.Include
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "customer_id", nullable = false)
-    private UUID customerId;
+    private Long customerId;
 
     @Column(name = "first_name", nullable = false)
     private String firstName;
