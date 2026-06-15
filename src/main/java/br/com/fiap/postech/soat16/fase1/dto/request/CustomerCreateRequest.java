@@ -28,4 +28,7 @@ public class CustomerCreateRequest {
 
     @NotBlank(message = "phone_number cannot be blank")
     private String phoneNumber;
+
+    @NotBlank(message = "document cannot be blank")
+    private String document;
 }

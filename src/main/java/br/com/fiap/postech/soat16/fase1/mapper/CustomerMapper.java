@@ -8,6 +8,9 @@ import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
+import org.mapstruct.Mapper;
+
+import java.util.UUID;
 
 @Mapper(componentModel = "cdi")
 public interface CustomerMapper {
@@ -22,12 +25,14 @@ public interface CustomerMapper {
                 entity.getLastName(),
                 entity.getEmail(),
                 entity.getPhoneNumber(),
+                entity.getDocument(),
+                entity.getDocumentType() != null ? entity.getDocumentType().name() : null,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
     }
 
-    default Customer toEntity(CustomerCreateRequest request) {
+    default Customer toEntity(CustomerCreateRequest request, Document document) {
         if (request == null) {
             return null;
         }
@@ -37,6 +42,8 @@ public interface CustomerMapper {
         entity.setLastName(request.getLastName());
         entity.setEmail(request.getEmail());
         entity.setPhoneNumber(request.getPhoneNumber());
+        entity.setDocument(document.getValue());
+        entity.setDocumentType(document.getType());
         return entity;
     }
 

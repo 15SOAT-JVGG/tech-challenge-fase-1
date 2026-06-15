@@ -3,6 +3,8 @@ package br.com.fiap.postech.soat16.fase1.model;
 import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.*;
@@ -35,6 +37,13 @@ public class Customer extends AuditableEntity {
 
     @Column(name = "phone_number", nullable = false)
     private String phoneNumber;
+
+    @Column(name = "document", nullable = false, unique = true)
+    private String document;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_type", nullable = false)
+    private DocumentType documentType;
 
     @Override
     public final boolean equals(Object o) {

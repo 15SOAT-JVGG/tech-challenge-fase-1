@@ -1,17 +1,15 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.UUID;
-
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequest;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.Pagination;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
+import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
+import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
+import br.com.fiap.postech.soat16.fase1.exception.DuplicatePhoneNumberException;
+import br.com.fiap.postech.soat16.fase1.service.CustomerService;
+import io.smallrye.mutiny.Uni;
 import jakarta.ws.rs.core.Response;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -50,11 +48,11 @@ class CustomerControllerTest {
     @BeforeEach
     void setUp() {
         controller = new CustomerController(service);
-        response = new CustomerResponse(FIXED_UUID, "John", "Doe", "john.doe@example.com", "5511987654321", null, null);
+        response = new CustomerResponse(FIXED_UUID, "John", "Doe", "john.doe@example.com", "5511987654321", "52998224725", "CPF", null, null);
     }
 
     @Nested
-    @DisplayName("GET /v1/customer — findAll")
+    @DisplayName("GET /v1/customers — findAll")
     class FindAll {
 
         @Test
@@ -109,7 +107,7 @@ class CustomerControllerTest {
     }
 
     @Nested
-    @DisplayName("GET /v1/customer/{id} — findById")
+    @DisplayName("GET /v1/customers/{id} — findById")
     class FindById {
 
         @Test
@@ -136,13 +134,13 @@ class CustomerControllerTest {
     }
 
     @Nested
-    @DisplayName("POST /v1/customer — create")
+    @DisplayName("POST /v1/customers — create")
     class Create {
 
         @Test
         @DisplayName("should return HTTP 201 when create succeeds")
         void shouldReturn201WhenCreateSucceeds() {
-            CustomerCreateRequest dto = new CustomerCreateRequest("John", "Doe", "john.doe@example.com", "5511987654321");
+            CustomerCreateRequest dto = new CustomerCreateRequest("John", "Doe", "john.doe@example.com", "5511987654321", "529.982.247-25");
 
             when(service.create(dto)).thenReturn(Uni.createFrom().voidItem());
 
@@ -153,20 +151,20 @@ class CustomerControllerTest {
         }
 
         @Test
-        @DisplayName("should propagate DuplicatePhoneNumberException")
-        void shouldPropagateDuplicatePhoneException() {
-            CustomerCreateRequest dto = new CustomerCreateRequest("John", "Doe", "john.doe@example.com", "5511987654321");
+        @DisplayName("should propagate DuplicateDocumentException")
+        void shouldPropagateDuplicateDocumentException() {
+            CustomerCreateRequest dto = new CustomerCreateRequest("John", "Doe", "john.doe@example.com", "5511987654321", "529.982.247-25");
 
             when(service.create(dto))
-                    .thenReturn(Uni.createFrom().failure(new DuplicatePhoneNumberException()));
+                    .thenReturn(Uni.createFrom().failure(new DuplicateDocumentException()));
 
-            assertThrows(DuplicatePhoneNumberException.class,
+            assertThrows(DuplicateDocumentException.class,
                     () -> controller.create(dto).await().indefinitely());
         }
     }
 
     @Nested
-    @DisplayName("PUT /v1/customer/{id} — update")
+    @DisplayName("PUT /v1/customers/{id} — update")
     class Update {
 
         @Test
@@ -174,7 +172,7 @@ class CustomerControllerTest {
         void shouldReturn200WithUpdatedBody() {
             CustomerUpdateRequest dto = new CustomerUpdateRequest("Jane", "Doe", "jane.doe@example.com", "5511987654321");
             CustomerResponse updated = new CustomerResponse(FIXED_UUID, "Jane", "Doe", "jane.doe@example.com", "5511987654321",
-                    OffsetDateTime.now(), OffsetDateTime.now());
+                    "52998224725", "CPF", OffsetDateTime.now(), OffsetDateTime.now());
 
             when(service.update(FIXED_UUID, dto)).thenReturn(Uni.createFrom().item(updated));
 
@@ -198,7 +196,7 @@ class CustomerControllerTest {
     }
 
     @Nested
-    @DisplayName("DELETE /v1/customer/{id} — delete")
+    @DisplayName("DELETE /v1/customers/{id} — delete")
     class Delete {
 
         @Test
