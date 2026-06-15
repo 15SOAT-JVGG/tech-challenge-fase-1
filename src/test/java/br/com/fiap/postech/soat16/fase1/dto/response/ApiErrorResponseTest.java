@@ -1,12 +1,16 @@
 package br.com.fiap.postech.soat16.fase1.dto.response;
 
-import br.com.fiap.postech.soat16.fase1.exception.ErrorType;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.time.Instant;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import br.com.fiap.postech.soat16.fase1.exception.ErrorType;
 
 @DisplayName("ApiErrorResponse — Unit Tests")
 class ApiErrorResponseTest {
@@ -16,7 +20,13 @@ class ApiErrorResponseTest {
     void ofCreatesWithTimestamp() {
         Instant before = Instant.now();
 
-        ApiErrorResponse response = ApiErrorResponse.of(404, ErrorType.NOT_FOUND, "CUSTOMER_NOT_FOUND", "not found", "/v1/customer/123", null);
+        ApiErrorResponse response = ApiErrorResponse.of(
+                404,
+                ErrorType.NOT_FOUND,
+                "CUSTOMER_NOT_FOUND",
+                "not found",
+                "/v1/customer/123",
+                null);
 
         assertNotNull(response);
         assertEquals(404, response.status());

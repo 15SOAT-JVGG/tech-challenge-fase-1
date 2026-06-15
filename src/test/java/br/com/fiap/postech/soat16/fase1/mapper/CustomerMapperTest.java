@@ -1,26 +1,34 @@
 package br.com.fiap.postech.soat16.fase1.mapper;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
-import br.com.fiap.postech.soat16.fase1.model.Customer;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
+import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
+import br.com.fiap.postech.soat16.fase1.model.Customer;
+import br.com.fiap.postech.soat16.fase1.model.Document;
+import br.com.fiap.postech.soat16.fase1.model.DocumentType;
 
 @DisplayName("CustomerMapper — Unit Tests")
 class CustomerMapperTest {
 
     private CustomerMapper mapper;
 
+    private static final Document VALID_CPF = Document.of("529.982.247-25");
+
     @BeforeEach
     void setUp() {
-        mapper = new CustomerMapper() {};
+        mapper = new CustomerMapper() {
+        };
     }
 
     @Test
@@ -34,7 +42,15 @@ class CustomerMapperTest {
     void toResponseMapsAllFields() {
         UUID id = UUID.randomUUID();
         OffsetDateTime now = OffsetDateTime.now();
-        Customer entity = new Customer(id, "John", "Doe", "john@example.com", "5511987654321");
+
+        Customer entity = new Customer();
+        entity.setCustomerId(id);
+        entity.setFirstName("John");
+        entity.setLastName("Doe");
+        entity.setEmail("john@example.com");
+        entity.setPhoneNumber("5511987654321");
+        entity.setDocument(VALID_CPF.getValue());
+        entity.setDocumentType(DocumentType.CPF);
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
 
@@ -46,21 +62,23 @@ class CustomerMapperTest {
         assertEquals("Doe", result.getLastName());
         assertEquals("john@example.com", result.getEmail());
         assertEquals("5511987654321", result.getPhoneNumber());
+        assertEquals(VALID_CPF.getValue(), result.getDocument());
+        assertEquals("CPF", result.getDocumentType());
         assertEquals(now, result.getCreatedAt());
     }
 
     @Test
     @DisplayName("toEntity returns null when request is null")
     void toEntityNullWhenRequestNull() {
-        assertNull(mapper.toEntity(null));
+        assertNull(mapper.toEntity(null, VALID_CPF));
     }
 
     @Test
     @DisplayName("toEntity maps create request correctly and generates UUID")
     void toEntityMapsCreateRequest() {
-        CustomerCreateRequest request = new CustomerCreateRequest("John", "Doe", "john@example.com", "5511987654321");
+        CustomerCreateRequest request = new CustomerCreateRequest("John", "Doe", "john@example.com", "5511987654321", "529.982.247-25");
 
-        Customer result = mapper.toEntity(request);
+        Customer result = mapper.toEntity(request, VALID_CPF);
 
         assertNotNull(result);
         assertNotNull(result.getCustomerId());
@@ -68,12 +86,22 @@ class CustomerMapperTest {
         assertEquals("Doe", result.getLastName());
         assertEquals("john@example.com", result.getEmail());
         assertEquals("5511987654321", result.getPhoneNumber());
+        assertEquals(VALID_CPF.getValue(), result.getDocument());
+        assertEquals(DocumentType.CPF, result.getDocumentType());
     }
 
     @Test
     @DisplayName("updateEntity applies changes from update request")
     void updateEntityAppliesChanges() {
-        Customer entity = new Customer(UUID.randomUUID(), "John", "Doe", "john@example.com", "5511987654321");
+        Customer entity = new Customer();
+        entity.setCustomerId(UUID.randomUUID());
+        entity.setFirstName("John");
+        entity.setLastName("Doe");
+        entity.setEmail("john@example.com");
+        entity.setPhoneNumber("5511987654321");
+        entity.setDocument(VALID_CPF.getValue());
+        entity.setDocumentType(DocumentType.CPF);
+
         CustomerUpdateRequest request = new CustomerUpdateRequest("Jane", "Smith", "jane@example.com", "5511111111111");
 
         mapper.updateEntity(entity, request);
@@ -82,5 +110,6 @@ class CustomerMapperTest {
         assertEquals("Smith", entity.getLastName());
         assertEquals("jane@example.com", entity.getEmail());
         assertEquals("5511111111111", entity.getPhoneNumber());
+        assertEquals(VALID_CPF.getValue(), entity.getDocument());
     }
 }

@@ -1,11 +1,12 @@
 package br.com.fiap.postech.soat16.fase1.dto.response;
 
-import br.com.fiap.postech.soat16.fase1.exception.ErrorType;
+import java.time.Instant;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-import java.time.Instant;
+import br.com.fiap.postech.soat16.fase1.exception.ErrorType;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 @JsonInclude(JsonInclude.Include.NON_NULL)

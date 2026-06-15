@@ -1,23 +1,25 @@
 package br.com.fiap.postech.soat16.fase1.model;
 
-import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+import java.util.Objects;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
-import java.util.UUID;
+import org.hibernate.proxy.HibernateProxy;
+
+import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+
+import lombok.*;
 
 @Getter
 @Setter
 @Entity
-@Table(name = "customer", schema = "oficina-mecanica")
-@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+@Table(name = "customer", schema = "oficina_mecanica")
 @AllArgsConstructor
 @NoArgsConstructor
 public class Customer extends AuditableEntity {
@@ -38,4 +40,27 @@ public class Customer extends AuditableEntity {
 
     @Column(name = "phone_number", nullable = false)
     private String phoneNumber;
+
+    @Column(name = "document", nullable = false, unique = true)
+    private String document;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_type", nullable = false)
+    private DocumentType documentType;
+
+    @Override
+    public final boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null) return false;
+        Class<?> oEffectiveClass = o instanceof HibernateProxy ? ((HibernateProxy) o).getHibernateLazyInitializer().getPersistentClass() : o.getClass();
+        Class<?> thisEffectiveClass = this instanceof HibernateProxy ? ((HibernateProxy) this).getHibernateLazyInitializer().getPersistentClass() : this.getClass();
+        if (thisEffectiveClass != oEffectiveClass) return false;
+        Customer customer = (Customer) o;
+        return getCustomerId() != null && Objects.equals(getCustomerId(), customer.getCustomerId());
+    }
+
+    @Override
+    public final int hashCode() {
+        return this instanceof HibernateProxy ? ((HibernateProxy) this).getHibernateLazyInitializer().getPersistentClass().hashCode() : getClass().hashCode();
+    }
 }

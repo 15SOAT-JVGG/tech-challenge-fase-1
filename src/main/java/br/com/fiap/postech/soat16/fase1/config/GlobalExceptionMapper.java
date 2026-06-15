@@ -1,13 +1,14 @@
 package br.com.fiap.postech.soat16.fase1.config;
 
-import br.com.fiap.postech.soat16.fase1.dto.response.ApiErrorResponse;
-import br.com.fiap.postech.soat16.fase1.exception.AppException;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
+
+import br.com.fiap.postech.soat16.fase1.dto.response.ApiErrorResponse;
+import br.com.fiap.postech.soat16.fase1.exception.AppException;
 
 @Provider
 public class GlobalExceptionMapper implements ExceptionMapper<AppException> {
@@ -20,6 +21,7 @@ public class GlobalExceptionMapper implements ExceptionMapper<AppException> {
 
         int status = switch (ex.getType()) {
             case VALIDATION -> 400;
+            case UNAUTHORIZED -> 401;
             case NOT_FOUND -> 404;
             case CONFLICT -> 409;
             case BUSINESS -> 422;

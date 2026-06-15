@@ -1,13 +1,15 @@
 package br.com.fiap.postech.soat16.fase1.repository;
 
+import java.util.List;
+import java.util.UUID;
+
+import jakarta.enterprise.context.ApplicationScoped;
+
 import br.com.fiap.postech.soat16.fase1.model.Customer;
+
 import io.quarkus.hibernate.reactive.panache.PanacheRepository;
 import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-
-import java.util.List;
-import java.util.UUID;
 
 @ApplicationScoped
 public class CustomerRepository implements PanacheRepository<Customer> {
@@ -26,8 +28,12 @@ public class CustomerRepository implements PanacheRepository<Customer> {
                 .invoke(deleted -> Log.infof("Customer deleted: id=%s deleted=%d", id, deleted));
     }
 
-    public Uni<Boolean> existsByPhoneNumber(String phoneNumber) {
-        return count("phoneNumber = ?1", phoneNumber)
+    public Uni<Customer> findByDocument(String document) {
+        return find("document = ?1", document).firstResult();
+    }
+
+    public Uni<Boolean> existsByDocument(String document) {
+        return count("document = ?1", document)
                 .map(total -> total > 0);
     }
 }
