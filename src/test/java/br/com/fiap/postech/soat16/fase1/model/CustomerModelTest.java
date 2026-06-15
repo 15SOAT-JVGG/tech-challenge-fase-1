@@ -29,9 +29,10 @@ class CustomerModelTest {
     @Test
     @DisplayName("equality is based on customerId")
     void equalityBasedOnId() {
-        Customer c1 = new Customer(null, "John", "Doe", "a@a.com", "111");
-        Customer c2 = new Customer(null, "Jane", "Smith", "b@b.com", "222");
-        Customer c3 = new Customer(null, "John", "Doe", "a@a.com", "111");
+        UUID id = UUID.randomUUID();
+        Customer c1 = new Customer(id, "John", "Doe", "a@a.com", "111");
+        Customer c2 = new Customer(id, "Jane", "Smith", "b@b.com", "222");
+        Customer c3 = new Customer(UUID.randomUUID(), "John", "Doe", "a@a.com", "111");
 
         assertEquals(c1, c2);
         assertNotEquals(c1, c3);

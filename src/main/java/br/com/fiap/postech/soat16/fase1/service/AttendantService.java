@@ -2,10 +2,10 @@ package br.com.fiap.postech.soat16.fase1.service;
 
 import java.util.UUID;
 
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;
@@ -28,9 +28,9 @@ public class AttendantService {
     private final AttendantMapper mapper;
     private final PasswordService passwordService;
 
-    public PageableResponse<AttendantResponse> findAll(String q, int page, int size) {
+    public PageableResponseDto<AttendantResponse> findAll(String q, int page, int size) {
         var data = repository.findPage(page, size).stream().map(mapper::toResponse).toList();
-        return PageableResponse.of(data, page, size, repository.count());
+        return PageableResponseDto.of(data, page, size, repository.count());
     }
 
     public AttendantResponse findById(UUID id) {

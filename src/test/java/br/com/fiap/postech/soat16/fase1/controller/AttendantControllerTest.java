@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.UUID;
 
+import br.com.fiap.postech.soat16.fase1.dto.pagination.*;
 import jakarta.ws.rs.core.Response;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -19,9 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequest;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.Pagination;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;
@@ -55,9 +53,9 @@ class AttendantControllerTest {
         @Test
         @DisplayName("should return paginated list")
         void shouldReturnPaginatedList() {
-            PageableRequest pageable = mock(PageableRequest.class);
-            Pagination pagination = new Pagination(0, 10, 1L, 1, false, false);
-            PageableResponse<AttendantResponse> page = new PageableResponse<>(List.of(response), pagination);
+            PageableRequestDto pageable = mock(PageableRequestDto.class);
+            PaginationDto pagination = new PaginationDto(0, 10, 1L, 1, false, false);
+            PageableResponseDto<AttendantResponse> page = new PageableResponseDto<>(List.of(response), pagination);
 
             when(pageable.getQ()).thenReturn(null);
             when(pageable.getPage()).thenReturn(0);
