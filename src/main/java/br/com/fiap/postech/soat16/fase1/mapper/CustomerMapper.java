@@ -17,7 +17,7 @@ public interface CustomerMapper {
             return null;
         }
         return new CustomerResponse(
-                null,//entity.getCustomerId(),
+                entity.getCustomerId(),
                 entity.getFirstName(),
                 entity.getLastName(),
                 entity.getEmail(),
@@ -32,6 +32,7 @@ public interface CustomerMapper {
             return null;
         }
         var entity = new Customer();
+        entity.setCustomerId(UUID.randomUUID());
         entity.setFirstName(request.getFirstName());
         entity.setLastName(request.getLastName());
         entity.setEmail(request.getEmail());
