@@ -1,8 +1,10 @@
 package br.com.fiap.postech.soat16.fase1.dto.request;
 
 import jakarta.ws.rs.QueryParam;
-import lombok.Getter;
+
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
+
+import lombok.Getter;
 
 @Getter
 public class VehicleFilterDto {

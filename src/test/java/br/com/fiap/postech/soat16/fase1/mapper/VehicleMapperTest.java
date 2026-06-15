@@ -1,14 +1,15 @@
 package br.com.fiap.postech.soat16.fase1.mapper;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
-import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
-import br.com.fiap.postech.soat16.fase1.model.Vehicle;
-import br.com.fiap.postech.soat16.fase1.model.VehicleType;
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
+import br.com.fiap.postech.soat16.fase1.model.Vehicle;
+import br.com.fiap.postech.soat16.fase1.model.VehicleType;
 
 @DisplayName("VehicleMapper — Unit Tests")
 class VehicleMapperTest {

@@ -1,16 +1,17 @@
 package br.com.fiap.postech.soat16.fase1.security;
 
-import io.quarkus.runtime.LaunchMode;
-import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
+
+import io.quarkus.runtime.LaunchMode;
+import io.quarkus.runtime.StartupEvent;
 
 /**
  * Falha rápido no boot se a aplicação subir em produção (LaunchMode.NORMAL) ainda usando
  * a chave JWT default de desenvolvimento. Em dev/test apenas registra um aviso.
- *
  * Produção deve sobrescrever JWT_PRIVATE_KEY_LOCATION / JWT_PUBLIC_KEY_LOCATION apontando
  * para chaves seguras (ex.: secret montado), nunca as chaves versionadas no repositório.
  */

@@ -1,7 +1,22 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.Pagination;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
@@ -15,20 +30,6 @@ import br.com.fiap.postech.soat16.fase1.model.DocumentType;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
 
 import io.smallrye.mutiny.Uni;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CustomerService — Unit Tests")
@@ -44,6 +45,8 @@ class CustomerServiceTest {
 
     private Customer entity;
     private CustomerResponse response;
+
+    private static final UUID FIXED_UUID = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
     @BeforeEach
     void setUp() {
@@ -101,7 +104,7 @@ class CustomerServiceTest {
             CustomerResponse result = service.findById(null).await().indefinitely();
 
             assertNotNull(result);
-            assertEquals(null, result.getCustomerId());
+            assertEquals(FIXED_UUID, result.getCustomerId());
         }
 
         @Test

@@ -1,17 +1,20 @@
 package br.com.fiap.postech.soat16.fase1.model;
 
-import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+import java.util.Objects;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.*;
+
 import org.hibernate.proxy.HibernateProxy;
 
-import java.util.Objects;
-import java.util.UUID;
+import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+
+import lombok.*;
 
 @Getter
 @Setter

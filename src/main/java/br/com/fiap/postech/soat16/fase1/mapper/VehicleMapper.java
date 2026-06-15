@@ -1,10 +1,11 @@
 package br.com.fiap.postech.soat16.fase1.mapper;
 
+import org.mapstruct.Mapper;
+
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
-import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "cdi")
 public interface VehicleMapper {

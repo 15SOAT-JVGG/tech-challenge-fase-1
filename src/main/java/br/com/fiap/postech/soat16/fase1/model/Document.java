@@ -1,8 +1,8 @@
 package br.com.fiap.postech.soat16.fase1.model;
 
-import br.com.fiap.postech.soat16.fase1.exception.InvalidDocumentException;
-
 import java.util.Objects;
+
+import br.com.fiap.postech.soat16.fase1.exception.InvalidDocumentException;
 
 public final class Document {
 

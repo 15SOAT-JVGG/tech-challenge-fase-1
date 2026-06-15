@@ -1,8 +1,9 @@
 package br.com.fiap.postech.soat16.fase1.security;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
 import io.quarkus.hibernate.reactive.panache.PanacheRepository;
 import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
 public class AppUserRepository implements PanacheRepository<AppUser> {

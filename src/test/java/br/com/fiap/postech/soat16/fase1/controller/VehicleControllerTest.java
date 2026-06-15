@@ -1,17 +1,12 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
-import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
-import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
-import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
-import br.com.fiap.postech.soat16.fase1.model.VehicleType;
-import br.com.fiap.postech.soat16.fase1.service.VehicleService;
-import io.smallrye.mutiny.Uni;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.util.List;
+
 import jakarta.ws.rs.core.Response;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,10 +15,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
+import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
+import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
+import br.com.fiap.postech.soat16.fase1.model.VehicleType;
+import br.com.fiap.postech.soat16.fase1.service.VehicleService;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.smallrye.mutiny.Uni;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("VehicleController — Unit Tests")
@@ -62,7 +65,7 @@ class VehicleControllerTest {
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
-            assertEquals("ABC1234", result.content().get(0).licensePlate());
+            assertEquals("ABC1234", result.content().getFirst().licensePlate());
             verify(vehicleService).listAll(pageable, filter);
         }
 

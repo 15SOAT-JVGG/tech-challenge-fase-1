@@ -1,14 +1,16 @@
 package br.com.fiap.postech.soat16.fase1.dto.pagination;
 
-import io.quarkus.panache.common.Sort;
+import java.util.List;
+
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.QueryParam;
-import lombok.Getter;
+
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 
-import java.util.List;
+import io.quarkus.panache.common.Sort;
+import lombok.Getter;
 
 @Getter
 public class PageableRequestDto {

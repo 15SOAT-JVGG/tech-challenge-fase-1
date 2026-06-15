@@ -1,12 +1,12 @@
 package br.com.fiap.postech.soat16.fase1.dto.request;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.lang.reflect.Field;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
 @DisplayName("VehicleFilterDto — Unit Tests")
 class VehicleFilterDtoTest {

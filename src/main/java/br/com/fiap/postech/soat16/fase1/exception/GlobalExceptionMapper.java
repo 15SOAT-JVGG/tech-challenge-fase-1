@@ -1,14 +1,15 @@
 package br.com.fiap.postech.soat16.fase1.exception;
 
+import java.time.OffsetDateTime;
+import java.util.Map;
+import java.util.UUID;
+
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
-import org.jboss.logging.Logger;
 
-import java.time.OffsetDateTime;
-import java.util.Map;
-import java.util.UUID;
+import org.jboss.logging.Logger;
 
 @Provider
 public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {

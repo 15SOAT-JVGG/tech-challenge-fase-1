@@ -1,11 +1,12 @@
 package br.com.fiap.postech.soat16.fase1.security;
 
-import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
+import java.io.IOException;
+import java.util.Map;
+
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.PostgreSQLContainer;
 
-import java.io.IOException;
-import java.util.Map;
+import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
 
 /**
  * Sobe um PostgreSQL real (Testcontainers) e injeta a URL reativa em runtime.

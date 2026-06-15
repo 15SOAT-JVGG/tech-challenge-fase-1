@@ -8,9 +8,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
-import org.mapstruct.Mapper;
-
-import java.util.UUID;
+import br.com.fiap.postech.soat16.fase1.model.Document;
 
 @Mapper(componentModel = "cdi")
 public interface CustomerMapper {

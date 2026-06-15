@@ -1,18 +1,20 @@
 package br.com.fiap.postech.soat16.fase1.security;
 
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.Optional;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
+
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
+
 import io.quarkus.elytron.security.common.BcryptUtil;
 import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.vertx.VertxContextSupport;
 import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
-
-import java.security.SecureRandom;
-import java.util.Base64;
-import java.util.Optional;
 
 @ApplicationScoped
 public class DataSeeder {

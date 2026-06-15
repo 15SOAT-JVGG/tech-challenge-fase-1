@@ -1,15 +1,12 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequest;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.Pagination;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
-import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
-import br.com.fiap.postech.soat16.fase1.exception.DuplicatePhoneNumberException;
-import br.com.fiap.postech.soat16.fase1.service.CustomerService;
-import io.smallrye.mutiny.Uni;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
 import jakarta.ws.rs.core.Response;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -26,8 +23,7 @@ import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
-import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
-import br.com.fiap.postech.soat16.fase1.exception.DuplicatePhoneNumberException;
+import br.com.fiap.postech.soat16.fase1.exception.*;
 import br.com.fiap.postech.soat16.fase1.service.CustomerService;
 
 import io.smallrye.mutiny.Uni;
@@ -72,7 +68,7 @@ class CustomerControllerTest {
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
-            assertEquals("John", result.content().get(0).getFirstName());
+            assertEquals("John", result.content().getFirst().getFirstName());
             verify(service).findAll(null, 0, 10);
         }
 

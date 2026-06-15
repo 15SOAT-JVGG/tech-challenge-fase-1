@@ -1,13 +1,14 @@
 package br.com.fiap.postech.soat16.fase1.model;
 
-import br.com.fiap.postech.soat16.fase1.exception.InvalidDocumentException;
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import static org.junit.jupiter.api.Assertions.*;
+import br.com.fiap.postech.soat16.fase1.exception.InvalidDocumentException;
 
 @DisplayName("Document value object — Unit Tests")
 class DocumentTest {

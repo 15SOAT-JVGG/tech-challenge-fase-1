@@ -1,17 +1,5 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
-import br.com.fiap.postech.soat16.fase1.security.AuthService;
-import br.com.fiap.postech.soat16.fase1.security.PostgresTestResource;
-import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.vertx.VertxContextSupport;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-
-import java.util.UUID;
-
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
@@ -19,17 +7,31 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
 
+import java.util.UUID;
+
+import jakarta.inject.Inject;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+import br.com.fiap.postech.soat16.fase1.security.AuthService;
+import br.com.fiap.postech.soat16.fase1.security.PostgresTestResource;
+
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.vertx.VertxContextSupport;
+
 /**
  * Testes de integração HTTP do endpoint POST /v1/auth/login contra um PostgreSQL real
  * (Testcontainers via {@link PostgresTestResource}). Exercita toda a stack:
  * RestAssured → AuthController → AuthService → AppUserRepository → Hibernate Reactive → PostgreSQL.
- *
- * Cada teste usa um username único porque o schema é drop-and-create por execução (não por método).
+ * Cada teste usa um username único porque o schema é drop-and-create por execução (não por méthodo).
  */
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
 @DisplayName("AuthController — Integration Tests (HTTP)")
-class AuthControllerTest {
+class AuthControllerIT {
 
     private static final String LOGIN_PATH = "/v1/auth/login";
     private static final String RAW_PASSWORD = "S3nh@-F0rte";

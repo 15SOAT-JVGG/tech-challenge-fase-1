@@ -1,15 +1,12 @@
 package br.com.fiap.postech.soat16.fase1.controller.docs;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
-import io.smallrye.mutiny.Uni;
+import java.util.UUID;
+
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.ParameterIn;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
@@ -19,7 +16,13 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-import java.util.UUID;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
+import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
+
+import io.smallrye.mutiny.Uni;
 
 @Path("/v1/customers")
 @Produces(MediaType.APPLICATION_JSON)
@@ -64,7 +67,7 @@ public interface CustomerControllerDocs {
     @APIResponse(responseCode = "400", description = "Invalid request body")
     @APIResponse(responseCode = "409", description = "Document already registered")
     Uni<Response> create(
-            @RequestBody(required = true, description = "Customer data for registration")
+            @RequestBody(description = "Customer data for registration")
             @Valid CustomerCreateRequest body);
 
     @PUT
@@ -77,7 +80,7 @@ public interface CustomerControllerDocs {
     Uni<Response> update(
             @Parameter(name = "id", description = "Customer identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,
-            @RequestBody(required = true, description = "Updated customer data. Document (CPF/CNPJ) is not updatable.")
+            @RequestBody(description = "Updated customer data. Document (CPF/CNPJ) is not updatable.")
             @Valid CustomerUpdateRequest body);
 
     @DELETE
