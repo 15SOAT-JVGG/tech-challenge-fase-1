@@ -1,6 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.Pagination;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
@@ -12,6 +13,7 @@ import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Document;
 import br.com.fiap.postech.soat16.fase1.model.DocumentType;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
+
 import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +28,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,8 +41,6 @@ class CustomerServiceTest {
     private CustomerMapper mapper;
 
     private CustomerService service;
-
-    private static final UUID FIXED_UUID = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
     private Customer entity;
     private CustomerResponse response;
@@ -76,15 +75,16 @@ class CustomerServiceTest {
         @Test
         @DisplayName("should return paginated response")
         void shouldReturnPaginatedResponse() {
+            PaginationDto paginationDto = new PaginationDto(0, 10, 1L, 1, false, false);
             when(repository.findPage(0, 10)).thenReturn(Uni.createFrom().item(List.of(entity)));
             when(repository.count()).thenReturn(Uni.createFrom().item(1L));
             when(mapper.toResponse(entity)).thenReturn(response);
 
-            PageableResponse<CustomerResponse> result = service.findAll(null, 0, 10).await().indefinitely();
+            PageableResponseDto<CustomerResponse> result = service.findAll(null, 0, 10).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
-            assertEquals(1L, result.pagination().totalElements());
+            assertEquals(1L, result.paginationDto().totalElements());
         }
     }
 
@@ -95,22 +95,22 @@ class CustomerServiceTest {
         @Test
         @DisplayName("should return customer response when found")
         void shouldReturnCustomerWhenFound() {
-            when(repository.findByCustomerId(FIXED_UUID)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.findByCustomerId(null)).thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResponse(entity)).thenReturn(response);
 
-            CustomerResponse result = service.findById(FIXED_UUID).await().indefinitely();
+            CustomerResponse result = service.findById(null).await().indefinitely();
 
             assertNotNull(result);
-            assertEquals(FIXED_UUID, result.getCustomerId());
+            assertEquals(null, result.getCustomerId());
         }
 
         @Test
         @DisplayName("should throw CustomerNotFoundException when not found")
         void shouldThrowNotFoundWhenMissing() {
-            when(repository.findByCustomerId(FIXED_UUID)).thenReturn(Uni.createFrom().nullItem());
+            when(repository.findByCustomerId(null)).thenReturn(Uni.createFrom().nullItem());
 
             assertThrows(CustomerNotFoundException.class,
-                    () -> service.findById(FIXED_UUID).await().indefinitely());
+                    () -> service.findById(null).await().indefinitely());
         }
     }
 
@@ -123,11 +123,11 @@ class CustomerServiceTest {
         void shouldUpdateAndReturn() {
             CustomerUpdateRequest request = new CustomerUpdateRequest("Jane", "Doe", "jane.doe@example.com", "5511987654321");
 
-            when(repository.findByCustomerId(FIXED_UUID)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.findByCustomerId(null)).thenReturn(Uni.createFrom().item(entity));
             when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResponse(entity)).thenReturn(response);
 
-            CustomerResponse result = service.update(FIXED_UUID, request).await().indefinitely();
+            CustomerResponse result = service.update(null, request).await().indefinitely();
 
             assertNotNull(result);
             verify(mapper).updateEntity(entity, request);
@@ -138,10 +138,10 @@ class CustomerServiceTest {
         void shouldThrowNotFoundWhenMissing() {
             CustomerUpdateRequest request = new CustomerUpdateRequest("Jane", "Doe", "jane.doe@example.com", "5511987654321");
 
-            when(repository.findByCustomerId(FIXED_UUID)).thenReturn(Uni.createFrom().nullItem());
+            when(repository.findByCustomerId(null)).thenReturn(Uni.createFrom().nullItem());
 
             assertThrows(CustomerNotFoundException.class,
-                    () -> service.update(FIXED_UUID, request).await().indefinitely());
+                    () -> service.update(null, request).await().indefinitely());
         }
     }
 
@@ -152,18 +152,18 @@ class CustomerServiceTest {
         @Test
         @DisplayName("should delete customer when found")
         void shouldDeleteWhenFound() {
-            when(repository.deleteByCustomerId(FIXED_UUID)).thenReturn(Uni.createFrom().item(1L));
+            when(repository.deleteByCustomerId(null)).thenReturn(Uni.createFrom().item(1L));
 
-            assertDoesNotThrow(() -> service.delete(FIXED_UUID).await().indefinitely());
+            assertDoesNotThrow(() -> service.delete(null).await().indefinitely());
         }
 
         @Test
         @DisplayName("should throw CustomerNotFoundException when no record deleted")
         void shouldThrowWhenNoRecordDeleted() {
-            when(repository.deleteByCustomerId(FIXED_UUID)).thenReturn(Uni.createFrom().item(0L));
+            when(repository.deleteByCustomerId(null)).thenReturn(Uni.createFrom().item(0L));
 
             assertThrows(CustomerNotFoundException.class,
-                    () -> service.delete(FIXED_UUID).await().indefinitely());
+                    () -> service.delete(null).await().indefinitely());
         }
     }
 

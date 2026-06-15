@@ -1,11 +1,20 @@
 package br.com.fiap.postech.soat16.fase1.mapper;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
-import br.com.fiap.postech.soat16.fase1.model.Document;
-import br.com.fiap.postech.soat16.fase1.model.DocumentType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,7 +33,8 @@ class CustomerMapperTest {
 
     @BeforeEach
     void setUp() {
-        mapper = new CustomerMapper() {};
+        mapper = new CustomerMapper() {
+        };
     }
 
     @Test

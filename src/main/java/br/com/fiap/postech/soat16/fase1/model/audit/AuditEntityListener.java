@@ -1,11 +1,11 @@
 package br.com.fiap.postech.soat16.fase1.model.audit;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
-
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 
 @ApplicationScoped
 public class AuditEntityListener {
