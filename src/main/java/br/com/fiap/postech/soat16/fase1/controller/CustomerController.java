@@ -31,7 +31,7 @@ import lombok.RequiredArgsConstructor;
 
 @ApplicationScoped
 @RequiredArgsConstructor
-@Path("/v1/customers")
+@Path("/v1/customer")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class CustomerController implements CustomerControllerDocs {
