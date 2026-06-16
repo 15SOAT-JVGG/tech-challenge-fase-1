@@ -1,6 +1,6 @@
 # fiap-srv-mecanica
 
-Construído com [Quarkus](https://quarkus.io/) (reactive stack), expõe uma API REST para criação, consulta, atualização e remoção de clientes.
+Back-end da oficina mecânica (15SOAT — Tech Challenge Fase 1). Construído com [Quarkus](https://quarkus.io/) (reactive stack), expõe uma API REST para gestão de **clientes, veículos e atendentes**, com **autenticação JWT** para as APIs administrativas.
 
 ---
 
@@ -10,56 +10,182 @@ Construído com [Quarkus](https://quarkus.io/) (reactive stack), expõe uma API 
 |---|---|
 | Runtime | Quarkus 3.x (Reactive) |
 | Persistência | Hibernate Reactive + Panache + PostgreSQL |
+| Segurança | SmallRye JWT (RS256) |
 | Observabilidade | OpenTelemetry + Micrometer + Prometheus |
 | Mapeamento | MapStruct |
 
 ---
 
-## Arquitetura
+## Portas
 
-O serviço segue o padrão **MVC**:
+| Porta | Uso |
+|---|---|
+| `8080` | API da aplicação (endpoints `/v1/**`) |
+| `8090` | Management — Swagger UI, OpenAPI, health e métricas |
 
-```
-controller/        → Endpoints REST (CustomerController + interface OpenAPI)
-service/           → Lógica de negócio (CustomerService)
-repository/        → Acesso a dados via Panache (CustomerRepository)
-model/             → Entidade JPA (Customer) e auditoria
-dto/
-  request/         → CustomerCreateRequest, CustomerUpdateRequest
-  response/        → CustomerResponse, ApiErrorResponse
-  paginationDto/      → PageableRequest, PageableResponse, Pagination
-mapper/            → CustomerMapper (MapStruct)
-exception/         → AppException (base), exceções específicas, ErrorType/Code
-config/            → GlobalExceptionMapper, OpenApiConfig, SchemaInitializer
-```
+- Swagger UI: `http://localhost:8090/q/swagger-ui`
+- OpenAPI: `http://localhost:8090/q/openapi`
 
 ---
 
-## Variáveis de ambiente
-
-| Variável | Descrição | Exemplo         |
-|---|---|-----------------|
-| `INFRA_OTEL_HOST` | Endpoint do coletor OTEL | `x.x.x.x:14317` |
-| `INFRA_HOST_OTEL` | Endpoint OTEL (perfil dev) | `x.x.x.x:14317` |
-
----
-
-## Executando localmente
-
-### Pré-requisitos
+## Pré-requisitos
 
 - Java 21+
-- Maven 3.9+
-- PostgreSQL rodando (via Docker ou homelab)
+- Maven 3.9+ (ou o wrapper `./mvnw`)
+- Docker + Docker Compose (para o banco e/ou execução completa)
 
-### Dev mode
+---
+
+## Configuração (.env)
+
+Copie o arquivo de exemplo e ajuste as variáveis:
 
 ```shell
+cp .env.example .env
+```
+
+Variáveis relevantes:
+
+| Variável | Descrição | Padrão |
+|---|---|---|
+| `INFRA_HOST_POSTGRES` | Host do PostgreSQL | `localhost` |
+| `POSTGRES_DB` | Nome do banco (deve existir) | `oficina` |
+| `POSTGRES_USERNAME` | Usuário do banco | `admin` |
+| `POSTGRES_PASSWORD` | Senha do banco | — (obrigatória no Compose) |
+| `APP_SEED_ADMIN_USERNAME` | Usuário admin inicial | `admin` |
+| `APP_SEED_ADMIN_PASSWORD` | Senha do admin inicial | — (ver nota abaixo) |
+| `APP_SEED_MECHANIC_USERNAME` | Usuário mecânico inicial | `mecanico` |
+| `APP_SEED_MECHANIC_PASSWORD` | Senha do mecânico inicial | — (ver nota abaixo) |
+| `JWT_EXPIRATION_HOURS` | Validade do token (horas) | `8` |
+
+> **Importante (token):** se `APP_SEED_ADMIN_PASSWORD` / `APP_SEED_MECHANIC_PASSWORD` ficarem em branco, a aplicação **gera uma senha aleatória** na primeira inicialização e a imprime no log com o prefixo `[SEED]`. Para ter credenciais conhecidas (e conseguir gerar tokens sem ler o log), **defina essas senhas no `.env`**. O `.env.example` já traz valores de exemplo (`admin123` / `mecanico123`).
+
+---
+
+## Como rodar localmente
+
+Há dois caminhos. Escolha um.
+
+### Opção A — Ambiente completo via Docker Compose (recomendado)
+
+Sobe PostgreSQL **e** a aplicação juntos. A imagem da aplicação é montada a partir dos artefatos já compilados, então é preciso empacotar antes:
+
+```shell
+# 1. Garanta o .env (com POSTGRES_PASSWORD e as senhas de seed definidas)
+cp .env.example .env
+
+# 2. Compile os artefatos
+./mvnw package -DskipTests
+
+# 3. Suba o ambiente
+docker compose --env-file .env -f src/main/docker/compose/docker-compose.yml up -d --build
+```
+
+A API ficará em `http://localhost:8080` e o Swagger UI em `http://localhost:8090/q/swagger-ui`.
+
+Para derrubar:
+
+```shell
+docker compose -f src/main/docker/compose/docker-compose.yml down
+```
+
+### Opção B — Dev mode (live reload) + Postgres em container
+
+Útil para desenvolvimento. Suba só o banco e rode a aplicação em modo dev:
+
+```shell
+# 1. Apenas o PostgreSQL
+docker compose --env-file .env -f src/main/docker/compose/docker-compose.yml up -d postgres
+
+# 2. Aplicação em dev mode (carrega as variáveis do .env)
 ./mvnw quarkus:dev
 ```
 
-A aplicação sobe em `http://localhost:8080` com live reload habilitado.
-O Dev UI fica disponível em `http://localhost:8080/q/dev/`.
+A aplicação sobe em `http://localhost:8080` com live reload. Dev UI em `http://localhost:8080/q/dev/`.
+
+> As senhas de seed são lidas do `.env`. Em dev mode, exporte as variáveis ou rode com `--env-file` se o seu shell não carregar o `.env` automaticamente.
+
+---
+
+## Autenticação — gerando e usando o token JWT
+
+As APIs administrativas usam **Bearer JWT (RS256)**. O fluxo é: fazer login → receber o token → enviá-lo no header `Authorization`.
+
+### Usuários iniciais (seed)
+
+Criados automaticamente na primeira inicialização:
+
+| Usuário | Role | Senha |
+|---|---|---|
+| `admin` | `ADMIN` | valor de `APP_SEED_ADMIN_PASSWORD` |
+| `mecanico` | `MECHANIC` | valor de `APP_SEED_MECHANIC_PASSWORD` |
+
+Usando o `.env.example`: **`admin` / `admin123`**.
+
+### 1. Login (gera o token)
+
+`POST http://localhost:8080/v1/auth/login`
+
+```shell
+curl -s -X POST http://localhost:8080/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
+```
+
+No PowerShell:
+
+```powershell
+$resp = Invoke-RestMethod -Method Post -Uri http://localhost:8080/v1/auth/login `
+  -ContentType "application/json" `
+  -Body '{"username":"admin","password":"admin123"}'
+$token = $resp.token
+$token
+```
+
+Resposta:
+
+```json
+{
+  "token": "eyJraWQiOiJ...",
+  "username": "admin",
+  "role": "ADMIN",
+  "expiresIn": 28800
+}
+```
+
+- `token` — JWT assinado a ser usado nas chamadas seguintes.
+- `expiresIn` — validade em **segundos** (8h = 28800 por padrão).
+
+### 2. Usando o token nas chamadas
+
+Envie o token no header `Authorization: Bearer <token>`:
+
+```shell
+TOKEN="eyJraWQiOiJ..."   # cole o token retornado no login
+
+curl -s http://localhost:8080/v1/vehicle/1 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+No PowerShell (reaproveitando `$token` do passo anterior):
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:8080/v1/vehicle/1 `
+  -Headers @{ Authorization = "Bearer $token" }
+```
+
+### 3. Usando o token pelo Swagger UI
+
+1. Abra `http://localhost:8090/q/swagger-ui`.
+2. Chame `POST /v1/auth/login` com `admin` / `admin123` e copie o campo `token` da resposta.
+3. Clique em **Authorize** (cadeado, esquema `bearerAuth`), cole **apenas o token** (sem o prefixo `Bearer`) e confirme.
+4. As demais chamadas passam a enviar o header automaticamente.
+
+> Se você não definiu as senhas no `.env`, recupere a senha gerada no log de inicialização:
+> ```
+> [SEED] Senha não configurada para 'admin'. Senha gerada (anote e altere): <senha>
+> ```
+> No Compose: `docker compose -f src/main/docker/compose/docker-compose.yml logs srv-oficina-mecanica | grep SEED`.
 
 ---
 
@@ -71,7 +197,7 @@ O Dev UI fica disponível em `http://localhost:8080/q/dev/`.
 ./mvnw test
 ```
 
-Executa apenas os testes `*Test.java` sem dependências externas.
+Executa apenas os testes `*Test.java`, sem dependências externas.
 
 ### Integração (Testcontainers)
 
@@ -79,9 +205,7 @@ Executa apenas os testes `*Test.java` sem dependências externas.
 ./mvnw test -Pitest
 ```
 
-Sobe um container PostgreSQL via Testcontainers e executa testes `*IT.java` + `*Test.java` contra a stack completa.
-
-> Requer Docker em execução.
+Sobe um PostgreSQL via Testcontainers e executa `*IT.java` + `*Test.java` contra a stack completa. **Requer Docker em execução.**
 
 ---
 
@@ -93,34 +217,25 @@ Sobe um container PostgreSQL via Testcontainers e executa testes `*IT.java` + `*
 
 Executa testes, cobertura JaCoCo e a análise estática local:
 
-- Spotless: imports, espaços finais e newline final
-- Checkstyle: estilo Java, nomenclatura e imports explícitos
-- PMD: regras leves para bugs prováveis e boas práticas de baixo ruído
-- SpotBugs: bytecode analysis em classes de aplicação, com prioridade média ou alta
-- JaCoCo: cobertura mínima de 70%, ignorando entidades, configs e mappers gerados
+- **Spotless** — imports, espaços finais e newline final
+- **Checkstyle** — estilo, nomenclatura e imports explícitos
+- **PMD** — bugs prováveis e boas práticas
+- **SpotBugs** — análise de bytecode (prioridade média/alta)
+- **JaCoCo** — cobertura mínima configurada
 
-Para corrigir automaticamente a camada segura de formatação:
+Corrigir formatação automaticamente:
 
 ```shell
 ./mvnw spotless:apply
 ```
 
-Para rodar apenas os checks estáticos:
+Apenas os checks estáticos:
 
 ```shell
 ./mvnw spotless:check checkstyle:check pmd:check pmd:cpd-check spotbugs:check
 ```
 
-Relatórios gerados em `target`:
-
-- Testes unitários: `target/surefire-reports/`
-- JaCoCo: `target/jacoco-report/index.html`, `target/jacoco-report/jacoco.xml` e `target/jacoco-report/jacoco.csv`
-- Checkstyle: `target/checkstyle-result.xml`
-- PMD: `target/reports/pmd.html` e `target/pmd.xml`
-- CPD: `target/reports/cpd.html` e `target/cpd.xml`
-- SpotBugs: `target/spotbugsXml.xml`
-
-O Spotless não gera relatório separado; o resultado aparece no console durante `spotless:check`.
+Relatórios em `target/`: `surefire-reports/`, `jacoco-report/index.html`, `checkstyle-result.xml`, `reports/pmd.html`, `spotbugsXml.xml`.
 
 ---
 
@@ -137,18 +252,12 @@ java -jar target/quarkus-app/quarkus-run.jar
 
 ```shell
 ./mvnw package -Dnative
-# ou, sem GraalVM instalado localmente:
+# ou, sem GraalVM local:
 ./mvnw package -Dnative -Dquarkus.native.container-build=true
 ```
 
 ---
 
-## API
+## Segurança das chaves JWT
 
-A documentação OpenAPI (Swagger UI) fica disponível em:
-
-```
-http://localhost:8090/q/swagger-ui
-```
-
-> A porta de management é `8090`, separada da porta da aplicação (`8080`).
+O par RSA versionado em `src/main/resources/jwt` é **somente para desenvolvimento**. Em produção, sobrescreva `JWT_PRIVATE_KEY_LOCATION` / `JWT_PUBLIC_KEY_LOCATION` apontando para secrets montados (ex.: `file:/etc/jwt/privateKey.pem`) e **nunca** utilize as chaves versionadas.
