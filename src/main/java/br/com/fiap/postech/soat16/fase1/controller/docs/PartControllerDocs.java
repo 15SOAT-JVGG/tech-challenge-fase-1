@@ -32,7 +32,7 @@ import java.util.List;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @SecurityRequirement(name = "bearerAuth")
-@Tag(name = "Peças e Insumos", description = "Gestão de peças e insumos com controle de estoque")
+@Tag(name = "Parts and Supplies", description = "Parts and supplies management with inventory control")
 public interface PartControllerDocs {
 
     @GET

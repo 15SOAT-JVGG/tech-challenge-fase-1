@@ -24,7 +24,7 @@ import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
 
 import io.smallrye.mutiny.Uni;
 
-@Path("/v1/customers")
+@Path("/v1/customer")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Customer", description = "Customer management operations")

@@ -48,7 +48,7 @@ class CustomerControllerTest {
     }
 
     @Nested
-    @DisplayName("GET /v1/customers — findAll")
+    @DisplayName("GET /v1/customer — findAll")
     class FindAll {
 
         @Test
@@ -103,7 +103,7 @@ class CustomerControllerTest {
     }
 
     @Nested
-    @DisplayName("GET /v1/customers/{id} — findById")
+    @DisplayName("GET /v1/customer/{id} — findById")
     class FindById {
 
         @Test
@@ -130,7 +130,7 @@ class CustomerControllerTest {
     }
 
     @Nested
-    @DisplayName("POST /v1/customers — create")
+    @DisplayName("POST /v1/customer — create")
     class Create {
 
         @Test
@@ -160,7 +160,7 @@ class CustomerControllerTest {
     }
 
     @Nested
-    @DisplayName("PUT /v1/customers/{id} — update")
+    @DisplayName("PUT /v1/customer/{id} — update")
     class Update {
 
         @Test
@@ -192,7 +192,7 @@ class CustomerControllerTest {
     }
 
     @Nested
-    @DisplayName("DELETE /v1/customers/{id} — delete")
+    @DisplayName("DELETE /v1/customer/{id} — delete")
     class Delete {
 
         @Test
