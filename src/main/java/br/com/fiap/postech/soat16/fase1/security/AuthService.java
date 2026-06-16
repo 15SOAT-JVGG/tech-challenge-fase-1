@@ -1,19 +1,22 @@
 package br.com.fiap.postech.soat16.fase1.security;
 
+import java.time.Duration;
+import java.util.Set;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.NotAuthorizedException;
+
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
+
 import br.com.fiap.postech.soat16.fase1.dto.request.LoginRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.LoginResponseDto;
+
 import io.quarkus.elytron.security.common.BcryptUtil;
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.jwt.build.Jwt;
 import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.ws.rs.NotAuthorizedException;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
-
-import java.time.Duration;
-import java.util.Set;
 
 @ApplicationScoped
 public class AuthService {

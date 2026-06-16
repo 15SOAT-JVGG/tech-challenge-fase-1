@@ -1,16 +1,18 @@
 package br.com.fiap.postech.soat16.fase1.repository;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
-import br.com.fiap.postech.soat16.fase1.model.Vehicle;
-import io.quarkus.hibernate.reactive.panache.PanacheRepository;
-import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import jakarta.enterprise.context.ApplicationScoped;
+
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.model.Vehicle;
+
+import io.quarkus.hibernate.reactive.panache.PanacheRepository;
+import io.smallrye.mutiny.Uni;
 
 @ApplicationScoped
 public class VehicleRepository implements PanacheRepository<Vehicle> {

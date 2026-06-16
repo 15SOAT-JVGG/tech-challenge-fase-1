@@ -2,8 +2,6 @@ package br.com.fiap.postech.soat16.fase1.controller;
 
 import java.util.UUID;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.BeanParam;
@@ -21,6 +19,8 @@ import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 
 import br.com.fiap.postech.soat16.fase1.controller.docs.AttendantControllerDocs;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;

@@ -17,14 +17,8 @@ import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
-import java.time.OffsetDateTime;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import br.com.fiap.postech.soat16.fase1.model.Document;
+import br.com.fiap.postech.soat16.fase1.model.DocumentType;
 
 @DisplayName("CustomerMapper — Unit Tests")
 class CustomerMapperTest {

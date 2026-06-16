@@ -1,39 +1,40 @@
 package br.com.fiap.postech.soat16.fase1.security;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.UUID;
+
+import jakarta.inject.Inject;
+import jakarta.ws.rs.NotAuthorizedException;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
 import br.com.fiap.postech.soat16.fase1.dto.request.LoginRequestDto;
+
 import io.quarkus.elytron.security.common.BcryptUtil;
 import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.vertx.RunOnVertxContext;
 import io.quarkus.test.vertx.UniAsserter;
-import jakarta.inject.Inject;
-import jakarta.ws.rs.NotAuthorizedException;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Testes de integração contra um PostgreSQL real (DevServices/Testcontainers).
  * Executam toda a stack reativa: AuthService → AppUserRepository → Hibernate Reactive → PostgreSQL.
- *
  * Foco principal: confirmar que o offload do bcrypt para o worker pool
  * (runSubscriptionOn / emitOn) preserva a sessão reativa via context propagation
  * do Quarkus — caso contrário o persist/read falharia com "No current Mutiny.Session".
- *
  * Roda apenas no profile itest (mvn test -Pitest) por exigir Docker.
  */
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
 @DisplayName("AuthService — Integration Tests")
-class AuthServiceTest {
+class AuthServiceIT {
 
     private static final String RAW_PASSWORD = "S3nh@-F0rte";
     private static final String ROLE = "ADMIN";

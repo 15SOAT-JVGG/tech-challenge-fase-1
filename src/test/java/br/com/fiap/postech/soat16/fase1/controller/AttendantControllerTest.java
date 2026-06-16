@@ -9,7 +9,6 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.UUID;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.*;
 import jakarta.ws.rs.core.Response;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import br.com.fiap.postech.soat16.fase1.dto.pagination.*;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;

@@ -1,12 +1,12 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
-import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
-import br.com.fiap.postech.soat16.fase1.exception.DuplicateDocumentException;
-import br.com.fiap.postech.soat16.fase1.service.CustomerService;
-import io.smallrye.mutiny.Uni;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
 import jakarta.ws.rs.core.Response;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -20,13 +20,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
+import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
+import br.com.fiap.postech.soat16.fase1.exception.*;
+import br.com.fiap.postech.soat16.fase1.service.CustomerService;
 
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.smallrye.mutiny.Uni;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CustomerController — Unit Tests")
@@ -68,7 +68,7 @@ class CustomerControllerTest {
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
-            assertEquals("John", result.content().get(0).getFirstName());
+            assertEquals("John", result.content().getFirst().getFirstName());
             verify(service).findAll(null, 0, 10);
         }
 
