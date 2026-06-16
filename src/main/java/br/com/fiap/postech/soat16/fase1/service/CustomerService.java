@@ -53,7 +53,7 @@ public class CustomerService {
         return repository.existsByDocument(document.getValue())
                 .flatMap(docExists -> {
                     if (TRUE.equals(docExists)) {
-                        throw new DuplicateDocumentException();
+                        return Uni.createFrom().<Void>failure(new DuplicateDocumentException());
                     }
                     return repository.persist(mapper.toEntity(request, document)).replaceWithVoid();
                 });
@@ -72,9 +72,6 @@ public class CustomerService {
         return repository.findByCustomerId(id)
                 .onItem().ifNull().failWith(() -> new CustomerNotFoundException(id))
                 .flatMap(entity -> {
-                    if (entity == null) {
-                        throw new CustomerNotFoundException(id);
-                    }
                     mapper.updateEntity(entity, request);
                     return repository.persist(entity).map(mapper::toResponse);
                 });
@@ -85,7 +82,7 @@ public class CustomerService {
         return repository.deleteByCustomerId(id)
                 .flatMap(deleted -> {
                     if (deleted == 0) {
-                        throw new CustomerNotFoundException(id);
+                        return Uni.createFrom().<Void>failure(new CustomerNotFoundException(id));
                     }
                     return Uni.createFrom().voidItem();
                 });

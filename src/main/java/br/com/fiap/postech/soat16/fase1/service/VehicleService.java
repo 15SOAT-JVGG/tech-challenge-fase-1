@@ -55,7 +55,7 @@ public class VehicleService {
         return vehicleRepository.existsByLicensePlate(dto.licensePlate())
                 .flatMap(exists -> {
                     if (TRUE.equals(exists)) {
-                        throw new DuplicateLicensePlateException();
+                        return Uni.createFrom().failure(new DuplicateLicensePlateException());
                     }
                     return vehicleRepository.persist(vehicleMapper.toEntity(dto, null))
                             .replaceWithVoid();
@@ -65,13 +65,10 @@ public class VehicleService {
     @WithTransaction
     public Uni<VehicleResponseDto> update(Long id, VehicleDto request) {
         return vehicleRepository.findById(id)
+                .onItem().ifNull().failWith(() -> new ResourceNotFoundException("Vehicle not found"))
                 .flatMap(entity -> {
-                    if (entity == null) {
-                        throw new ResourceNotFoundException("Vehicle not found");
-                    }
                     vehicleMapper.updateEntity(entity, request);
-                    return vehicleRepository.persist(entity)
-                            .map(vehicleMapper::toResponse);
+                    return vehicleRepository.persist(entity).map(vehicleMapper::toResponse);
                 });
     }
 
@@ -80,7 +77,7 @@ public class VehicleService {
         return vehicleRepository.deleteById(id)
                 .flatMap(deleted -> {
                     if (FALSE.equals(deleted)) {
-                        throw new ResourceNotFoundException("Vehicle not found");
+                        return Uni.createFrom().failure(new ResourceNotFoundException("Vehicle not found"));
                     }
                     return Uni.createFrom().voidItem();
                 });

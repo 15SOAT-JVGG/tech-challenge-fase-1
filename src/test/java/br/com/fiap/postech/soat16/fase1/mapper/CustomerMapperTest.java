@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import br.com.fiap.postech.soat16.fase1.model.Document;
+import br.com.fiap.postech.soat16.fase1.model.DocumentType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

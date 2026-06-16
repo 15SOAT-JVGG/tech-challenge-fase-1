@@ -1,7 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponse;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.Pagination;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
@@ -44,6 +44,8 @@ class CustomerServiceTest {
 
     private Customer entity;
     private CustomerResponse response;
+
+    private static final UUID FIXED_UUID = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
     @BeforeEach
     void setUp() {
@@ -101,7 +103,7 @@ class CustomerServiceTest {
             CustomerResponse result = service.findById(null).await().indefinitely();
 
             assertNotNull(result);
-            assertEquals(null, result.getCustomerId());
+            assertEquals(FIXED_UUID, result.getCustomerId());
         }
 
         @Test

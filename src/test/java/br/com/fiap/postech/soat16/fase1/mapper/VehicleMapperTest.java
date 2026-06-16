@@ -8,6 +8,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("VehicleMapper — Unit Tests")
@@ -22,12 +24,13 @@ class VehicleMapperTest {
         @Test
         @DisplayName("should map all fields from entity to response")
         void shouldMapEntityToResponse() {
-            Vehicle entity = new Vehicle(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+            UUID id = UUID.randomUUID();
+            Vehicle entity = new Vehicle(id, null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
 
             VehicleResponseDto result = mapper.toResponse(entity);
 
             assertNotNull(result);
-            assertEquals(1L, result.id());
+            assertEquals(id, result.id());
             assertEquals("ABC1234", result.licensePlate());
             assertEquals("Toyota", result.manufacturer());
             assertEquals("Corolla", result.model());
@@ -79,7 +82,7 @@ class VehicleMapperTest {
         @Test
         @DisplayName("should overwrite all fields on existing entity")
         void shouldUpdateAllFields() {
-            Vehicle entity = new Vehicle(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+            Vehicle entity = new Vehicle(UUID.randomUUID(), null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
             VehicleDto dto = new VehicleDto(null, "XYZ9876", "Honda", "Civic", "Preto", 2022, 10000L, VehicleType.MOTO);
 
             mapper.updateEntity(entity, dto);

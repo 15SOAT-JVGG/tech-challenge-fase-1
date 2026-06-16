@@ -21,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,6 +39,8 @@ class VehicleServiceTest {
 
     private VehicleService service;
 
+    private static final UUID VEHICLE_ID = UUID.randomUUID();
+
     private Vehicle entity;
     private VehicleResponseDto response;
     private VehicleDto request;
@@ -45,8 +48,8 @@ class VehicleServiceTest {
     @BeforeEach
     void setUp() {
         service = new VehicleService(vehicleRepository, vehicleMapper);
-        entity = new Vehicle(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
-        response = new VehicleResponseDto(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO, null);
+        entity = new Vehicle(VEHICLE_ID, null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+        response = new VehicleResponseDto(VEHICLE_ID, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO, null);
         request = new VehicleDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
     }
 
@@ -141,7 +144,7 @@ class VehicleServiceTest {
             VehicleResponseDto result = service.findById(1L).await().indefinitely();
 
             assertNotNull(result);
-            assertEquals(1L, result.id());
+            assertEquals(VEHICLE_ID, result.id());
             assertEquals("ABC1234", result.licensePlate());
             assertEquals("Toyota", result.manufacturer());
             verify(vehicleRepository).findById(1L);
@@ -224,7 +227,7 @@ class VehicleServiceTest {
             VehicleResponseDto result = service.update(1L, request).await().indefinitely();
 
             assertNotNull(result);
-            assertEquals(1L, result.id());
+            assertEquals(VEHICLE_ID, result.id());
             assertEquals("ABC1234", result.licensePlate());
             verify(vehicleMapper).updateEntity(entity, request);
             verify(vehicleRepository).persist(entity);

@@ -1,1 +1,1 @@
-CREATE SCHEMA IF NOT EXISTS "oficina-mecanica";
+CREATE SCHEMA IF NOT EXISTS "oficina_mecanica";

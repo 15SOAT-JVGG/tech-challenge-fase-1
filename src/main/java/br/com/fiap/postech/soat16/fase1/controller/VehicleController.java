@@ -18,7 +18,8 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 @ApplicationScoped
 @AllArgsConstructor
 @Path("/v1/vehicle")
-public class VehicleController implements VehicleControllerDocs {
+public class
+VehicleController implements VehicleControllerDocs {
 
     private final VehicleService vehicleService;
 

@@ -4,10 +4,9 @@ import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
+
+import java.util.UUID;
 
 @Entity
 @Table(name="vehicle")
@@ -17,13 +16,14 @@ import lombok.Setter;
 @NoArgsConstructor
 public class Vehicle extends AuditableEntity {
 
+    @EqualsAndHashCode.Include
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "vehicle_id", nullable = false)
+    private UUID id;
 
-   // @ManyToOne
-   // @JoinColumn(name = "customer_id")
-   // private Customer customer;
+    @ManyToOne
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
 
     @Pattern(regexp = "^[A-Z]{3}\\d[A-Z\\d]\\d{2}$", message = "Placa inválida")
     @Column(name = "license_plate", nullable = false, length = 7, unique = true)
