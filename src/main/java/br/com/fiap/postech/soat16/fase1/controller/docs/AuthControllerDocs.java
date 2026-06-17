@@ -24,6 +24,7 @@ import io.smallrye.mutiny.Uni;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Authentication", description = "Authentication and token issuing operations")
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface AuthControllerDocs {
 
     @POST

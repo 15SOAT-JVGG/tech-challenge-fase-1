@@ -1,10 +1,19 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,14 +25,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
-import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
+import br.com.fiap.postech.soat16.fase1.exception.VehicleNotFoundException;
 import br.com.fiap.postech.soat16.fase1.mapper.VehicleMapper;
+import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.model.VehicleType;
+import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
 import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
 
 import io.smallrye.mutiny.Uni;
@@ -33,6 +44,9 @@ import io.smallrye.mutiny.Uni;
 class VehicleServiceTest {
 
     @Mock
+    private CustomerRepository customerRepository;
+
+    @Mock
     private VehicleRepository vehicleRepository;
 
     @Mock
@@ -40,16 +54,23 @@ class VehicleServiceTest {
 
     private VehicleService service;
 
+    private static final UUID VEHICLE_ID = UUID.randomUUID();
+    private static final UUID CUSTOMER_ID = UUID.randomUUID();
+
+    private Customer customer;
     private Vehicle entity;
     private VehicleResponseDto response;
-    private VehicleDto request;
+    private VehicleRequestDto request;
 
     @BeforeEach
     void setUp() {
-        service = new VehicleService(vehicleRepository, vehicleMapper);
-        entity = new Vehicle(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
-        response = new VehicleResponseDto(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO, null);
-        request = new VehicleDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+        service = new VehicleService(customerRepository, vehicleRepository, vehicleMapper);
+        customer = new Customer();
+        customer.setId(CUSTOMER_ID);
+        entity = new Vehicle(VEHICLE_ID, customer, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
+        response = new VehicleResponseDto(VEHICLE_ID, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L,
+                VehicleType.CAR, CUSTOMER_ID, null);
+        request = new VehicleRequestDto(CUSTOMER_ID, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
     }
 
     @Nested
@@ -88,12 +109,12 @@ class VehicleServiceTest {
 
             PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
 
-            assertEquals(0, result.paginationDto().page());
-            assertEquals(5, result.paginationDto().size());
-            assertEquals(12L, result.paginationDto().totalElements());
-            assertEquals(3, result.paginationDto().totalPages());
-            assertFalse(result.paginationDto().hasPrevious());
-            assertTrue(result.paginationDto().hasNext());
+            assertEquals(0, result.pagination().page());
+            assertEquals(5, result.pagination().size());
+            assertEquals(12L, result.pagination().totalElements());
+            assertEquals(3, result.pagination().totalPages());
+            assertFalse(result.pagination().hasPrevious());
+            assertTrue(result.pagination().hasNext());
         }
 
         @Test
@@ -109,7 +130,7 @@ class VehicleServiceTest {
             PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
 
             assertTrue(result.content().isEmpty());
-            assertEquals(0L, result.paginationDto().totalElements());
+            assertEquals(0L, result.pagination().totalElements());
         }
 
         @Test
@@ -125,8 +146,8 @@ class VehicleServiceTest {
 
             PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
 
-            assertTrue(result.paginationDto().hasPrevious());
-            assertFalse(result.paginationDto().hasNext());
+            assertTrue(result.pagination().hasPrevious());
+            assertFalse(result.pagination().hasNext());
         }
     }
 
@@ -137,25 +158,26 @@ class VehicleServiceTest {
         @Test
         @DisplayName("should return vehicle response when found")
         void shouldReturnVehicleWhenFound() {
-            when(vehicleRepository.findById(1L)).thenReturn(Uni.createFrom().item(entity));
+            when(vehicleRepository.findByVehicleId(VEHICLE_ID)).thenReturn(Uni.createFrom().item(entity));
             when(vehicleMapper.toResponse(entity)).thenReturn(response);
 
-            VehicleResponseDto result = service.findById(1L).await().indefinitely();
+            VehicleResponseDto result = service.findById(VEHICLE_ID).await().indefinitely();
 
             assertNotNull(result);
-            assertEquals(1L, result.id());
+            assertEquals(VEHICLE_ID, result.id());
             assertEquals("ABC1234", result.licensePlate());
             assertEquals("Toyota", result.manufacturer());
-            verify(vehicleRepository).findById(1L);
+            verify(vehicleRepository).findByVehicleId(VEHICLE_ID);
         }
 
         @Test
-        @DisplayName("should throw ResourceNotFoundException when not found")
+        @DisplayName("should throw VehicleNotFoundException when not found")
         void shouldThrowNotFoundWhenMissing() {
-            when(vehicleRepository.findById(99L)).thenReturn(Uni.createFrom().nullItem());
+            UUID missingId = UUID.randomUUID();
+            when(vehicleRepository.findByVehicleId(missingId)).thenReturn(Uni.createFrom().nullItem());
 
-            assertThrows(ResourceNotFoundException.class,
-                    () -> service.findById(99L).await().indefinitely());
+            assertThrows(VehicleNotFoundException.class,
+                    () -> service.findById(missingId).await().indefinitely());
         }
     }
 
@@ -177,11 +199,11 @@ class VehicleServiceTest {
         }
 
         @Test
-        @DisplayName("should throw ResourceNotFoundException when license plate not found")
+        @DisplayName("should throw VehicleNotFoundException when license plate not found")
         void shouldThrowNotFoundWhenMissing() {
             when(vehicleRepository.findByLicensePlate("XYZ9999")).thenReturn(Uni.createFrom().nullItem());
 
-            assertThrows(ResourceNotFoundException.class,
+            assertThrows(VehicleNotFoundException.class,
                     () -> service.findByLicensePlate("XYZ9999").await().indefinitely());
         }
     }
@@ -193,8 +215,9 @@ class VehicleServiceTest {
         @Test
         @DisplayName("should persist entity when license plate is unique")
         void shouldPersistWhenPlateIsUnique() {
+            when(customerRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
             when(vehicleRepository.existsByLicensePlate("ABC1234")).thenReturn(Uni.createFrom().item(false));
-            when(vehicleMapper.toEntity(request, null)).thenReturn(entity);
+            when(vehicleMapper.toEntity(request, customer)).thenReturn(entity);
             when(vehicleRepository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
 
             assertDoesNotThrow(() -> service.create(request).await().indefinitely());
@@ -204,6 +227,7 @@ class VehicleServiceTest {
         @Test
         @DisplayName("should throw DuplicateLicensePlateException when plate already exists")
         void shouldThrowDuplicateWhenPlateExists() {
+            when(customerRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
             when(vehicleRepository.existsByLicensePlate("ABC1234")).thenReturn(Uni.createFrom().item(true));
 
             assertThrows(DuplicateLicensePlateException.class,
@@ -219,26 +243,27 @@ class VehicleServiceTest {
         @Test
         @DisplayName("should update entity and return response with correct data")
         void shouldUpdateAndReturn() {
-            when(vehicleRepository.findById(1L)).thenReturn(Uni.createFrom().item(entity));
+            when(vehicleRepository.findByVehicleId(VEHICLE_ID)).thenReturn(Uni.createFrom().item(entity));
             when(vehicleRepository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
             when(vehicleMapper.toResponse(entity)).thenReturn(response);
 
-            VehicleResponseDto result = service.update(1L, request).await().indefinitely();
+            VehicleResponseDto result = service.update(VEHICLE_ID, request).await().indefinitely();
 
             assertNotNull(result);
-            assertEquals(1L, result.id());
+            assertEquals(VEHICLE_ID, result.id());
             assertEquals("ABC1234", result.licensePlate());
             verify(vehicleMapper).updateEntity(entity, request);
             verify(vehicleRepository).persist(entity);
         }
 
         @Test
-        @DisplayName("should throw ResourceNotFoundException when entity not found")
+        @DisplayName("should throw VehicleNotFoundException when entity not found")
         void shouldThrowNotFoundWhenMissing() {
-            when(vehicleRepository.findById(99L)).thenReturn(Uni.createFrom().nullItem());
+            UUID missingId = UUID.randomUUID();
+            when(vehicleRepository.findByVehicleId(missingId)).thenReturn(Uni.createFrom().nullItem());
 
-            assertThrows(ResourceNotFoundException.class,
-                    () -> service.update(99L, request).await().indefinitely());
+            assertThrows(VehicleNotFoundException.class,
+                    () -> service.update(missingId, request).await().indefinitely());
             verify(vehicleRepository, never()).persist(any(Vehicle.class));
         }
     }
@@ -250,19 +275,20 @@ class VehicleServiceTest {
         @Test
         @DisplayName("should delete vehicle when found")
         void shouldDeleteWhenFound() {
-            when(vehicleRepository.deleteById(1L)).thenReturn(Uni.createFrom().item(true));
+            when(vehicleRepository.deleteByVehicleId(VEHICLE_ID)).thenReturn(Uni.createFrom().item(1L));
 
-            assertDoesNotThrow(() -> service.delete(1L).await().indefinitely());
-            verify(vehicleRepository).deleteById(1L);
+            assertDoesNotThrow(() -> service.delete(VEHICLE_ID).await().indefinitely());
+            verify(vehicleRepository).deleteByVehicleId(VEHICLE_ID);
         }
 
         @Test
-        @DisplayName("should throw ResourceNotFoundException when vehicle not found")
+        @DisplayName("should throw VehicleNotFoundException when vehicle not found")
         void shouldThrowWhenNotFound() {
-            when(vehicleRepository.deleteById(99L)).thenReturn(Uni.createFrom().item(false));
+            UUID missingId = UUID.randomUUID();
+            when(vehicleRepository.deleteByVehicleId(missingId)).thenReturn(Uni.createFrom().item(0L));
 
-            assertThrows(ResourceNotFoundException.class,
-                    () -> service.delete(99L).await().indefinitely());
+            assertThrows(VehicleNotFoundException.class,
+                    () -> service.delete(missingId).await().indefinitely());
         }
     }
 }

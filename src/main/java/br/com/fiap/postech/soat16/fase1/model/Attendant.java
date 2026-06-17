@@ -4,6 +4,8 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
@@ -18,7 +20,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "attendant", schema = "oficina-mecanica")
+@Table(name = "attendant", schema = "oficina_mecanica")
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 @AllArgsConstructor
 @NoArgsConstructor
@@ -26,7 +28,8 @@ public class Attendant extends AuditableEntity {
 
     @EqualsAndHashCode.Include
     @Id
-    @Column(name = "id", nullable = false)
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "attendant_id", nullable = false)
     private UUID id;
 
     @Column(name = "first_name", nullable = false)

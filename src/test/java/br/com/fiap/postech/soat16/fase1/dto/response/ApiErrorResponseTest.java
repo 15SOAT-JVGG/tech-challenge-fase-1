@@ -10,6 +10,7 @@ import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import br.com.fiap.postech.soat16.fase1.dto.response.error.ApiErrorResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.ErrorType;
 
 @DisplayName("ApiErrorResponse — Unit Tests")
@@ -20,7 +21,7 @@ class ApiErrorResponseTest {
     void ofCreatesWithTimestamp() {
         Instant before = Instant.now();
 
-        ApiErrorResponse response = ApiErrorResponse.of(
+        ApiErrorResponseDto response = ApiErrorResponseDto.of(
                 404,
                 ErrorType.NOT_FOUND,
                 "CUSTOMER_NOT_FOUND",

@@ -1,36 +1,32 @@
 package br.com.fiap.postech.soat16.fase1.mapper;
 
-import java.util.UUID;
-
 import org.mapstruct.Mapper;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponse;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Attendant;
 
 @Mapper(componentModel = "cdi")
 public interface AttendantMapper {
 
-    default AttendantResponse toResponse(Attendant entity) {
+    default AttendantResponseDto toResponse(Attendant entity) {
         if (entity == null) {
             return null;
         }
-        return new AttendantResponse(
+        return new AttendantResponseDto(
                 entity.getId(),
                 entity.getFirstName(),
                 entity.getLastName(),
                 entity.getEmail(),
                 entity.getPhoneNumber(),
                 entity.isActive(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getCreatedAt()
         );
     }
 
-    default AttendantLoginResponse toLoginResponse(Attendant entity) {
-        return new AttendantLoginResponse(
+    default AttendantLoginResponseDto toLoginResponse(Attendant entity) {
+        return new AttendantLoginResponseDto(
                 entity.getId(),
                 entity.getFirstName(),
                 entity.getLastName(),
@@ -39,26 +35,21 @@ public interface AttendantMapper {
         );
     }
 
-    default Attendant toEntity(AttendantCreateRequest request, String passwordHash) {
-        if (request == null) {
-            return null;
-        }
+    default Attendant toEntity(AttendantRequestDto request, String passwordHash) {
         var entity = new Attendant();
-        entity.setId(UUID.randomUUID());
-        entity.setFirstName(request.getFirstName());
-        entity.setLastName(request.getLastName());
-        entity.setEmail(request.getEmail());
-        entity.setPhoneNumber(request.getPhoneNumber());
+        entity.setFirstName(request.firstName());
+        entity.setLastName(request.lastName());
+        entity.setEmail(request.email());
+        entity.setPhoneNumber(request.phoneNumber());
         entity.setPasswordHash(passwordHash);
         entity.setActive(true);
         return entity;
     }
 
-    default void updateEntity(Attendant entity, AttendantUpdateRequest request) {
-        entity.setFirstName(request.getFirstName());
-        entity.setLastName(request.getLastName());
-        entity.setEmail(request.getEmail());
-        entity.setPhoneNumber(request.getPhoneNumber());
-        entity.setActive(request.getActive());
+    default void updateEntity(Attendant entity, AttendantRequestDto request) {
+        entity.setFirstName(request.firstName());
+        entity.setLastName(request.lastName());
+        entity.setEmail(request.email());
+        entity.setPhoneNumber(request.phoneNumber());
     }
 }

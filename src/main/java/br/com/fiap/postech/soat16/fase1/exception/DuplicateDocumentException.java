@@ -6,6 +6,6 @@ import static br.com.fiap.postech.soat16.fase1.exception.ErrorType.CONFLICT;
 public class DuplicateDocumentException extends AppException {
 
     public DuplicateDocumentException() {
-        super("Este documento (CPF/CNPJ) já está cadastrado", DOCUMENT_ALREADY_EXISTS, CONFLICT);
+        super("This document (CPF/CNPJ) is already registered", DOCUMENT_ALREADY_EXISTS, CONFLICT);
     }
 }

@@ -34,8 +34,18 @@ public class PostgresTestResource implements QuarkusTestResourceLifecycleManager
             postgres.getDatabaseName(),
             SCHEMA);
 
+        // O Flyway usa o datasource JDBC (blocking), não o reativo. Sem este override ele
+        // herda quarkus.datasource.jdbc.url da config base (ex.: INFRA_HOST_POSTGRES local),
+        // mas com as credenciais do container — causando "password authentication failed".
+        String jdbcUrl = "jdbc:postgresql://%s:%d/%s?currentSchema=%s".formatted(
+            postgres.getHost(),
+            postgres.getMappedPort(PostgreSQLContainer.POSTGRESQL_PORT),
+            postgres.getDatabaseName(),
+            SCHEMA);
+
         return Map.of(
             "quarkus.datasource.reactive.url", reactiveUrl,
+            "quarkus.datasource.jdbc.url", jdbcUrl,
             "quarkus.datasource.username", postgres.getUsername(),
             "quarkus.datasource.password", postgres.getPassword()
         );

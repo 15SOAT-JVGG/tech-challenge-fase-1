@@ -1,18 +1,22 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
-import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
+
+import java.util.Locale;
+import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
+import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
-import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
+import br.com.fiap.postech.soat16.fase1.exception.VehicleNotFoundException;
 import br.com.fiap.postech.soat16.fase1.mapper.VehicleMapper;
+import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
 import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
 
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
@@ -24,6 +28,7 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class VehicleService {
 
+    private CustomerRepository customerRepository;
     private VehicleRepository vehicleRepository;
     private VehicleMapper vehicleMapper;
 
@@ -39,50 +44,49 @@ public class VehicleService {
     }
 
     @WithSession
-    public Uni<VehicleResponseDto> findById(Long id) {
-        return vehicleRepository.findById(id)
-                .onItem().ifNull().failWith(() -> new ResourceNotFoundException("Vehicle not found"))
+    public Uni<VehicleResponseDto> findById(UUID id) {
+        return vehicleRepository.findByVehicleId(id)
+                .onItem().ifNull().failWith(VehicleNotFoundException::new)
                 .map(vehicleMapper::toResponse);
     }
 
     @WithSession
     public Uni<VehicleResponseDto> findByLicensePlate(String licensePlate) {
-        return vehicleRepository.findByLicensePlate(licensePlate)
-                .onItem().ifNull().failWith(() -> new ResourceNotFoundException("Vehicle not found"))
+        final String normalizedLicensePlate = licensePlate.replace("-", "").toUpperCase(Locale.ROOT);
+        return vehicleRepository.findByLicensePlate(normalizedLicensePlate)
+                .onItem().ifNull().failWith(() -> new VehicleNotFoundException(licensePlate))
                 .map(vehicleMapper::toResponse);
     }
 
     @WithTransaction
-    public Uni<Void> create(VehicleDto dto) {
-        return vehicleRepository.existsByLicensePlate(dto.licensePlate())
-                .flatMap(exists -> {
-                    if (TRUE.equals(exists)) {
-                        throw new DuplicateLicensePlateException();
-                    }
-                    return vehicleRepository.persist(vehicleMapper.toEntity(dto, null))
-                            .replaceWithVoid();
-                });
+    public Uni<Void> create(VehicleRequestDto dto) {
+        return customerRepository.findByCustomerId(dto.customerId())
+                .onItem().ifNull().failWith(CustomerNotFoundException::new)
+                .flatMap(customer -> vehicleRepository.existsByLicensePlate(dto.licensePlate())
+                        .flatMap(exists -> {
+                            if (TRUE.equals(exists)) {
+                                return Uni.createFrom().failure(new DuplicateLicensePlateException());
+                            }
+                            return vehicleRepository.persist(vehicleMapper.toEntity(dto, customer)).replaceWithVoid();
+                        }));
     }
 
     @WithTransaction
-    public Uni<VehicleResponseDto> update(Long id, VehicleDto request) {
-        return vehicleRepository.findById(id)
+    public Uni<VehicleResponseDto> update(UUID id, VehicleRequestDto request) {
+        return vehicleRepository.findByVehicleId(id)
+                .onItem().ifNull().failWith(VehicleNotFoundException::new)
                 .flatMap(entity -> {
-                    if (entity == null) {
-                        throw new ResourceNotFoundException("Vehicle not found");
-                    }
                     vehicleMapper.updateEntity(entity, request);
-                    return vehicleRepository.persist(entity)
-                            .map(vehicleMapper::toResponse);
+                    return vehicleRepository.persist(entity).map(vehicleMapper::toResponse);
                 });
     }
 
     @WithTransaction
-    public Uni<Void> delete(Long id) {
-        return vehicleRepository.deleteById(id)
+    public Uni<Void> delete(UUID id) {
+        return vehicleRepository.deleteByVehicleId(id)
                 .flatMap(deleted -> {
-                    if (FALSE.equals(deleted)) {
-                        throw new ResourceNotFoundException("Vehicle not found");
+                    if (deleted == 0) {
+                        return Uni.createFrom().failure(new VehicleNotFoundException());
                     }
                     return Uni.createFrom().voidItem();
                 });

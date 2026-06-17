@@ -2,16 +2,16 @@ package br.com.fiap.postech.soat16.fase1.mapper;
 
 import org.mapstruct.Mapper;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 
 @Mapper(componentModel = "cdi")
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface VehicleMapper {
 
     default VehicleResponseDto toResponse(Vehicle entity) {
-        if (entity == null) return null;
         return new VehicleResponseDto(
                 entity.getId(),
                 entity.getLicensePlate(),
@@ -21,14 +21,23 @@ public interface VehicleMapper {
                 entity.getYear(),
                 entity.getKmDriven(),
                 entity.getType(),
-                null
-                //entity.getCustomer().getCustomerId()
+                entity.getCustomer().getId(),
+                entity.getCreatedAt()
         );
     }
 
-    default Vehicle toEntity(VehicleDto dto, Customer customer) {
-        if (dto == null) return null;
+    default Vehicle toEntity(VehicleRequestDto dto, Customer customer) {
         var entity = new Vehicle();
+        buildVehicleEntity(dto, entity);
+        entity.setCustomer(customer);
+        return entity;
+    }
+
+    default void updateEntity(Vehicle vehicle, VehicleRequestDto dto) {
+        buildVehicleEntity(dto, vehicle);
+    }
+
+    private void buildVehicleEntity(VehicleRequestDto dto, Vehicle entity) {
         entity.setLicensePlate(dto.licensePlate());
         entity.setManufacturer(dto.manufacturer());
         entity.setModel(dto.model());
@@ -36,17 +45,5 @@ public interface VehicleMapper {
         entity.setYear(dto.year());
         entity.setKmDriven(dto.kmDriven());
         entity.setType(dto.type());
-        //entity.setCustomer(customer);
-        return entity;
-    }
-
-    default void updateEntity(Vehicle vehicle, VehicleDto dto) {
-        vehicle.setLicensePlate(dto.licensePlate());
-        vehicle.setManufacturer(dto.manufacturer());
-        vehicle.setModel(dto.model());
-        vehicle.setColor(dto.color());
-        vehicle.setYear(dto.year());
-        vehicle.setKmDriven(dto.kmDriven());
-        vehicle.setType(dto.type());
     }
 }

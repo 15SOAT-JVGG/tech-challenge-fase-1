@@ -3,7 +3,9 @@ package br.com.fiap.postech.soat16.fase1.repository;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -12,6 +14,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 
 import io.quarkus.hibernate.reactive.panache.PanacheRepository;
+import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
 
 @ApplicationScoped
@@ -23,6 +26,20 @@ public class VehicleRepository implements PanacheRepository<Vehicle> {
 
     public Uni<Boolean> existsByLicensePlate(String licensePlate) {
         return count("licensePlate = ?1", licensePlate).map(total -> total > 0);
+    }
+
+    public Uni<Boolean> existsByCustomerId(UUID customerId) {
+        return count("customer.id = ?1", customerId).map(total -> total > 0);
+    }
+
+    public Uni<Vehicle> findByVehicleId(UUID id) {
+        return find("id = ?1", id).firstResult()
+                .invoke(found -> Log.infof("Vehicle lookup: id=%s found=%b", id, found != null));
+    }
+
+    public Uni<Long> deleteByVehicleId(UUID id) {
+        return delete("id = ?1", id)
+                .invoke(deleted -> Log.infof("Vehicle deleted: id=%s deleted=%d", id, deleted));
     }
 
     public Uni<List<Vehicle>> findPageWithFilter(PageableRequestDto pageable, VehicleFilterDto filter) {
@@ -52,21 +69,21 @@ public class VehicleRepository implements PanacheRepository<Vehicle> {
 
         if (filter.getLicensePlate() != null && !filter.getLicensePlate().isBlank()) {
             conditions.add("LOWER(licensePlate) LIKE :licensePlate");
-            params.put("licensePlate", "%" + filter.getLicensePlate().toLowerCase() + "%");
+            params.put("licensePlate", "%" + filter.getLicensePlate().toLowerCase(Locale.ROOT) + "%");
         }
 
         if (filter.getManufacturer() != null && !filter.getManufacturer().isBlank()) {
             conditions.add("LOWER(manufacturer) LIKE :manufacturer");
-            params.put("manufacturer", "%" + filter.getManufacturer().toLowerCase() + "%");
+            params.put("manufacturer", "%" + filter.getManufacturer().toLowerCase(Locale.ROOT) + "%");
         }
 
         if (filter.getModel() != null && !filter.getModel().isBlank()) {
             conditions.add("LOWER(model) LIKE :model");
-            params.put("model", "%" + filter.getModel().toLowerCase() + "%");
+            params.put("model", "%" + filter.getModel().toLowerCase(Locale.ROOT) + "%");
         }
 
         return new FilterResult(String.join(" AND ", conditions), params);
     }
 
-    private record FilterResult(String query, Map<String, Object> params) {}
+    private record FilterResult(String query, Map<String, Object> params) { }
 }

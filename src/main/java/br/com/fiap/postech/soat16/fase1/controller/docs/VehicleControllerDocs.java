@@ -1,7 +1,17 @@
 package br.com.fiap.postech.soat16.fase1.controller.docs;
 
+import java.util.UUID;
+
 import jakarta.validation.Valid;
-import jakarta.ws.rs.*;
+import jakarta.ws.rs.BeanParam;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
@@ -16,8 +26,8 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 
 import io.smallrye.mutiny.Uni;
@@ -47,10 +57,10 @@ public interface VehicleControllerDocs {
     @APIResponse(responseCode = "404", description = "Vehicle not found")
     Uni<VehicleResponseDto> findById(
             @Parameter(name = "id", description = "Vehicle identifier", required = true, in = ParameterIn.PATH)
-            @PathParam("id") Long id);
+            @PathParam("id") UUID id);
 
     @GET
-    @Path("/license-plate/{license_plate}")
+    @Path("/by-license-plate/{license_plate}")
     @Operation(summary = "Get vehicle by license plate", description = "Returns a single vehicle by identifier.")
     @APIResponse(responseCode = "200", description = "Vehicle found",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
@@ -69,7 +79,7 @@ public interface VehicleControllerDocs {
     @APIResponse(responseCode = "409", description = "License plate already registered")
     Uni<Response> create(
             @RequestBody(description = "Vehicle data for registration")
-            @Valid VehicleDto body);
+            @Valid VehicleRequestDto body);
 
     @PUT
     @Path("/{id}")
@@ -80,9 +90,9 @@ public interface VehicleControllerDocs {
     @APIResponse(responseCode = "404", description = "Vehicle not found")
     Uni<Response> update(
             @Parameter(name = "id", description = "Vehicle identifier", required = true, in = ParameterIn.PATH)
-            @PathParam("id") Long id,
+            @PathParam("id") UUID id,
             @RequestBody(description = "Updated vehicle data")
-            @Valid VehicleDto body);
+            @Valid VehicleRequestDto body);
 
     @DELETE
     @Path("/{id}")
@@ -91,5 +101,5 @@ public interface VehicleControllerDocs {
     @APIResponse(responseCode = "404", description = "Vehicle not found")
     Uni<Response> delete(
             @Parameter(name = "id", description = "Vehicle identifier", required = true, in = ParameterIn.PATH)
-            @PathParam("id") Long id);
+            @PathParam("id") UUID id);
 }

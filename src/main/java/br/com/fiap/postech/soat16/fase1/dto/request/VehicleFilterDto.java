@@ -1,5 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.dto.request;
 
+import java.util.Locale;
+
 import jakarta.ws.rs.QueryParam;
 
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
@@ -22,6 +24,6 @@ public class VehicleFilterDto {
     private String model;
 
     public String getLicensePlate() {
-        return licensePlate == null ? null : licensePlate.replace("-", "").toUpperCase();
+        return licensePlate == null ? null : licensePlate.replace("-", "").toUpperCase(Locale.ROOT);
     }
 }

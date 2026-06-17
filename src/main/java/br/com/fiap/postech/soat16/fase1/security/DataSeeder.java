@@ -43,20 +43,22 @@ public class DataSeeder {
     @ConfigProperty(name = "app.seed.enabled", defaultValue = "true")
     boolean seedEnabled;
 
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     void onStart(@Observes StartupEvent ev) {
         if (!seedEnabled) {
-            LOG.info("Seed inicial desabilitado (app.seed.enabled=false).");
+            LOG.info("Initial seed disabled (app.seed.enabled=false).");
             return;
         }
         try {
-            // Hibernate Reactive exige contexto Vert.x e sessão/transação reativos;
-            // subscribeAndAwait bloqueia o startup até o seed concluir.
+            // Hibernate Reactive requires a Vert.x context and reactive session/transaction;
+            // subscribeAndAwait blocks startup until the seed completes.
             VertxContextSupport.subscribeAndAwait(() ->
                 Panache.withTransaction(() ->
                     seedUser(adminUsername, adminPassword, "ADMIN")
                         .chain(() -> seedUser(mechanicUsername, mechanicPassword, "MECHANIC"))));
         } catch (Throwable e) {
-            throw new IllegalStateException("Falha ao executar seed inicial.", e);
+            // subscribeAndAwait declares "throws Throwable", so this catch can't be narrowed
+            throw new IllegalStateException("Failed to run initial seed.", e);
         }
     }
 
@@ -68,14 +70,14 @@ public class DataSeeder {
                 }
                 String password = configuredPassword.filter(p -> !p.isBlank()).orElseGet(() -> {
                     String generated = generateRandomPassword();
-                    LOG.warnf("[SEED] Senha não configurada para '%s'. Senha gerada (anote e altere): %s",
+                    LOG.warnf("[SEED] Password not configured for '%s'. Generated password (note it down and change it): %s",
                         username, generated);
                     return generated;
                 });
 
                 AppUser user = new AppUser(username, BcryptUtil.bcryptHash(password), role);
                 return userRepository.persist(user)
-                    .invoke(() -> LOG.infof("Usuário inicial criado: %s (%s)", username, role))
+                    .invoke(() -> LOG.infof("Initial user created: %s (%s)", username, role))
                     .replaceWithVoid();
             });
     }

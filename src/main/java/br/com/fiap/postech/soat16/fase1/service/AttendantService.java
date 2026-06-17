@@ -6,11 +6,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponse;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.AttendantNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateAttendantEmailException;
 import br.com.fiap.postech.soat16.fase1.exception.InactiveAttendantException;
@@ -28,32 +27,32 @@ public class AttendantService {
     private final AttendantMapper mapper;
     private final PasswordService passwordService;
 
-    public PageableResponseDto<AttendantResponse> findAll(String q, int page, int size) {
+    public PageableResponseDto<AttendantResponseDto> findAll(String q, int page, int size) {
         var data = repository.findPage(page, size).stream().map(mapper::toResponse).toList();
         return PageableResponseDto.of(data, page, size, repository.count());
     }
 
-    public AttendantResponse findById(UUID id) {
+    public AttendantResponseDto findById(UUID id) {
         return repository.findByAttendantId(id)
                 .map(mapper::toResponse)
                 .orElseThrow(() -> new AttendantNotFoundException(id));
     }
 
     @Transactional
-    public void create(AttendantCreateRequest request) {
-        if (repository.existsByEmail(request.getEmail())) {
+    public void create(AttendantRequestDto request) {
+        if (repository.existsByEmail(request.email())) {
             throw new DuplicateAttendantEmailException();
         }
-        String passwordHash = passwordService.hash(request.getPassword());
+        String passwordHash = passwordService.hash(request.password());
         repository.persist(mapper.toEntity(request, passwordHash));
     }
 
     @Transactional
-    public AttendantResponse update(UUID id, AttendantUpdateRequest request) {
+    public AttendantResponseDto update(UUID id, AttendantRequestDto request) {
         var entity = repository.findByAttendantId(id)
                 .orElseThrow(() -> new AttendantNotFoundException(id));
 
-        if (repository.existsByEmailAndDifferentId(request.getEmail(), id)) {
+        if (repository.existsByEmailAndDifferentId(request.email(), id)) {
             throw new DuplicateAttendantEmailException();
         }
 
@@ -69,15 +68,15 @@ public class AttendantService {
         }
     }
 
-    public AttendantLoginResponse login(AttendantLoginRequest request) {
-        var entity = repository.findByEmail(request.getEmail())
+    public AttendantLoginResponseDto login(AttendantLoginRequestDto request) {
+        var entity = repository.findByEmail(request.email())
                 .orElseThrow(InvalidAttendantCredentialsException::new);
 
         if (!entity.isActive()) {
             throw new InactiveAttendantException();
         }
 
-        if (!passwordService.matches(request.getPassword(), entity.getPasswordHash())) {
+        if (!passwordService.matches(request.password(), entity.getPasswordHash())) {
             throw new InvalidAttendantCredentialsException();
         }
 

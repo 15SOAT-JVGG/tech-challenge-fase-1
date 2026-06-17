@@ -5,8 +5,13 @@ import java.util.List;
 
 public record PageableResponseDto<T>(
         List<T> content,
-        PaginationDto paginationDto
+        PaginationDto pagination
 ) {
+
+    public PageableResponseDto(List<T> content, PaginationDto pagination) {
+        this.content = List.copyOf(content);
+        this.pagination = pagination;
+    }
 
     public static <T> PageableResponseDto<T> of(List<T> content, int page, int size, long totalElements) {
         int totalPages = size <= 0 ? 0 : (int) Math.ceil((double) totalElements / size);

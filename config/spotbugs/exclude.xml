@@ -3,4 +3,14 @@
     <Match>
         <Class name="~.*MapperImpl"/>
     </Match>
+    <Match>
+        <!-- Hibernate-recommended equals/hashCode pattern for proxy-safe entity comparison -->
+        <Class name="br.com.fiap.postech.soat16.fase1.model.Customer"/>
+        <Bug pattern="EQ_CHECK_FOR_OPERAND_NOT_COMPATIBLE_WITH_THIS"/>
+    </Match>
+    <Match>
+        <!-- content is defensively copied with List.copyOf in the constructor, so it is already immutable -->
+        <Class name="br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>

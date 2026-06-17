@@ -1,6 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.dto.request;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.lang.reflect.Field;
 

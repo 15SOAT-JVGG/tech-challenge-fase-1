@@ -1,26 +1,26 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
-import br.com.fiap.postech.soat16.fase1.controller.docs.PartControllerDocs;
-import br.com.fiap.postech.soat16.fase1.dto.request.PartRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.response.PartResponseDto;
-import br.com.fiap.postech.soat16.fase1.service.PartService;
-import io.smallrye.mutiny.Uni;
+import java.net.URI;
+import java.util.List;
+
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.core.Response;
 
-import java.net.URI;
-import java.util.List;
+import br.com.fiap.postech.soat16.fase1.controller.docs.PartControllerDocs;
+import br.com.fiap.postech.soat16.fase1.dto.request.PartRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.PartResponseDto;
+import br.com.fiap.postech.soat16.fase1.service.PartService;
+
+import io.smallrye.mutiny.Uni;
+import lombok.RequiredArgsConstructor;
 
 @ApplicationScoped
+@RequiredArgsConstructor
 @RolesAllowed({"ADMIN", "MECHANIC"})
 public class PartController implements PartControllerDocs {
 
     private final PartService partService;
-
-    public PartController(PartService partService) {
-        this.partService = partService;
-    }
 
     @Override
     public Uni<List<PartResponseDto>> listAll() {

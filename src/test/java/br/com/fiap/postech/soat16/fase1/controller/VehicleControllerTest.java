@@ -1,9 +1,15 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.UUID;
 
 import jakarta.ws.rs.core.Response;
 
@@ -18,8 +24,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
 import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
@@ -38,13 +44,14 @@ class VehicleControllerTest {
     private VehicleController controller;
 
     private VehicleResponseDto response;
-    private VehicleDto request;
+    private VehicleRequestDto request;
 
     @BeforeEach
     void setUp() {
         controller = new VehicleController(vehicleService);
-        response = new VehicleResponseDto(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO, null);
-        request = new VehicleDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+        response = new VehicleResponseDto(UUID.randomUUID(), "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L,
+                VehicleType.CAR, null, null);
+        request = new VehicleRequestDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
     }
 
     @Nested
@@ -102,23 +109,25 @@ class VehicleControllerTest {
         @Test
         @DisplayName("should return vehicle when found")
         void shouldReturnVehicleWhenFound() {
-            when(vehicleService.findById(1L)).thenReturn(Uni.createFrom().item(response));
+            UUID id = response.id();
+            when(vehicleService.findById(id)).thenReturn(Uni.createFrom().item(response));
 
-            VehicleResponseDto result = controller.findById(1L).await().indefinitely();
+            VehicleResponseDto result = controller.findById(id).await().indefinitely();
 
             assertNotNull(result);
             assertEquals("ABC1234", result.licensePlate());
-            verify(vehicleService).findById(1L);
+            verify(vehicleService).findById(id);
         }
 
         @Test
         @DisplayName("should propagate ResourceNotFoundException")
         void shouldPropagateNotFoundException() {
-            when(vehicleService.findById(99L))
+            UUID missingId = UUID.randomUUID();
+            when(vehicleService.findById(missingId))
                     .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Vehicle not found")));
 
             assertThrows(ResourceNotFoundException.class,
-                    () -> controller.findById(99L).await().indefinitely());
+                    () -> controller.findById(missingId).await().indefinitely());
         }
     }
 
@@ -183,22 +192,24 @@ class VehicleControllerTest {
         @Test
         @DisplayName("should return HTTP 200 with updated body")
         void shouldReturn200WithUpdatedBody() {
-            when(vehicleService.update(1L, request)).thenReturn(Uni.createFrom().item(response));
+            UUID id = response.id();
+            when(vehicleService.update(id, request)).thenReturn(Uni.createFrom().item(response));
 
-            Response result = controller.update(1L, request).await().indefinitely();
+            Response result = controller.update(id, request).await().indefinitely();
 
             assertEquals(200, result.getStatus());
-            verify(vehicleService).update(1L, request);
+            verify(vehicleService).update(id, request);
         }
 
         @Test
         @DisplayName("should propagate ResourceNotFoundException")
         void shouldPropagateNotFoundException() {
-            when(vehicleService.update(99L, request))
+            UUID missingId = UUID.randomUUID();
+            when(vehicleService.update(missingId, request))
                     .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Vehicle not found")));
 
             assertThrows(ResourceNotFoundException.class,
-                    () -> controller.update(99L, request).await().indefinitely());
+                    () -> controller.update(missingId, request).await().indefinitely());
         }
     }
 
@@ -209,22 +220,24 @@ class VehicleControllerTest {
         @Test
         @DisplayName("should return HTTP 204 when delete succeeds")
         void shouldReturn204WhenDeleteSucceeds() {
-            when(vehicleService.delete(1L)).thenReturn(Uni.createFrom().voidItem());
+            UUID id = UUID.randomUUID();
+            when(vehicleService.delete(id)).thenReturn(Uni.createFrom().voidItem());
 
-            Response result = controller.delete(1L).await().indefinitely();
+            Response result = controller.delete(id).await().indefinitely();
 
             assertEquals(204, result.getStatus());
-            verify(vehicleService).delete(1L);
+            verify(vehicleService).delete(id);
         }
 
         @Test
         @DisplayName("should propagate ResourceNotFoundException")
         void shouldPropagateNotFoundException() {
-            when(vehicleService.delete(99L))
+            UUID missingId = UUID.randomUUID();
+            when(vehicleService.delete(missingId))
                     .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Vehicle not found")));
 
             assertThrows(ResourceNotFoundException.class,
-                    () -> controller.delete(99L).await().indefinitely());
+                    () -> controller.delete(missingId).await().indefinitely());
         }
     }
 }

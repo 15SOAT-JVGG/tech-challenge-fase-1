@@ -1,13 +1,18 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.PartRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.response.PartResponseDto;
-import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
-import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
-import br.com.fiap.postech.soat16.fase1.model.PartType;
-import br.com.fiap.postech.soat16.fase1.service.PartService;
-import io.smallrye.mutiny.Uni;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
 import jakarta.ws.rs.core.Response;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,12 +21,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
+import br.com.fiap.postech.soat16.fase1.dto.request.PartRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.PartResponseDto;
+import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
+import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
+import br.com.fiap.postech.soat16.fase1.model.PartType;
+import br.com.fiap.postech.soat16.fase1.service.PartService;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.smallrye.mutiny.Uni;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PartController — Unit Tests")
@@ -36,10 +43,12 @@ class PartControllerTest {
 
     private PartResponseDto response;
 
+    private static final UUID FIXED_UUID = UUID.fromString("c3b79cde-2872-4053-9622-37605bf124a3");
+
     @BeforeEach
     void setUp() {
         controller = new PartController(service);
-        response = new PartResponseDto(ID, "Óleo 5W30", "Óleo sintético", new BigDecimal("49.90"),
+        response = new PartResponseDto(FIXED_UUID, "Óleo 5W30", "Óleo sintético", new BigDecimal("49.90"),
             10, "L", 5, PartType.INSUMO, false, LocalDateTime.now());
     }
 
@@ -126,7 +135,7 @@ class PartControllerTest {
             Response result = controller.create(dto).await().indefinitely();
 
             assertEquals(201, result.getStatus());
-            assertEquals("/admin/parts/1", result.getLocation().toString());
+            assertEquals("/admin/parts/c3b79cde-2872-4053-9622-37605bf124a3", result.getLocation().toString());
             assertEquals(response, result.getEntity());
             verify(service).create(dto);
         }
@@ -179,7 +188,7 @@ class PartControllerTest {
         @DisplayName("should propagate BusinessException on insufficient stock")
         void shouldPropagateBusiness() {
             when(service.adjustStock(ID, -50))
-                .thenReturn(Uni.createFrom().failure(new BusinessException("Estoque insuficiente")));
+                .thenReturn(Uni.createFrom().failure(new BusinessException("Insufficient stock")));
 
             assertThrows(BusinessException.class,
                 () -> controller.adjustStock(ID, -50).await().indefinitely());

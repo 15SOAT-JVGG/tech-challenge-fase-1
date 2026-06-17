@@ -19,12 +19,12 @@ public class CustomerRepository implements PanacheRepository<Customer> {
     }
 
     public Uni<Customer> findByCustomerId(UUID id) {
-        return find("customerId = ?1", id).firstResult()
+        return find("id = ?1", id).firstResult()
                 .invoke(found -> Log.infof("Customer lookup: id=%s found=%b", id, found != null));
     }
 
     public Uni<Long> deleteByCustomerId(UUID id) {
-        return delete("customerId = ?1", id)
+        return delete("id = ?1", id)
                 .invoke(deleted -> Log.infof("Customer deleted: id=%s deleted=%d", id, deleted));
     }
 
@@ -33,7 +33,6 @@ public class CustomerRepository implements PanacheRepository<Customer> {
     }
 
     public Uni<Boolean> existsByDocument(String document) {
-        return count("document = ?1", document)
-                .map(total -> total > 0);
+        return count("document = ?1", document).map(total -> total > 0);
     }
 }

@@ -5,4 +5,4 @@ public record LoginResponseDto(
     String username,
     String role,
     long expiresIn
-) {}
+) { }

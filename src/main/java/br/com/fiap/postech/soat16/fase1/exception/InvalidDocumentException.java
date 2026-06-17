@@ -6,6 +6,6 @@ import static br.com.fiap.postech.soat16.fase1.exception.ErrorType.VALIDATION;
 public class InvalidDocumentException extends AppException {
 
     public InvalidDocumentException(String document) {
-        super("Documento inválido: " + document, INVALID_DOCUMENT, VALIDATION);
+        super("Invalid document " + document, INVALID_DOCUMENT, VALIDATION);
     }
 }

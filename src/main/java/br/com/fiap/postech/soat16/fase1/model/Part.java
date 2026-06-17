@@ -1,6 +1,9 @@
 package br.com.fiap.postech.soat16.fase1.model;
 
-import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -12,16 +15,19 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
+
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "parts")
 public class Part {
 
+    @EqualsAndHashCode.Include
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "part_id", nullable = false)
+    private UUID id;
 
     @Column(nullable = false, length = 100)
     private String name;
@@ -93,7 +99,7 @@ public class Part {
     }
 
     /**
-     * Indica necessidade de reposição: estoque atual igual ou abaixo do mínimo definido para a peça.
+     * Indicates restocking is needed: current stock at or below the minimum defined for the part.
      */
     public boolean isLowStock() {
         return minimumStock != null && stockQuantity <= minimumStock;
@@ -102,7 +108,7 @@ public class Part {
     public void decreaseStock(int quantity) {
         if (this.stockQuantity < quantity) {
             throw new BusinessException(
-                "Estoque insuficiente para a peça '" + name + "'. Disponível: " + stockQuantity
+                "Insufficient stock for part '" + name + "'. Available: " + stockQuantity
             );
         }
         this.stockQuantity -= quantity;
@@ -112,7 +118,7 @@ public class Part {
         this.stockQuantity += quantity;
     }
 
-    public Long getId() { return id; }
+    public UUID getId() { return id; }
     public String getName() { return name; }
     public String getDescription() { return description; }
     public BigDecimal getUnitPrice() { return unitPrice; }

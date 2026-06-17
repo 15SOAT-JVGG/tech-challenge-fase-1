@@ -1,20 +1,24 @@
 package br.com.fiap.postech.soat16.fase1.mapper;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
+import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.model.VehicleType;
 
 @DisplayName("VehicleMapper — Unit Tests")
 class VehicleMapperTest {
 
-    private final VehicleMapper mapper = new VehicleMapper() {};
+    private final VehicleMapper mapper = new VehicleMapper() { };
 
     @Nested
     @DisplayName("toResponse")
@@ -23,25 +27,24 @@ class VehicleMapperTest {
         @Test
         @DisplayName("should map all fields from entity to response")
         void shouldMapEntityToResponse() {
-            Vehicle entity = new Vehicle(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+            UUID id = UUID.randomUUID();
+            UUID customerId = UUID.randomUUID();
+            Customer customer = new Customer();
+            customer.setId(customerId);
+            Vehicle entity = new Vehicle(id, customer, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
 
             VehicleResponseDto result = mapper.toResponse(entity);
 
             assertNotNull(result);
-            assertEquals(1L, result.id());
+            assertEquals(id, result.id());
             assertEquals("ABC1234", result.licensePlate());
             assertEquals("Toyota", result.manufacturer());
             assertEquals("Corolla", result.model());
             assertEquals("Prata", result.color());
             assertEquals(2020, result.year());
             assertEquals(50000L, result.kmDriven());
-            assertEquals(VehicleType.CARRO, result.type());
-        }
-
-        @Test
-        @DisplayName("should return null when entity is null")
-        void shouldReturnNullWhenEntityIsNull() {
-            assertNull(mapper.toResponse(null));
+            assertEquals(VehicleType.CAR, result.type());
+            assertEquals(customerId, result.customerId());
         }
     }
 
@@ -52,7 +55,7 @@ class VehicleMapperTest {
         @Test
         @DisplayName("should map all fields from dto to entity")
         void shouldMapDtoToEntity() {
-            VehicleDto dto = new VehicleDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+            VehicleRequestDto dto = new VehicleRequestDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
 
             Vehicle result = mapper.toEntity(dto, null);
 
@@ -63,13 +66,7 @@ class VehicleMapperTest {
             assertEquals("Prata", result.getColor());
             assertEquals(2020, result.getYear());
             assertEquals(50000L, result.getKmDriven());
-            assertEquals(VehicleType.CARRO, result.getType());
-        }
-
-        @Test
-        @DisplayName("should return null when dto is null")
-        void shouldReturnNullWhenDtoIsNull() {
-            assertNull(mapper.toEntity(null, null));
+            assertEquals(VehicleType.CAR, result.getType());
         }
     }
 
@@ -80,8 +77,8 @@ class VehicleMapperTest {
         @Test
         @DisplayName("should overwrite all fields on existing entity")
         void shouldUpdateAllFields() {
-            Vehicle entity = new Vehicle(1L, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
-            VehicleDto dto = new VehicleDto(null, "XYZ9876", "Honda", "Civic", "Preto", 2022, 10000L, VehicleType.MOTO);
+            Vehicle entity = new Vehicle(UUID.randomUUID(), null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
+            VehicleRequestDto dto = new VehicleRequestDto(null, "XYZ9876", "Honda", "Civic", "Preto", 2022, 10000L, VehicleType.MOTOCYCLE);
 
             mapper.updateEntity(entity, dto);
 
@@ -91,7 +88,7 @@ class VehicleMapperTest {
             assertEquals("Preto", entity.getColor());
             assertEquals(2022, entity.getYear());
             assertEquals(10000L, entity.getKmDriven());
-            assertEquals(VehicleType.MOTO, entity.getType());
+            assertEquals(VehicleType.MOTOCYCLE, entity.getType());
         }
     }
 }

@@ -49,7 +49,7 @@ Variáveis relevantes:
 | Variável | Descrição | Padrão |
 |---|---|---|
 | `INFRA_HOST_POSTGRES` | Host do PostgreSQL | `localhost` |
-| `POSTGRES_DB` | Nome do banco (deve existir) | `oficina` |
+| `POSTGRES_DB` | Nome do banco (deve existir) | `oficina_mecanica` |
 | `POSTGRES_USERNAME` | Usuário do banco | `admin` |
 | `POSTGRES_PASSWORD` | Senha do banco | — (obrigatória no Compose) |
 | `APP_SEED_ADMIN_USERNAME` | Usuário admin inicial | `admin` |

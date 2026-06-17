@@ -7,14 +7,15 @@ import java.util.UUID;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
+import br.com.fiap.postech.soat16.fase1.exception.CustomerHasVehiclesException;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateDocumentException;
 import br.com.fiap.postech.soat16.fase1.mapper.CustomerMapper;
 import br.com.fiap.postech.soat16.fase1.model.Document;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
+import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
 
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
@@ -26,10 +27,11 @@ import lombok.RequiredArgsConstructor;
 public class CustomerService {
 
     private final CustomerRepository repository;
+    private final VehicleRepository vehicleRepository;
     private final CustomerMapper mapper;
 
     @WithSession
-    public Uni<PageableResponseDto<CustomerResponse>> findAll(String q, int page, int size) {
+    public Uni<PageableResponseDto<CustomerResponseDto>> findAll(String q, int page, int size) {
         return Uni.combine().all()
                 .unis(repository.findPage(page, size), repository.count())
                 .asTuple()
@@ -40,27 +42,27 @@ public class CustomerService {
     }
 
     @WithSession
-    public Uni<CustomerResponse> findById(UUID id) {
+    public Uni<CustomerResponseDto> findById(UUID id) {
         return repository.findByCustomerId(id)
-                .onItem().ifNull().failWith(() -> new CustomerNotFoundException(id))
+                .onItem().ifNull().failWith(CustomerNotFoundException::new)
                 .map(mapper::toResponse);
     }
 
     @WithTransaction
-    public Uni<Void> create(CustomerCreateRequest request) {
-        Document document = Document.of(request.getDocument());
+    public Uni<Void> create(CustomerRequestDto request) {
+        Document document = Document.of(request.document());
 
         return repository.existsByDocument(document.getValue())
                 .flatMap(docExists -> {
                     if (TRUE.equals(docExists)) {
-                        throw new DuplicateDocumentException();
+                        return Uni.createFrom().<Void>failure(new DuplicateDocumentException());
                     }
                     return repository.persist(mapper.toEntity(request, document)).replaceWithVoid();
                 });
     }
 
     @WithSession
-    public Uni<CustomerResponse> findByDocument(String rawDocument) {
+    public Uni<CustomerResponseDto> findByDocument(String rawDocument) {
         Document document = Document.of(rawDocument);
         return repository.findByDocument(document.getValue())
                 .onItem().ifNull().failWith(() -> new CustomerNotFoundException(rawDocument))
@@ -68,13 +70,10 @@ public class CustomerService {
     }
 
     @WithTransaction
-    public Uni<CustomerResponse> update(UUID id, CustomerUpdateRequest request) {
+    public Uni<CustomerResponseDto> update(UUID id, CustomerRequestDto request) {
         return repository.findByCustomerId(id)
-                .onItem().ifNull().failWith(() -> new CustomerNotFoundException(id))
+                .onItem().ifNull().failWith(CustomerNotFoundException::new)
                 .flatMap(entity -> {
-                    if (entity == null) {
-                        throw new CustomerNotFoundException(id);
-                    }
                     mapper.updateEntity(entity, request);
                     return repository.persist(entity).map(mapper::toResponse);
                 });
@@ -82,10 +81,16 @@ public class CustomerService {
 
     @WithTransaction
     public Uni<Void> delete(UUID id) {
-        return repository.deleteByCustomerId(id)
+        return vehicleRepository.existsByCustomerId(id)
+                .flatMap(hasVehicles -> {
+                    if (TRUE.equals(hasVehicles)) {
+                        return Uni.createFrom().<Long>failure(new CustomerHasVehiclesException());
+                    }
+                    return repository.deleteByCustomerId(id);
+                })
                 .flatMap(deleted -> {
                     if (deleted == 0) {
-                        throw new CustomerNotFoundException(id);
+                        return Uni.createFrom().<Void>failure(new CustomerNotFoundException());
                     }
                     return Uni.createFrom().voidItem();
                 });
