@@ -3,8 +3,6 @@ package br.com.fiap.postech.soat16.fase1.exception;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.UUID;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -14,12 +12,11 @@ class AppExceptionTest {
     @Test
     @DisplayName("CustomerNotFoundException carries NOT_FOUND type and CUSTOMER_NOT_FOUND code")
     void customerNotFoundHasCorrectTypeAndCode() {
-        UUID id = UUID.randomUUID();
-        CustomerNotFoundException ex = new CustomerNotFoundException(id);
+        CustomerNotFoundException ex = new CustomerNotFoundException();
 
         assertEquals(ErrorType.NOT_FOUND, ex.getType());
         assertEquals("CUSTOMER_NOT_FOUND", ex.getCode());
-        assertTrue(ex.getMessage().contains(id.toString()));
+        assertEquals("Customer not found", ex.getMessage());
     }
 
     @Test

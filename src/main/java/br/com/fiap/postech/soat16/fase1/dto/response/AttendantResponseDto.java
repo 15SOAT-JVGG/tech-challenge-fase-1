@@ -5,8 +5,6 @@ import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -15,18 +13,16 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class CustomerResponse {
+public class AttendantResponseDto {
 
-    private UUID customerId;
+    private UUID attendantId;
     private String firstName;
     private String lastName;
     private String email;
     private String phoneNumber;
-    private String document;
-    private String documentType;
+    private Boolean active;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

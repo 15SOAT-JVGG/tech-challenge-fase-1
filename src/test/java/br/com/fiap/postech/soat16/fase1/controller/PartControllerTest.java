@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -36,10 +37,12 @@ class PartControllerTest {
 
     private PartResponseDto response;
 
+    private static final UUID FIXED_UUID = UUID.fromString("c3b79cde-2872-4053-9622-37605bf124a3");
+
     @BeforeEach
     void setUp() {
         controller = new PartController(service);
-        response = new PartResponseDto(ID, "Óleo 5W30", "Óleo sintético", new BigDecimal("49.90"),
+        response = new PartResponseDto(FIXED_UUID, "Óleo 5W30", "Óleo sintético", new BigDecimal("49.90"),
             10, "L", 5, PartType.INSUMO, false, LocalDateTime.now());
     }
 
@@ -126,7 +129,7 @@ class PartControllerTest {
             Response result = controller.create(dto).await().indefinitely();
 
             assertEquals(201, result.getStatus());
-            assertEquals("/admin/parts/1", result.getLocation().toString());
+            assertEquals("/admin/parts/c3b79cde-2872-4053-9622-37605bf124a3", result.getLocation().toString());
             assertEquals(response, result.getEntity());
             verify(service).create(dto);
         }

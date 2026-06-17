@@ -18,9 +18,9 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 
 import io.smallrye.mutiny.Uni;
 
@@ -36,16 +36,16 @@ public interface CustomerControllerDocs {
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = PageableResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid query parameters")
-    Uni<PageableResponseDto<CustomerResponse>> findAll(@BeanParam @Valid PageableRequestDto pageable);
+    Uni<PageableResponseDto<CustomerResponseDto>> findAll(@BeanParam @Valid PageableRequestDto pageable);
 
     @GET
     @Path("/{id}")
     @Operation(summary = "Get customer by ID", description = "Returns a single customer by internal identifier.")
     @APIResponse(responseCode = "200", description = "Customer found",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
-                    schema = @Schema(implementation = CustomerResponse.class)))
+                    schema = @Schema(implementation = CustomerResponseDto.class)))
     @APIResponse(responseCode = "404", description = "Customer not found")
-    Uni<CustomerResponse> findById(
+    Uni<CustomerResponseDto> findById(
             @Parameter(name = "id", description = "Customer internal identifier (UUID)", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id);
 
@@ -54,10 +54,10 @@ public interface CustomerControllerDocs {
     @Operation(summary = "Find customer by document", description = "Returns a customer identified by CPF or CNPJ. Accepts both masked (e.g. 529.982.247-25) and unmasked (e.g. 52998224725) formats.")
     @APIResponse(responseCode = "200", description = "Customer found",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
-                    schema = @Schema(implementation = CustomerResponse.class)))
+                    schema = @Schema(implementation = CustomerResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid CPF/CNPJ format")
     @APIResponse(responseCode = "404", description = "Customer not found")
-    Uni<CustomerResponse> findByDocument(
+    Uni<CustomerResponseDto> findByDocument(
             @Parameter(name = "document", description = "Customer CPF or CNPJ (with or without mask)", required = true, in = ParameterIn.PATH)
             @PathParam("document") String document);
 
@@ -68,20 +68,20 @@ public interface CustomerControllerDocs {
     @APIResponse(responseCode = "409", description = "Document already registered")
     Uni<Response> create(
             @RequestBody(description = "Customer data for registration")
-            @Valid CustomerCreateRequest body);
+            @Valid CustomerCreateRequestDto body);
 
     @PUT
     @Path("/{id}")
     @Operation(summary = "Update customer", description = "Fully replaces a customer's data. Document (CPF/CNPJ) cannot be changed.")
     @APIResponse(responseCode = "200", description = "Customer updated successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
-                    schema = @Schema(implementation = CustomerResponse.class)))
+                    schema = @Schema(implementation = CustomerResponseDto.class)))
     @APIResponse(responseCode = "404", description = "Customer not found")
     Uni<Response> update(
             @Parameter(name = "id", description = "Customer identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,
             @RequestBody(description = "Updated customer data. Document (CPF/CNPJ) is not updatable.")
-            @Valid CustomerUpdateRequest body);
+            @Valid CustomerUpdateRequestDto body);
 
     @DELETE
     @Path("/{id}")

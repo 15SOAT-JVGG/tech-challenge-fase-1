@@ -21,11 +21,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponse;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.AttendantNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateAttendantEmailException;
 import br.com.fiap.postech.soat16.fase1.exception.InactiveAttendantException;
@@ -52,13 +52,13 @@ class AttendantServiceTest {
     private static final UUID FIXED_UUID = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
     private Attendant entity;
-    private AttendantResponse response;
+    private AttendantResponseDto response;
 
     @BeforeEach
     void setUp() {
         service = new AttendantService(repository, mapper, passwordService);
         entity = new Attendant(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", "hash", true);
-        response = new AttendantResponse(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", true, null, null);
+        response = new AttendantResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", true, null, null);
     }
 
     @Nested
@@ -90,7 +90,7 @@ class AttendantServiceTest {
             when(repository.findByAttendantId(FIXED_UUID)).thenReturn(Optional.of(entity));
             when(mapper.toResponse(entity)).thenReturn(response);
 
-            AttendantResponse result = service.findById(FIXED_UUID);
+            AttendantResponseDto result = service.findById(FIXED_UUID);
 
             assertEquals(FIXED_UUID, result.getAttendantId());
         }
@@ -111,7 +111,7 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should persist entity when email is unique")
         void shouldPersistWhenEmailIsUnique() {
-            AttendantCreateRequest request = new AttendantCreateRequest(
+            AttendantCreateRequestDto request = new AttendantCreateRequestDto(
                     "Ana", "Silva", "ana@example.com", "5511999999999", "password123");
 
             when(repository.existsByEmail("ana@example.com")).thenReturn(false);
@@ -126,7 +126,7 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should throw DuplicateAttendantEmailException when email exists")
         void shouldThrowDuplicateWhenEmailExists() {
-            AttendantCreateRequest request = new AttendantCreateRequest(
+            AttendantCreateRequestDto request = new AttendantCreateRequestDto(
                     "Ana", "Silva", "ana@example.com", "5511999999999", "password123");
 
             when(repository.existsByEmail("ana@example.com")).thenReturn(true);
@@ -143,14 +143,14 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should update entity and return response")
         void shouldUpdateAndReturn() {
-            AttendantUpdateRequest request = new AttendantUpdateRequest(
+            AttendantUpdateRequestDto request = new AttendantUpdateRequestDto(
                     "Maria", "Souza", "maria@example.com", "5511888888888", true);
 
             when(repository.findByAttendantId(FIXED_UUID)).thenReturn(Optional.of(entity));
             when(repository.existsByEmailAndDifferentId("maria@example.com", FIXED_UUID)).thenReturn(false);
             when(mapper.toResponse(entity)).thenReturn(response);
 
-            AttendantResponse result = service.update(FIXED_UUID, request);
+            AttendantResponseDto result = service.update(FIXED_UUID, request);
 
             assertNotNull(result);
             verify(mapper).updateEntity(entity, request);
@@ -160,7 +160,7 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should throw DuplicateAttendantEmailException when another attendant has email")
         void shouldThrowDuplicateWhenAnotherAttendantHasEmail() {
-            AttendantUpdateRequest request = new AttendantUpdateRequest(
+            AttendantUpdateRequestDto request = new AttendantUpdateRequestDto(
                     "Maria", "Souza", "maria@example.com", "5511888888888", true);
 
             when(repository.findByAttendantId(FIXED_UUID)).thenReturn(Optional.of(entity));
@@ -198,14 +198,14 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should return login response when credentials are valid")
         void shouldReturnLoginResponseWhenCredentialsAreValid() {
-            AttendantLoginRequest request = new AttendantLoginRequest("ana@example.com", "password123");
-            AttendantLoginResponse loginResponse = new AttendantLoginResponse(FIXED_UUID, "Ana", "Silva", "ana@example.com", true);
+            AttendantLoginRequestDto request = new AttendantLoginRequestDto("ana@example.com", "password123");
+            AttendantLoginResponseDto loginResponse = new AttendantLoginResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", true);
 
             when(repository.findByEmail("ana@example.com")).thenReturn(Optional.of(entity));
             when(passwordService.matches("password123", "hash")).thenReturn(true);
             when(mapper.toLoginResponse(entity)).thenReturn(loginResponse);
 
-            AttendantLoginResponse result = service.login(request);
+            AttendantLoginResponseDto result = service.login(request);
 
             assertEquals(FIXED_UUID, result.attendantId());
         }
@@ -213,7 +213,7 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should throw InvalidAttendantCredentialsException when email is missing")
         void shouldThrowInvalidCredentialsWhenEmailIsMissing() {
-            AttendantLoginRequest request = new AttendantLoginRequest("ana@example.com", "password123");
+            AttendantLoginRequestDto request = new AttendantLoginRequestDto("ana@example.com", "password123");
 
             when(repository.findByEmail("ana@example.com")).thenReturn(Optional.empty());
 
@@ -223,7 +223,7 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should throw InactiveAttendantException when attendant is inactive")
         void shouldThrowInactiveWhenAttendantIsInactive() {
-            AttendantLoginRequest request = new AttendantLoginRequest("ana@example.com", "password123");
+            AttendantLoginRequestDto request = new AttendantLoginRequestDto("ana@example.com", "password123");
             entity.setActive(false);
 
             when(repository.findByEmail("ana@example.com")).thenReturn(Optional.of(entity));
@@ -234,7 +234,7 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should throw InvalidAttendantCredentialsException when password is invalid")
         void shouldThrowInvalidCredentialsWhenPasswordIsInvalid() {
-            AttendantLoginRequest request = new AttendantLoginRequest("ana@example.com", "password123");
+            AttendantLoginRequestDto request = new AttendantLoginRequestDto("ana@example.com", "password123");
 
             when(repository.findByEmail("ana@example.com")).thenReturn(Optional.of(entity));
             when(passwordService.matches("password123", "hash")).thenReturn(false);

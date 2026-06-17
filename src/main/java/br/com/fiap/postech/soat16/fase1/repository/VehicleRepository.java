@@ -1,10 +1,9 @@
 package br.com.fiap.postech.soat16.fase1.repository;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+import br.com.fiap.postech.soat16.fase1.model.Customer;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
@@ -23,6 +22,16 @@ public class VehicleRepository implements PanacheRepository<Vehicle> {
 
     public Uni<Boolean> existsByLicensePlate(String licensePlate) {
         return count("licensePlate = ?1", licensePlate).map(total -> total > 0);
+    }
+
+    public Uni<Vehicle> findByVehicleId(UUID id) {
+        return find("id = ?1", id).firstResult()
+                .invoke(found -> Log.infof("Vehicle lookup: id=%s found=%b", id, found != null));
+    }
+
+    public Uni<Long> deleteByVehicleId(UUID id) {
+        return delete("id = ?1", id)
+                .invoke(deleted -> Log.infof("Vehicle deleted: id=%s deleted=%d", id, deleted));
     }
 
     public Uni<List<Vehicle>> findPageWithFilter(PageableRequestDto pageable, VehicleFilterDto filter) {

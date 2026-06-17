@@ -11,8 +11,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.model.Attendant;
 
 @DisplayName("AttendantMapper - Unit Tests")
@@ -43,12 +43,12 @@ class AttendantMapperTest {
     @Test
     @DisplayName("should map create request to entity")
     void shouldMapCreateRequestToEntity() {
-        AttendantCreateRequest request = new AttendantCreateRequest(
+        AttendantCreateRequestDto request = new AttendantCreateRequestDto(
                 "Ana", "Silva", "ana@example.com", "5511999999999", "password123");
 
         Attendant entity = mapper.toEntity(request, "hash");
 
-        assertNotNull(entity.getId());
+        assertEquals("Ana", entity.getFirstName());
         assertEquals("ana@example.com", entity.getEmail());
         assertEquals("hash", entity.getPasswordHash());
         assertTrue(entity.isActive());
@@ -64,7 +64,7 @@ class AttendantMapperTest {
     @DisplayName("should update entity")
     void shouldUpdateEntity() {
         Attendant entity = new Attendant(UUID.randomUUID(), "Ana", "Silva", "ana@example.com", null, "hash", true);
-        AttendantUpdateRequest request = new AttendantUpdateRequest(
+        AttendantUpdateRequestDto request = new AttendantUpdateRequestDto(
                 "Maria", "Souza", "maria@example.com", "5511888888888", false);
 
         mapper.updateEntity(entity, request);

@@ -14,7 +14,7 @@
       schema-management:
         strategy: drop-and-create      # Hibernate cria as tabelas do zero a cada run
       database:
-        default-schema: customer
+        default-schema: oficina_mecanica
       log:
         sql: true
 

@@ -5,9 +5,10 @@ import br.com.fiap.postech.soat16.fase1.model.PartType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public record PartResponseDto(
-    Long id,
+    UUID id,
     String name,
     String description,
     BigDecimal unitPrice,

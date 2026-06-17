@@ -13,5 +13,5 @@ public record VehicleResponseDto(
         Integer year,
         Long kmDriven,
         VehicleType type,
-        Long customerId
+        UUID customerId
 ) { }

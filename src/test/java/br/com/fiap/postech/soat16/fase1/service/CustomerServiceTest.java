@@ -17,9 +17,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateDocumentException;
 import br.com.fiap.postech.soat16.fase1.exception.InvalidDocumentException;
@@ -44,7 +44,7 @@ class CustomerServiceTest {
     private CustomerService service;
 
     private Customer entity;
-    private CustomerResponse response;
+    private CustomerResponseDto response;
 
     private static final UUID FIXED_UUID = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
@@ -53,7 +53,7 @@ class CustomerServiceTest {
         service = new CustomerService(repository, mapper);
 
         entity = new Customer();
-        entity.setCustomerId(FIXED_UUID);
+        entity.setId(FIXED_UUID);
         entity.setFirstName("John");
         entity.setLastName("Doe");
         entity.setEmail("john.doe@example.com");
@@ -61,7 +61,7 @@ class CustomerServiceTest {
         entity.setDocument("52998224725");
         entity.setDocumentType(DocumentType.CPF);
 
-        response = new CustomerResponse();
+        response = new CustomerResponseDto();
         response.setCustomerId(FIXED_UUID);
         response.setFirstName("John");
         response.setLastName("Doe");
@@ -83,7 +83,7 @@ class CustomerServiceTest {
             when(repository.count()).thenReturn(Uni.createFrom().item(1L));
             when(mapper.toResponse(entity)).thenReturn(response);
 
-            PageableResponseDto<CustomerResponse> result = service.findAll(null, 0, 10).await().indefinitely();
+            PageableResponseDto<CustomerResponseDto> result = service.findAll(null, 0, 10).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
@@ -101,7 +101,7 @@ class CustomerServiceTest {
             when(repository.findByCustomerId(null)).thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResponse(entity)).thenReturn(response);
 
-            CustomerResponse result = service.findById(null).await().indefinitely();
+            CustomerResponseDto result = service.findById(null).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(FIXED_UUID, result.getCustomerId());
@@ -124,13 +124,13 @@ class CustomerServiceTest {
         @Test
         @DisplayName("should update entity and return response")
         void shouldUpdateAndReturn() {
-            CustomerUpdateRequest request = new CustomerUpdateRequest("Jane", "Doe", "jane.doe@example.com", "5511987654321");
+            CustomerUpdateRequestDto request = new CustomerUpdateRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321");
 
             when(repository.findByCustomerId(null)).thenReturn(Uni.createFrom().item(entity));
             when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResponse(entity)).thenReturn(response);
 
-            CustomerResponse result = service.update(null, request).await().indefinitely();
+            CustomerResponseDto result = service.update(null, request).await().indefinitely();
 
             assertNotNull(result);
             verify(mapper).updateEntity(entity, request);
@@ -139,7 +139,7 @@ class CustomerServiceTest {
         @Test
         @DisplayName("should throw CustomerNotFoundException when entity is missing")
         void shouldThrowNotFoundWhenMissing() {
-            CustomerUpdateRequest request = new CustomerUpdateRequest("Jane", "Doe", "jane.doe@example.com", "5511987654321");
+            CustomerUpdateRequestDto request = new CustomerUpdateRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321");
 
             when(repository.findByCustomerId(null)).thenReturn(Uni.createFrom().nullItem());
 
@@ -183,11 +183,11 @@ class CustomerServiceTest {
         @Test
         @DisplayName("create_withValidCpf_persists — valid CPF, no duplicates, completes without error")
         void create_withValidCpf_persists() {
-            CustomerCreateRequest request = new CustomerCreateRequest(
+            CustomerCreateRequestDto request = new CustomerCreateRequestDto(
                     "João", "Silva", "joao@example.com", PHONE, VALID_CPF_MASKED);
 
             Customer customerEntity = new Customer();
-            customerEntity.setCustomerId(UUID.randomUUID());
+            customerEntity.setId(UUID.randomUUID());
             customerEntity.setFirstName("João");
             customerEntity.setDocument(VALID_CPF_DIGITS);
             customerEntity.setDocumentType(DocumentType.CPF);
@@ -203,11 +203,11 @@ class CustomerServiceTest {
         @Test
         @DisplayName("create_withValidCnpj_persists — valid CNPJ, no duplicates, completes without error")
         void create_withValidCnpj_persists() {
-            CustomerCreateRequest request = new CustomerCreateRequest(
+            CustomerCreateRequestDto request = new CustomerCreateRequestDto(
                     "Empresa", "LTDA", "empresa@example.com", PHONE, VALID_CNPJ_MASKED);
 
             Customer customerEntity = new Customer();
-            customerEntity.setCustomerId(UUID.randomUUID());
+            customerEntity.setId(UUID.randomUUID());
             customerEntity.setFirstName("Empresa");
             customerEntity.setDocument(VALID_CNPJ_DIGITS);
             customerEntity.setDocumentType(DocumentType.CNPJ);
@@ -223,7 +223,7 @@ class CustomerServiceTest {
         @Test
         @DisplayName("create_withInvalidDocument_throwsInvalidDocumentException — throws before any repo call")
         void create_withInvalidDocument_throwsInvalidDocumentException() {
-            CustomerCreateRequest request = new CustomerCreateRequest(
+            CustomerCreateRequestDto request = new CustomerCreateRequestDto(
                     "João", "Silva", "joao@example.com", PHONE, "123");
 
             assertThrows(InvalidDocumentException.class,
@@ -235,7 +235,7 @@ class CustomerServiceTest {
         @Test
         @DisplayName("create_withDuplicateDocument_throwsDuplicateDocumentException — existsByDocument returns true")
         void create_withDuplicateDocument_throwsDuplicateDocumentException() {
-            CustomerCreateRequest request = new CustomerCreateRequest(
+            CustomerCreateRequestDto request = new CustomerCreateRequestDto(
                     "João", "Silva", "joao@example.com", PHONE, VALID_CPF_MASKED);
 
             when(repository.existsByDocument(VALID_CPF_DIGITS)).thenReturn(Uni.createFrom().item(true));
@@ -259,13 +259,13 @@ class CustomerServiceTest {
         @DisplayName("findByDocument_withValidDocument_returnsCustomer — returns response with normalized document")
         void findByDocument_withValidDocument_returnsCustomer() {
             Customer customerEntity = new Customer();
-            customerEntity.setCustomerId(UUID.randomUUID());
+            customerEntity.setId(UUID.randomUUID());
             customerEntity.setFirstName("João");
             customerEntity.setDocument(VALID_CPF_DIGITS);
             customerEntity.setDocumentType(DocumentType.CPF);
 
-            CustomerResponse expectedResponse = new CustomerResponse();
-            expectedResponse.setCustomerId(customerEntity.getCustomerId());
+            CustomerResponseDto expectedResponse = new CustomerResponseDto();
+            expectedResponse.setCustomerId(customerEntity.getId());
             expectedResponse.setFirstName("João");
             expectedResponse.setDocument(VALID_CPF_DIGITS);
             expectedResponse.setDocumentType(DocumentType.CPF.name());
@@ -273,7 +273,7 @@ class CustomerServiceTest {
             when(repository.findByDocument(VALID_CPF_DIGITS)).thenReturn(Uni.createFrom().item(customerEntity));
             when(mapper.toResponse(customerEntity)).thenReturn(expectedResponse);
 
-            CustomerResponse result = service.findByDocument(VALID_CPF_MASKED).await().indefinitely();
+            CustomerResponseDto result = service.findByDocument(VALID_CPF_MASKED).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(VALID_CPF_DIGITS, result.getDocument());

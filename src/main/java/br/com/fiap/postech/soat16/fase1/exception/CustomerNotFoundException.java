@@ -7,11 +7,11 @@ import java.util.UUID;
 
 public class CustomerNotFoundException extends AppException {
 
-    public CustomerNotFoundException(UUID id) {
-        super("Cliente não encontrado: " + id, CUSTOMER_NOT_FOUND, NOT_FOUND);
+    public CustomerNotFoundException() {
+        super("Customer not found", CUSTOMER_NOT_FOUND, NOT_FOUND);
     }
 
     public CustomerNotFoundException(String document) {
-        super("Cliente não encontrado para o documento: " + document, CUSTOMER_NOT_FOUND, NOT_FOUND);
+        super("Customer not found for document: " + document, CUSTOMER_NOT_FOUND, NOT_FOUND);
     }
 }

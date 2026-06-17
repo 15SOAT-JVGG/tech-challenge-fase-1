@@ -1,25 +1,22 @@
 package br.com.fiap.postech.soat16.fase1.mapper;
 
-import java.util.UUID;
-
 import br.com.fiap.postech.soat16.fase1.model.Document;
 import org.mapstruct.Mapper;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
-import br.com.fiap.postech.soat16.fase1.model.Document;
 
 @Mapper(componentModel = "cdi")
 public interface CustomerMapper {
 
-    default CustomerResponse toResponse(Customer entity) {
+    default CustomerResponseDto toResponse(Customer entity) {
         if (entity == null) {
             return null;
         }
-        return new CustomerResponse(
-                entity.getCustomerId(),
+        return new CustomerResponseDto(
+                entity.getId(),
                 entity.getFirstName(),
                 entity.getLastName(),
                 entity.getEmail(),
@@ -31,12 +28,11 @@ public interface CustomerMapper {
         );
     }
 
-    default Customer toEntity(CustomerCreateRequest request, Document document) {
+    default Customer toEntity(CustomerCreateRequestDto request, Document document) {
         if (request == null) {
             return null;
         }
         var entity = new Customer();
-        entity.setCustomerId(UUID.randomUUID());
         entity.setFirstName(request.getFirstName());
         entity.setLastName(request.getLastName());
         entity.setEmail(request.getEmail());
@@ -46,7 +42,7 @@ public interface CustomerMapper {
         return entity;
     }
 
-    default void updateEntity(Customer entity, CustomerUpdateRequest request) {
+    default void updateEntity(Customer entity, CustomerUpdateRequestDto request) {
         entity.setFirstName(request.getFirstName());
         entity.setLastName(request.getLastName());
         entity.setEmail(request.getEmail());

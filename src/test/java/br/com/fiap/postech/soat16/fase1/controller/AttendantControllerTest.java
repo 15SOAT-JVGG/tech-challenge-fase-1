@@ -20,11 +20,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.*;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponse;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 import br.com.fiap.postech.soat16.fase1.service.AttendantService;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,12 +38,12 @@ class AttendantControllerTest {
 
     private static final UUID FIXED_UUID = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
-    private AttendantResponse response;
+    private AttendantResponseDto response;
 
     @BeforeEach
     void setUp() {
         controller = new AttendantController(service);
-        response = new AttendantResponse(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", true, null, null);
+        response = new AttendantResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", true, null, null);
     }
 
     @Nested
@@ -55,7 +55,7 @@ class AttendantControllerTest {
         void shouldReturnPaginatedList() {
             PageableRequestDto pageable = mock(PageableRequestDto.class);
             PaginationDto pagination = new PaginationDto(0, 10, 1L, 1, false, false);
-            PageableResponseDto<AttendantResponse> page = new PageableResponseDto<>(List.of(response), pagination);
+            PageableResponseDto<AttendantResponseDto> page = new PageableResponseDto<>(List.of(response), pagination);
 
             when(pageable.getQ()).thenReturn(null);
             when(pageable.getPage()).thenReturn(0);
@@ -74,7 +74,7 @@ class AttendantControllerTest {
     void shouldReturnAttendantById() {
         when(service.findById(FIXED_UUID)).thenReturn(response);
 
-        AttendantResponse result = controller.findById(FIXED_UUID);
+        AttendantResponseDto result = controller.findById(FIXED_UUID);
 
         assertEquals(FIXED_UUID, result.getAttendantId());
         verify(service).findById(FIXED_UUID);
@@ -83,7 +83,7 @@ class AttendantControllerTest {
     @Test
     @DisplayName("should return HTTP 201 when create succeeds")
     void shouldReturn201WhenCreateSucceeds() {
-        AttendantCreateRequest request = new AttendantCreateRequest(
+        AttendantCreateRequestDto request = new AttendantCreateRequestDto(
                 "Ana", "Silva", "ana@example.com", "5511999999999", "password123");
 
         Response result = controller.create(request);
@@ -95,12 +95,12 @@ class AttendantControllerTest {
     @Test
     @DisplayName("should return login response")
     void shouldReturnLoginResponse() {
-        AttendantLoginRequest request = new AttendantLoginRequest("ana@example.com", "password123");
-        AttendantLoginResponse loginResponse = new AttendantLoginResponse(FIXED_UUID, "Ana", "Silva", "ana@example.com", true);
+        AttendantLoginRequestDto request = new AttendantLoginRequestDto("ana@example.com", "password123");
+        AttendantLoginResponseDto loginResponse = new AttendantLoginResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", true);
 
         when(service.login(request)).thenReturn(loginResponse);
 
-        AttendantLoginResponse result = controller.login(request);
+        AttendantLoginResponseDto result = controller.login(request);
 
         assertNotNull(result);
         assertEquals(FIXED_UUID, result.attendantId());
@@ -109,7 +109,7 @@ class AttendantControllerTest {
     @Test
     @DisplayName("should return HTTP 200 when update succeeds")
     void shouldReturn200WhenUpdateSucceeds() {
-        AttendantUpdateRequest request = new AttendantUpdateRequest(
+        AttendantUpdateRequestDto request = new AttendantUpdateRequestDto(
                 "Maria", "Souza", "maria@example.com", "5511888888888", true);
 
         when(service.update(FIXED_UUID, request)).thenReturn(response);

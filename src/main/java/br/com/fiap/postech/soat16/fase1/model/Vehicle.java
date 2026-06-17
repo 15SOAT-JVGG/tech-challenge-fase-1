@@ -8,7 +8,7 @@ import java.util.UUID;
 import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
 
 @Entity
-@Table(name="vehicle")
+@Table(name="vehicle", schema = "oficina_mecanica")
 @Getter
 @Setter
 @AllArgsConstructor
@@ -17,6 +17,7 @@ public class Vehicle extends AuditableEntity {
 
     @EqualsAndHashCode.Include
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "vehicle_id", nullable = false)
     private UUID id;
 

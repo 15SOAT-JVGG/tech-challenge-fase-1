@@ -26,11 +26,11 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponse;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 
 @Path("/v1/attendant")
 @Produces(MediaType.APPLICATION_JSON)
@@ -44,16 +44,16 @@ public interface AttendantControllerDocs {
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = PageableResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid query parameters")
-    PageableResponseDto<AttendantResponse> findAll(@BeanParam @Valid PageableRequestDto pageable);
+    PageableResponseDto<AttendantResponseDto> findAll(@BeanParam @Valid PageableRequestDto pageable);
 
     @GET
     @Path("/{id}")
     @Operation(summary = "Get attendant by ID", description = "Returns a single attendant by identifier.")
     @APIResponse(responseCode = "200", description = "Attendant found",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
-                    schema = @Schema(implementation = AttendantResponse.class)))
+                    schema = @Schema(implementation = AttendantResponseDto.class)))
     @APIResponse(responseCode = "404", description = "Attendant not found")
-    AttendantResponse findById(
+    AttendantResponseDto findById(
             @Parameter(name = "id", description = "Attendant identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id);
 
@@ -64,32 +64,32 @@ public interface AttendantControllerDocs {
     @APIResponse(responseCode = "409", description = "Attendant email already exists")
     Response create(
             @RequestBody(description = "Attendant data for registration")
-            @Valid AttendantCreateRequest body);
+            @Valid AttendantCreateRequestDto body);
 
     @POST
     @Path("/login")
     @Operation(summary = "Authenticate attendant", description = "Validates attendant credentials.")
     @APIResponse(responseCode = "200", description = "Attendant authenticated",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
-                    schema = @Schema(implementation = AttendantLoginResponse.class)))
+                    schema = @Schema(implementation = AttendantLoginResponseDto.class)))
     @APIResponse(responseCode = "401", description = "Invalid credentials or inactive attendant")
-    AttendantLoginResponse login(
+    AttendantLoginResponseDto login(
             @RequestBody(description = "Attendant credentials")
-            @Valid AttendantLoginRequest body);
+            @Valid AttendantLoginRequestDto body);
 
     @PUT
     @Path("/{id}")
     @Operation(summary = "Update attendant", description = "Fully replaces an attendant's data.")
     @APIResponse(responseCode = "200", description = "Attendant updated successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
-                    schema = @Schema(implementation = AttendantResponse.class)))
+                    schema = @Schema(implementation = AttendantResponseDto.class)))
     @APIResponse(responseCode = "404", description = "Attendant not found")
     @APIResponse(responseCode = "409", description = "Attendant email already exists")
     Response update(
             @Parameter(name = "id", description = "Attendant identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,
             @RequestBody(description = "Updated attendant data")
-            @Valid AttendantUpdateRequest body);
+            @Valid AttendantUpdateRequestDto body);
 
     @DELETE
     @Path("/{id}")

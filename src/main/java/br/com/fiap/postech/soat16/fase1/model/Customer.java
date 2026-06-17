@@ -3,12 +3,7 @@ package br.com.fiap.postech.soat16.fase1.model;
 import java.util.Objects;
 import java.util.UUID;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 import org.hibernate.proxy.HibernateProxy;
 
@@ -16,18 +11,19 @@ import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
 
 import lombok.*;
 
-@Getter
-@Setter
 @Entity
 @Table(name = "customer", schema = "oficina_mecanica")
+@Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
 public class Customer extends AuditableEntity {
 
     @EqualsAndHashCode.Include
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "customer_id", nullable = false)
-    private UUID customerId;
+    private UUID id;
 
     @Column(name = "first_name", nullable = false)
     private String firstName;
@@ -56,7 +52,7 @@ public class Customer extends AuditableEntity {
         Class<?> thisEffectiveClass = this instanceof HibernateProxy ? ((HibernateProxy) this).getHibernateLazyInitializer().getPersistentClass() : this.getClass();
         if (thisEffectiveClass != oEffectiveClass) return false;
         Customer customer = (Customer) o;
-        return getCustomerId() != null && Objects.equals(getCustomerId(), customer.getCustomerId());
+        return getId() != null && Objects.equals(getId(), customer.getId());
     }
 
     @Override

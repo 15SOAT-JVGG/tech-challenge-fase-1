@@ -7,7 +7,7 @@ import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
-import br.com.fiap.postech.soat16.fase1.dto.response.ApiErrorResponse;
+import br.com.fiap.postech.soat16.fase1.dto.response.error.ApiErrorResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.AppException;
 
 @Provider
@@ -29,7 +29,7 @@ public class GlobalExceptionMapper implements ExceptionMapper<AppException> {
 
         String path = uriInfo != null ? uriInfo.getPath() : null;
 
-        ApiErrorResponse body = ApiErrorResponse.of(
+        ApiErrorResponseDto body = ApiErrorResponseDto.of(
                 status,
                 ex.getType(),
                 ex.getCode(),

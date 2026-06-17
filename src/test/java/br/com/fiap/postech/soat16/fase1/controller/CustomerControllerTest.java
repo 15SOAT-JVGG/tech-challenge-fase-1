@@ -20,9 +20,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.*;
 import br.com.fiap.postech.soat16.fase1.service.CustomerService;
 
@@ -39,12 +39,12 @@ class CustomerControllerTest {
 
     private static final UUID FIXED_UUID = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
-    private CustomerResponse response;
+    private CustomerResponseDto response;
 
     @BeforeEach
     void setUp() {
         controller = new CustomerController(service);
-        response = new CustomerResponse(FIXED_UUID, "John", "Doe", "john.doe@example.com", "5511987654321", "52998224725", "CPF", null, null);
+        response = new CustomerResponseDto(FIXED_UUID, "John", "Doe", "john.doe@example.com", "5511987654321", "52998224725", "CPF", null, null);
     }
 
     @Nested
@@ -60,11 +60,11 @@ class CustomerControllerTest {
             when(pageable.getSize()).thenReturn(10);
 
             PaginationDto paginationDto = new PaginationDto(0, 10, 1L, 1, false, false);
-            PageableResponseDto<CustomerResponse> page = new PageableResponseDto<>(List.of(response), paginationDto);
+            PageableResponseDto<CustomerResponseDto> page = new PageableResponseDto<>(List.of(response), paginationDto);
 
             when(service.findAll(null, 0, 10)).thenReturn(Uni.createFrom().item(page));
 
-            PageableResponseDto<CustomerResponse> result = controller.findAll(pageable).await().indefinitely();
+            PageableResponseDto<CustomerResponseDto> result = controller.findAll(pageable).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
@@ -82,7 +82,7 @@ class CustomerControllerTest {
 
             when(service.findAll(null, 0, 10)).thenReturn(Uni.createFrom().item(PageableResponseDto.emptyList()));
 
-            PageableResponseDto<CustomerResponse> result = controller.findAll(pageable).await().indefinitely();
+            PageableResponseDto<CustomerResponseDto> result = controller.findAll(pageable).await().indefinitely();
 
             assertTrue(result.content().isEmpty());
         }
@@ -111,7 +111,7 @@ class CustomerControllerTest {
         void shouldReturnCustomerWhenFound() {
             when(service.findById(FIXED_UUID)).thenReturn(Uni.createFrom().item(response));
 
-            CustomerResponse result = controller.findById(FIXED_UUID).await().indefinitely();
+            CustomerResponseDto result = controller.findById(FIXED_UUID).await().indefinitely();
 
             assertNotNull(result);
             assertEquals("John", result.getFirstName());
@@ -122,7 +122,7 @@ class CustomerControllerTest {
         @DisplayName("should propagate CustomerNotFoundException")
         void shouldPropagateNotFoundException() {
             when(service.findById(FIXED_UUID))
-                    .thenReturn(Uni.createFrom().failure(new CustomerNotFoundException(FIXED_UUID)));
+                    .thenReturn(Uni.createFrom().failure(new CustomerNotFoundException()));
 
             assertThrows(CustomerNotFoundException.class,
                     () -> controller.findById(FIXED_UUID).await().indefinitely());
@@ -136,7 +136,7 @@ class CustomerControllerTest {
         @Test
         @DisplayName("should return HTTP 201 when create succeeds")
         void shouldReturn201WhenCreateSucceeds() {
-            CustomerCreateRequest dto = new CustomerCreateRequest("John", "Doe", "john.doe@example.com", "5511987654321", "529.982.247-25");
+            CustomerCreateRequestDto dto = new CustomerCreateRequestDto("John", "Doe", "john.doe@example.com", "5511987654321", "529.982.247-25");
 
             when(service.create(dto)).thenReturn(Uni.createFrom().voidItem());
 
@@ -149,7 +149,7 @@ class CustomerControllerTest {
         @Test
         @DisplayName("should propagate DuplicateDocumentException")
         void shouldPropagateDuplicateDocumentException() {
-            CustomerCreateRequest dto = new CustomerCreateRequest("John", "Doe", "john.doe@example.com", "5511987654321", "529.982.247-25");
+            CustomerCreateRequestDto dto = new CustomerCreateRequestDto("John", "Doe", "john.doe@example.com", "5511987654321", "529.982.247-25");
 
             when(service.create(dto))
                     .thenReturn(Uni.createFrom().failure(new DuplicateDocumentException()));
@@ -166,8 +166,8 @@ class CustomerControllerTest {
         @Test
         @DisplayName("should return HTTP 200 with updated body")
         void shouldReturn200WithUpdatedBody() {
-            CustomerUpdateRequest dto = new CustomerUpdateRequest("Jane", "Doe", "jane.doe@example.com", "5511987654321");
-            CustomerResponse updated = new CustomerResponse(FIXED_UUID, "Jane", "Doe", "jane.doe@example.com", "5511987654321",
+            CustomerUpdateRequestDto dto = new CustomerUpdateRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321");
+            CustomerResponseDto updated = new CustomerResponseDto(FIXED_UUID, "Jane", "Doe", "jane.doe@example.com", "5511987654321",
                     "52998224725", "CPF", OffsetDateTime.now(), OffsetDateTime.now());
 
             when(service.update(FIXED_UUID, dto)).thenReturn(Uni.createFrom().item(updated));
@@ -181,10 +181,10 @@ class CustomerControllerTest {
         @Test
         @DisplayName("should propagate CustomerNotFoundException")
         void shouldPropagateNotFoundException() {
-            CustomerUpdateRequest dto = new CustomerUpdateRequest("Jane", "Doe", "jane.doe@example.com", "5511987654321");
+            CustomerUpdateRequestDto dto = new CustomerUpdateRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321");
 
             when(service.update(FIXED_UUID, dto))
-                    .thenReturn(Uni.createFrom().failure(new CustomerNotFoundException(FIXED_UUID)));
+                    .thenReturn(Uni.createFrom().failure(new CustomerNotFoundException()));
 
             assertThrows(CustomerNotFoundException.class,
                     () -> controller.update(FIXED_UUID, dto).await().indefinitely());
@@ -210,7 +210,7 @@ class CustomerControllerTest {
         @DisplayName("should propagate CustomerNotFoundException")
         void shouldPropagateNotFoundException() {
             when(service.delete(FIXED_UUID))
-                    .thenReturn(Uni.createFrom().failure(new CustomerNotFoundException(FIXED_UUID)));
+                    .thenReturn(Uni.createFrom().failure(new CustomerNotFoundException()));
 
             assertThrows(CustomerNotFoundException.class,
                     () -> controller.delete(FIXED_UUID).await().indefinitely());

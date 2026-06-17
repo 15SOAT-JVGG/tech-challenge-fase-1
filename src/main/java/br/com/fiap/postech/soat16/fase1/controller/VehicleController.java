@@ -18,6 +18,8 @@ import br.com.fiap.postech.soat16.fase1.service.VehicleService;
 import io.smallrye.mutiny.Uni;
 import lombok.AllArgsConstructor;
 
+import java.util.UUID;
+
 @ApplicationScoped
 @AllArgsConstructor
 @Path("/v1/vehicle")
@@ -35,7 +37,7 @@ VehicleController implements VehicleControllerDocs {
     @GET
     @Path("/{id}")
     @Override
-    public Uni<VehicleResponseDto> findById(@PathParam("id") Long id) {
+    public Uni<VehicleResponseDto> findById(@PathParam("id") UUID id) {
         return vehicleService.findById(id);
     }
 
@@ -56,7 +58,7 @@ VehicleController implements VehicleControllerDocs {
     @PUT
     @Path("/{id}")
     @Override
-    public Uni<Response> update(@PathParam("id") Long id, @RequestBody @Valid VehicleDto dto) {
+    public Uni<Response> update(@PathParam("id") UUID id, @RequestBody @Valid VehicleDto dto) {
         return vehicleService.update(id, dto)
                 .map(updated -> Response.ok(updated).build());
     }
@@ -64,7 +66,7 @@ VehicleController implements VehicleControllerDocs {
     @DELETE
     @Path("/{id}")
     @Override
-    public Uni<Response> delete(@PathParam("id") Long id) {
+    public Uni<Response> delete(@PathParam("id") UUID id) {
         return vehicleService.delete(id)
                 .replaceWith(Response.noContent().build());
     }

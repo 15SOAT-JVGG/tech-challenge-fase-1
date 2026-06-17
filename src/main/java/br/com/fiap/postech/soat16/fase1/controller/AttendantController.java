@@ -21,11 +21,11 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import br.com.fiap.postech.soat16.fase1.controller.docs.AttendantControllerDocs;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponse;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 import br.com.fiap.postech.soat16.fase1.service.AttendantService;
 
 import lombok.RequiredArgsConstructor;
@@ -41,20 +41,20 @@ public class AttendantController implements AttendantControllerDocs {
 
     @GET
     @Override
-    public PageableResponseDto<AttendantResponse> findAll(@BeanParam @Valid PageableRequestDto pageable) {
+    public PageableResponseDto<AttendantResponseDto> findAll(@BeanParam @Valid PageableRequestDto pageable) {
         return service.findAll(pageable.getQ(), pageable.getPage(), pageable.getSize());
     }
 
     @GET
     @Path("/{id}")
     @Override
-    public AttendantResponse findById(@PathParam("id") UUID id) {
+    public AttendantResponseDto findById(@PathParam("id") UUID id) {
         return service.findById(id);
     }
 
     @POST
     @Override
-    public Response create(@RequestBody @Valid AttendantCreateRequest dto) {
+    public Response create(@RequestBody @Valid AttendantCreateRequestDto dto) {
         service.create(dto);
         return Response.status(Response.Status.CREATED).build();
     }
@@ -62,14 +62,14 @@ public class AttendantController implements AttendantControllerDocs {
     @POST
     @Path("/login")
     @Override
-    public AttendantLoginResponse login(@RequestBody @Valid AttendantLoginRequest dto) {
+    public AttendantLoginResponseDto login(@RequestBody @Valid AttendantLoginRequestDto dto) {
         return service.login(dto);
     }
 
     @PUT
     @Path("/{id}")
     @Override
-    public Response update(@PathParam("id") UUID id, @RequestBody @Valid AttendantUpdateRequest dto) {
+    public Response update(@PathParam("id") UUID id, @RequestBody @Valid AttendantUpdateRequestDto dto) {
         return Response.ok(service.update(id, dto)).build();
     }
 

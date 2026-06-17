@@ -1,23 +1,21 @@
 package br.com.fiap.postech.soat16.fase1.mapper;
 
-import java.util.UUID;
-
 import org.mapstruct.Mapper;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequest;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponse;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponse;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Attendant;
 
 @Mapper(componentModel = "cdi")
 public interface AttendantMapper {
 
-    default AttendantResponse toResponse(Attendant entity) {
+    default AttendantResponseDto toResponse(Attendant entity) {
         if (entity == null) {
             return null;
         }
-        return new AttendantResponse(
+        return new AttendantResponseDto(
                 entity.getId(),
                 entity.getFirstName(),
                 entity.getLastName(),
@@ -29,8 +27,8 @@ public interface AttendantMapper {
         );
     }
 
-    default AttendantLoginResponse toLoginResponse(Attendant entity) {
-        return new AttendantLoginResponse(
+    default AttendantLoginResponseDto toLoginResponse(Attendant entity) {
+        return new AttendantLoginResponseDto(
                 entity.getId(),
                 entity.getFirstName(),
                 entity.getLastName(),
@@ -39,12 +37,11 @@ public interface AttendantMapper {
         );
     }
 
-    default Attendant toEntity(AttendantCreateRequest request, String passwordHash) {
+    default Attendant toEntity(AttendantCreateRequestDto request, String passwordHash) {
         if (request == null) {
             return null;
         }
         var entity = new Attendant();
-        entity.setId(UUID.randomUUID());
         entity.setFirstName(request.getFirstName());
         entity.setLastName(request.getLastName());
         entity.setEmail(request.getEmail());
@@ -54,7 +51,7 @@ public interface AttendantMapper {
         return entity;
     }
 
-    default void updateEntity(Attendant entity, AttendantUpdateRequest request) {
+    default void updateEntity(Attendant entity, AttendantUpdateRequestDto request) {
         entity.setFirstName(request.getFirstName());
         entity.setLastName(request.getLastName());
         entity.setEmail(request.getEmail());

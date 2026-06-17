@@ -22,6 +22,8 @@ import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 
 import io.smallrye.mutiny.Uni;
 
+import java.util.UUID;
+
 @Path("/v1/vehicle")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -47,7 +49,7 @@ public interface VehicleControllerDocs {
     @APIResponse(responseCode = "404", description = "Vehicle not found")
     Uni<VehicleResponseDto> findById(
             @Parameter(name = "id", description = "Vehicle identifier", required = true, in = ParameterIn.PATH)
-            @PathParam("id") Long id);
+            @PathParam("id") UUID id);
 
     @GET
     @Path("/license-plate/{license_plate}")
@@ -80,7 +82,7 @@ public interface VehicleControllerDocs {
     @APIResponse(responseCode = "404", description = "Vehicle not found")
     Uni<Response> update(
             @Parameter(name = "id", description = "Vehicle identifier", required = true, in = ParameterIn.PATH)
-            @PathParam("id") Long id,
+            @PathParam("id") UUID id,
             @RequestBody(description = "Updated vehicle data")
             @Valid VehicleDto body);
 
@@ -91,5 +93,5 @@ public interface VehicleControllerDocs {
     @APIResponse(responseCode = "404", description = "Vehicle not found")
     Uni<Response> delete(
             @Parameter(name = "id", description = "Vehicle identifier", required = true, in = ParameterIn.PATH)
-            @PathParam("id") Long id);
+            @PathParam("id") UUID id);
 }

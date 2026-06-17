@@ -44,8 +44,8 @@ class VehicleControllerTest {
     @BeforeEach
     void setUp() {
         controller = new VehicleController(vehicleService);
-        response = new VehicleResponseDto(UUID.randomUUID(), "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO, null);
-        request = new VehicleDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CARRO);
+        response = new VehicleResponseDto(UUID.randomUUID(), "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR, null);
+        request = new VehicleDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
     }
 
     @Nested
@@ -103,23 +103,25 @@ class VehicleControllerTest {
         @Test
         @DisplayName("should return vehicle when found")
         void shouldReturnVehicleWhenFound() {
-            when(vehicleService.findById(1L)).thenReturn(Uni.createFrom().item(response));
+            UUID id = response.id();
+            when(vehicleService.findById(id)).thenReturn(Uni.createFrom().item(response));
 
-            VehicleResponseDto result = controller.findById(1L).await().indefinitely();
+            VehicleResponseDto result = controller.findById(id).await().indefinitely();
 
             assertNotNull(result);
             assertEquals("ABC1234", result.licensePlate());
-            verify(vehicleService).findById(1L);
+            verify(vehicleService).findById(id);
         }
 
         @Test
         @DisplayName("should propagate ResourceNotFoundException")
         void shouldPropagateNotFoundException() {
-            when(vehicleService.findById(99L))
+            UUID missingId = UUID.randomUUID();
+            when(vehicleService.findById(missingId))
                     .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Vehicle not found")));
 
             assertThrows(ResourceNotFoundException.class,
-                    () -> controller.findById(99L).await().indefinitely());
+                    () -> controller.findById(missingId).await().indefinitely());
         }
     }
 
@@ -184,22 +186,24 @@ class VehicleControllerTest {
         @Test
         @DisplayName("should return HTTP 200 with updated body")
         void shouldReturn200WithUpdatedBody() {
-            when(vehicleService.update(1L, request)).thenReturn(Uni.createFrom().item(response));
+            UUID id = response.id();
+            when(vehicleService.update(id, request)).thenReturn(Uni.createFrom().item(response));
 
-            Response result = controller.update(1L, request).await().indefinitely();
+            Response result = controller.update(id, request).await().indefinitely();
 
             assertEquals(200, result.getStatus());
-            verify(vehicleService).update(1L, request);
+            verify(vehicleService).update(id, request);
         }
 
         @Test
         @DisplayName("should propagate ResourceNotFoundException")
         void shouldPropagateNotFoundException() {
-            when(vehicleService.update(99L, request))
+            UUID missingId = UUID.randomUUID();
+            when(vehicleService.update(missingId, request))
                     .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Vehicle not found")));
 
             assertThrows(ResourceNotFoundException.class,
-                    () -> controller.update(99L, request).await().indefinitely());
+                    () -> controller.update(missingId, request).await().indefinitely());
         }
     }
 
@@ -210,22 +214,24 @@ class VehicleControllerTest {
         @Test
         @DisplayName("should return HTTP 204 when delete succeeds")
         void shouldReturn204WhenDeleteSucceeds() {
-            when(vehicleService.delete(1L)).thenReturn(Uni.createFrom().voidItem());
+            UUID id = UUID.randomUUID();
+            when(vehicleService.delete(id)).thenReturn(Uni.createFrom().voidItem());
 
-            Response result = controller.delete(1L).await().indefinitely();
+            Response result = controller.delete(id).await().indefinitely();
 
             assertEquals(204, result.getStatus());
-            verify(vehicleService).delete(1L);
+            verify(vehicleService).delete(id);
         }
 
         @Test
         @DisplayName("should propagate ResourceNotFoundException")
         void shouldPropagateNotFoundException() {
-            when(vehicleService.delete(99L))
+            UUID missingId = UUID.randomUUID();
+            when(vehicleService.delete(missingId))
                     .thenReturn(Uni.createFrom().failure(new ResourceNotFoundException("Vehicle not found")));
 
             assertThrows(ResourceNotFoundException.class,
-                    () -> controller.delete(99L).await().indefinitely());
+                    () -> controller.delete(missingId).await().indefinitely());
         }
     }
 }

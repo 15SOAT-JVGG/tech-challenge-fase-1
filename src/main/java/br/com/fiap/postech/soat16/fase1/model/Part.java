@@ -11,17 +11,21 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "parts")
 public class Part {
 
+    @EqualsAndHashCode.Include
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "part_id", nullable = false)
+    private UUID id;
 
     @Column(nullable = false, length = 100)
     private String name;
@@ -112,7 +116,7 @@ public class Part {
         this.stockQuantity += quantity;
     }
 
-    public Long getId() { return id; }
+    public UUID getId() { return id; }
     public String getName() { return name; }
     public String getDescription() { return description; }
     public BigDecimal getUnitPrice() { return unitPrice; }

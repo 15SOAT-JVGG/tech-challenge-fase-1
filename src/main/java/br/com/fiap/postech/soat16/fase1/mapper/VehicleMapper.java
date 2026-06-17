@@ -21,8 +21,7 @@ public interface VehicleMapper {
                 entity.getYear(),
                 entity.getKmDriven(),
                 entity.getType(),
-                null
-                //entity.getCustomer().getCustomerId()
+                entity.getCustomer().getId()
         );
     }
 
@@ -36,7 +35,7 @@ public interface VehicleMapper {
         entity.setYear(dto.year());
         entity.setKmDriven(dto.kmDriven());
         entity.setType(dto.type());
-        //entity.setCustomer(customer);
+        entity.setCustomer(customer);
         return entity;
     }
 
