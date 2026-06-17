@@ -5,7 +5,7 @@ import java.util.List;
 
 public record PageableResponseDto<T>(
         List<T> content,
-        PaginationDto paginationDto
+        PaginationDto pagination
 ) {
 
     public static <T> PageableResponseDto<T> of(List<T> content, int page, int size, long totalElements) {

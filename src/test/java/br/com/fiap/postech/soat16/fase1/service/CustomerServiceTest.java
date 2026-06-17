@@ -87,7 +87,7 @@ class CustomerServiceTest {
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
-            assertEquals(1L, result.paginationDto().totalElements());
+            assertEquals(1L, result.pagination().totalElements());
         }
     }
 

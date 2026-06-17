@@ -100,12 +100,12 @@ class VehicleServiceTest {
 
             PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
 
-            assertEquals(0, result.paginationDto().page());
-            assertEquals(5, result.paginationDto().size());
-            assertEquals(12L, result.paginationDto().totalElements());
-            assertEquals(3, result.paginationDto().totalPages());
-            assertFalse(result.paginationDto().hasPrevious());
-            assertTrue(result.paginationDto().hasNext());
+            assertEquals(0, result.pagination().page());
+            assertEquals(5, result.pagination().size());
+            assertEquals(12L, result.pagination().totalElements());
+            assertEquals(3, result.pagination().totalPages());
+            assertFalse(result.pagination().hasPrevious());
+            assertTrue(result.pagination().hasNext());
         }
 
         @Test
@@ -121,7 +121,7 @@ class VehicleServiceTest {
             PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
 
             assertTrue(result.content().isEmpty());
-            assertEquals(0L, result.paginationDto().totalElements());
+            assertEquals(0L, result.pagination().totalElements());
         }
 
         @Test
@@ -137,8 +137,8 @@ class VehicleServiceTest {
 
             PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
 
-            assertTrue(result.paginationDto().hasPrevious());
-            assertFalse(result.paginationDto().hasNext());
+            assertTrue(result.pagination().hasPrevious());
+            assertFalse(result.pagination().hasNext());
         }
     }
 
