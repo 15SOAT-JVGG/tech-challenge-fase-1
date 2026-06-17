@@ -1,11 +1,11 @@
 package br.com.fiap.postech.soat16.fase1.dto.response;
 
-import br.com.fiap.postech.soat16.fase1.model.Part;
-import br.com.fiap.postech.soat16.fase1.model.PartType;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
+
+import br.com.fiap.postech.soat16.fase1.model.Part;
+import br.com.fiap.postech.soat16.fase1.model.PartType;
 
 public record PartResponseDto(
     UUID id,

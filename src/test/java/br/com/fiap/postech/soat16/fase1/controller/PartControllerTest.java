@@ -1,13 +1,15 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.PartRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.response.PartResponseDto;
-import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
-import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
-import br.com.fiap.postech.soat16.fase1.model.PartType;
-import br.com.fiap.postech.soat16.fase1.service.PartService;
-import io.smallrye.mutiny.Uni;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
 import jakarta.ws.rs.core.Response;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,13 +18,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
+import br.com.fiap.postech.soat16.fase1.dto.request.PartRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.PartResponseDto;
+import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
+import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
+import br.com.fiap.postech.soat16.fase1.model.PartType;
+import br.com.fiap.postech.soat16.fase1.service.PartService;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.smallrye.mutiny.Uni;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PartController — Unit Tests")

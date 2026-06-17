@@ -2,6 +2,8 @@ package br.com.fiap.postech.soat16.fase1.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -11,8 +13,6 @@ import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.model.VehicleType;
-
-import java.util.UUID;
 
 @DisplayName("VehicleMapper — Unit Tests")
 class VehicleMapperTest {

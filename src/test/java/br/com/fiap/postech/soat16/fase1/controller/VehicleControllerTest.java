@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
+import java.util.UUID;
 
 import jakarta.ws.rs.core.Response;
 
@@ -25,9 +26,8 @@ import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException
 import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
 import br.com.fiap.postech.soat16.fase1.model.VehicleType;
 import br.com.fiap.postech.soat16.fase1.service.VehicleService;
-import io.smallrye.mutiny.Uni;
 
-import java.util.UUID;
+import io.smallrye.mutiny.Uni;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("VehicleController — Unit Tests")

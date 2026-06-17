@@ -1,18 +1,20 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
+import static java.lang.Boolean.FALSE;
+
+import java.util.List;
+
+import jakarta.enterprise.context.ApplicationScoped;
+
 import br.com.fiap.postech.soat16.fase1.dto.request.PartRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.PartResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
 import br.com.fiap.postech.soat16.fase1.model.Part;
 import br.com.fiap.postech.soat16.fase1.repository.PartRepository;
+
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
-import jakarta.enterprise.context.ApplicationScoped;
-
-import java.util.List;
-
-import static java.lang.Boolean.FALSE;
 
 @ApplicationScoped
 public class PartService {

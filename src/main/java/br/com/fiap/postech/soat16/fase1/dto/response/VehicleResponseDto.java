@@ -1,10 +1,9 @@
 package br.com.fiap.postech.soat16.fase1.dto.response;
 
-import br.com.fiap.postech.soat16.fase1.model.VehicleType;
-
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+
+import br.com.fiap.postech.soat16.fase1.model.VehicleType;
 
 public record VehicleResponseDto(
         UUID id,

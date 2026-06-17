@@ -1,5 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.controller;
 
+import java.util.UUID;
+
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
@@ -10,15 +12,13 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import br.com.fiap.postech.soat16.fase1.controller.docs.VehicleControllerDocs;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.service.VehicleService;
 
 import io.smallrye.mutiny.Uni;
 import lombok.AllArgsConstructor;
-
-import java.util.UUID;
 
 @ApplicationScoped
 @AllArgsConstructor

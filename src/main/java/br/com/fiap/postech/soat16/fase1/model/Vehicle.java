@@ -1,11 +1,14 @@
 package br.com.fiap.postech.soat16.fase1.model;
 
+import java.util.UUID;
+
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
-import lombok.*;
-import java.util.UUID;
+
 import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+
+import lombok.*;
 
 @Entity
 @Table(name="vehicle", schema = "oficina_mecanica")

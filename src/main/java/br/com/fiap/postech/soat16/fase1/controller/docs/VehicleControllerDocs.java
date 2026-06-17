@@ -1,5 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.controller.docs;
 
+import java.util.UUID;
+
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -16,13 +18,11 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 
 import io.smallrye.mutiny.Uni;
-
-import java.util.UUID;
 
 @Path("/v1/vehicle")
 @Produces(MediaType.APPLICATION_JSON)

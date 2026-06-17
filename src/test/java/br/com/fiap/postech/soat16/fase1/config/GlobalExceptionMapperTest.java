@@ -2,8 +2,6 @@ package br.com.fiap.postech.soat16.fase1.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.util.UUID;
-
 import jakarta.ws.rs.core.Response;
 
 import org.junit.jupiter.api.BeforeEach;

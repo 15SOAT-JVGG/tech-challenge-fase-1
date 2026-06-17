@@ -1,10 +1,11 @@
 package br.com.fiap.postech.soat16.fase1.dto.request;
 
-import br.com.fiap.postech.soat16.fase1.model.VehicleType;
+import java.util.UUID;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-import java.util.UUID;
+import br.com.fiap.postech.soat16.fase1.model.VehicleType;
 
 public record VehicleRequestDto(
     @NotNull(message = "customerId cannot be blank")

@@ -2,8 +2,6 @@ package br.com.fiap.postech.soat16.fase1.repository;
 
 import java.util.*;
 
-import br.com.fiap.postech.soat16.fase1.model.Customer;
-import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
@@ -11,6 +9,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 
 import io.quarkus.hibernate.reactive.panache.PanacheRepository;
+import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
 
 @ApplicationScoped

@@ -7,10 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.time.Instant;
 
-import br.com.fiap.postech.soat16.fase1.dto.response.error.ApiErrorResponseDto;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import br.com.fiap.postech.soat16.fase1.dto.response.error.ApiErrorResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.ErrorType;
 
 @DisplayName("ApiErrorResponse — Unit Tests")
