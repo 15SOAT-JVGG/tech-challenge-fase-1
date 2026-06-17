@@ -9,7 +9,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
@@ -58,7 +58,7 @@ public class VehicleService {
     }
 
     @WithTransaction
-    public Uni<Void> create(VehicleDto dto) {
+    public Uni<Void> create(VehicleRequestDto dto) {
         return customerRepository.findByCustomerId(dto.customerId())
                 .onItem().ifNull().failWith(CustomerNotFoundException::new)
                 .flatMap(customer -> vehicleRepository.existsByLicensePlate(dto.licensePlate())
@@ -71,7 +71,7 @@ public class VehicleService {
     }
 
     @WithTransaction
-    public Uni<VehicleResponseDto> update(UUID id, VehicleDto request) {
+    public Uni<VehicleResponseDto> update(UUID id, VehicleRequestDto request) {
         return vehicleRepository.findByVehicleId(id)
                 .onItem().ifNull().failWith(VehicleNotFoundException::new)
                 .flatMap(entity -> {

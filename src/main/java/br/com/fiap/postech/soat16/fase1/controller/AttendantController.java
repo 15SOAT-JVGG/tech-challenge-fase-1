@@ -21,9 +21,8 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import br.com.fiap.postech.soat16.fase1.controller.docs.AttendantControllerDocs;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 import br.com.fiap.postech.soat16.fase1.service.AttendantService;
@@ -54,7 +53,7 @@ public class AttendantController implements AttendantControllerDocs {
 
     @POST
     @Override
-    public Response create(@RequestBody @Valid AttendantCreateRequestDto dto) {
+    public Response create(@RequestBody @Valid AttendantRequestDto dto) {
         service.create(dto);
         return Response.status(Response.Status.CREATED).build();
     }
@@ -69,7 +68,7 @@ public class AttendantController implements AttendantControllerDocs {
     @PUT
     @Path("/{id}")
     @Override
-    public Response update(@PathParam("id") UUID id, @RequestBody @Valid AttendantUpdateRequestDto dto) {
+    public Response update(@PathParam("id") UUID id, @RequestBody @Valid AttendantRequestDto dto) {
         return Response.ok(service.update(id, dto)).build();
     }
 

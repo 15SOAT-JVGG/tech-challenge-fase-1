@@ -26,9 +26,8 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 
@@ -64,7 +63,7 @@ public interface AttendantControllerDocs {
     @APIResponse(responseCode = "409", description = "Attendant email already exists")
     Response create(
             @RequestBody(description = "Attendant data for registration")
-            @Valid AttendantCreateRequestDto body);
+            @Valid AttendantRequestDto body);
 
     @POST
     @Path("/login")
@@ -89,7 +88,7 @@ public interface AttendantControllerDocs {
             @Parameter(name = "id", description = "Attendant identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,
             @RequestBody(description = "Updated attendant data")
-            @Valid AttendantUpdateRequestDto body);
+            @Valid AttendantRequestDto body);
 
     @DELETE
     @Path("/{id}")

@@ -21,8 +21,7 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import br.com.fiap.postech.soat16.fase1.controller.docs.CustomerControllerDocs;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 import br.com.fiap.postech.soat16.fase1.service.CustomerService;
 
@@ -60,7 +59,7 @@ public class CustomerController implements CustomerControllerDocs {
 
     @POST
     @Override
-    public Uni<Response> create(@RequestBody @Valid CustomerCreateRequestDto dto) {
+    public Uni<Response> create(@RequestBody @Valid CustomerRequestDto dto) {
         return service.create(dto)
                 .replaceWith(Response.status(Response.Status.CREATED).build());
     }
@@ -69,7 +68,7 @@ public class CustomerController implements CustomerControllerDocs {
     @Path("/{id}")
     @Override
     public Uni<Response> update(@PathParam("id") UUID id,
-                                @RequestBody @Valid CustomerUpdateRequestDto dto) {
+                                @RequestBody @Valid CustomerRequestDto dto) {
         return service.update(id, dto)
                 .map(updated -> Response.ok(updated).build());
     }

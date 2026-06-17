@@ -6,9 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.AttendantNotFoundException;
@@ -40,20 +39,20 @@ public class AttendantService {
     }
 
     @Transactional
-    public void create(AttendantCreateRequestDto request) {
-        if (repository.existsByEmail(request.getEmail())) {
+    public void create(AttendantRequestDto request) {
+        if (repository.existsByEmail(request.email())) {
             throw new DuplicateAttendantEmailException();
         }
-        String passwordHash = passwordService.hash(request.getPassword());
+        String passwordHash = passwordService.hash(request.password());
         repository.persist(mapper.toEntity(request, passwordHash));
     }
 
     @Transactional
-    public AttendantResponseDto update(UUID id, AttendantUpdateRequestDto request) {
+    public AttendantResponseDto update(UUID id, AttendantRequestDto request) {
         var entity = repository.findByAttendantId(id)
                 .orElseThrow(() -> new AttendantNotFoundException(id));
 
-        if (repository.existsByEmailAndDifferentId(request.getEmail(), id)) {
+        if (repository.existsByEmailAndDifferentId(request.email(), id)) {
             throw new DuplicateAttendantEmailException();
         }
 
@@ -70,14 +69,14 @@ public class AttendantService {
     }
 
     public AttendantLoginResponseDto login(AttendantLoginRequestDto request) {
-        var entity = repository.findByEmail(request.getEmail())
+        var entity = repository.findByEmail(request.email())
                 .orElseThrow(InvalidAttendantCredentialsException::new);
 
         if (!entity.isActive()) {
             throw new InactiveAttendantException();
         }
 
-        if (!passwordService.matches(request.getPassword(), entity.getPasswordHash())) {
+        if (!passwordService.matches(request.password(), entity.getPasswordHash())) {
             throw new InvalidAttendantCredentialsException();
         }
 

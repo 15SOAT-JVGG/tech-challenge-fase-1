@@ -2,7 +2,7 @@ package br.com.fiap.postech.soat16.fase1.mapper;
 
 import org.mapstruct.Mapper;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
@@ -24,18 +24,18 @@ public interface VehicleMapper {
         );
     }
 
-    default Vehicle toEntity(VehicleDto dto, Customer customer) {
+    default Vehicle toEntity(VehicleRequestDto dto, Customer customer) {
         var entity = new Vehicle();
         buildVehicleEntity(dto, entity);
         entity.setCustomer(customer);
         return entity;
     }
 
-    default void updateEntity(Vehicle vehicle, VehicleDto dto) {
+    default void updateEntity(Vehicle vehicle, VehicleRequestDto dto) {
         buildVehicleEntity(dto, vehicle);
     }
 
-    private void buildVehicleEntity(VehicleDto dto, Vehicle entity) {
+    private void buildVehicleEntity(VehicleRequestDto dto, Vehicle entity) {
         entity.setLicensePlate(dto.licensePlate());
         entity.setManufacturer(dto.manufacturer());
         entity.setModel(dto.model());

@@ -13,8 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 
@@ -76,7 +75,7 @@ class CustomerMapperTest {
     @Test
     @DisplayName("toEntity maps create request correctly")
     void toEntityMapsCreateRequest() {
-        CustomerCreateRequestDto request = new CustomerCreateRequestDto("John", "Doe", "john@example.com", "5511987654321", "529.982.247-25");
+        CustomerRequestDto request = new CustomerRequestDto("John", "Doe", "john@example.com", "5511987654321", "529.982.247-25");
 
         Customer result = mapper.toEntity(request, VALID_CPF);
 
@@ -101,7 +100,7 @@ class CustomerMapperTest {
         entity.setDocument(VALID_CPF.getValue());
         entity.setDocumentType(DocumentType.CPF);
 
-        CustomerUpdateRequestDto request = new CustomerUpdateRequestDto("Jane", "Smith", "jane@example.com", "5511111111111");
+        CustomerRequestDto request = new CustomerRequestDto("Jane", "Smith", "jane@example.com", "5511111111111", "529.982.247-25");
 
         mapper.updateEntity(entity, request);
 

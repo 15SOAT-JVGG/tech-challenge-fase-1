@@ -43,5 +43,5 @@ public class Attendant extends AuditableEntity {
     private String passwordHash;
 
     @Column(name = "active", nullable = false)
-    private boolean active;
+    private boolean active; // TODO
 }

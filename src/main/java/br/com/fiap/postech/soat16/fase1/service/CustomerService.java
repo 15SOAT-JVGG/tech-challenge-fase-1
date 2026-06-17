@@ -7,8 +7,7 @@ import java.util.UUID;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateDocumentException;
@@ -47,8 +46,8 @@ public class CustomerService {
     }
 
     @WithTransaction
-    public Uni<Void> create(CustomerCreateRequestDto request) {
-        Document document = Document.of(request.getDocument());
+    public Uni<Void> create(CustomerRequestDto request) {
+        Document document = Document.of(request.document());
 
         return repository.existsByDocument(document.getValue())
                 .flatMap(docExists -> {
@@ -68,7 +67,7 @@ public class CustomerService {
     }
 
     @WithTransaction
-    public Uni<CustomerResponseDto> update(UUID id, CustomerUpdateRequestDto request) {
+    public Uni<CustomerResponseDto> update(UUID id, CustomerRequestDto request) {
         return repository.findByCustomerId(id)
                 .onItem().ifNull().failWith(CustomerNotFoundException::new)
                 .flatMap(entity -> {

@@ -6,7 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
@@ -60,7 +60,7 @@ class VehicleMapperTest {
         @Test
         @DisplayName("should map all fields from dto to entity")
         void shouldMapDtoToEntity() {
-            VehicleDto dto = new VehicleDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
+            VehicleRequestDto dto = new VehicleRequestDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
 
             Vehicle result = mapper.toEntity(dto, null);
 
@@ -89,7 +89,7 @@ class VehicleMapperTest {
         @DisplayName("should overwrite all fields on existing entity")
         void shouldUpdateAllFields() {
             Vehicle entity = new Vehicle(UUID.randomUUID(), null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
-            VehicleDto dto = new VehicleDto(null, "XYZ9876", "Honda", "Civic", "Preto", 2022, 10000L, VehicleType.MOTOCYCLE);
+            VehicleRequestDto dto = new VehicleRequestDto(null, "XYZ9876", "Honda", "Civic", "Preto", 2022, 10000L, VehicleType.MOTOCYCLE);
 
             mapper.updateEntity(entity, dto);
 

@@ -18,7 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
@@ -52,7 +52,7 @@ class VehicleServiceTest {
     private Customer customer;
     private Vehicle entity;
     private VehicleResponseDto response;
-    private VehicleDto request;
+    private VehicleRequestDto request;
 
     @BeforeEach
     void setUp() {
@@ -61,7 +61,7 @@ class VehicleServiceTest {
         customer.setId(CUSTOMER_ID);
         entity = new Vehicle(VEHICLE_ID, customer, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
         response = new VehicleResponseDto(VEHICLE_ID, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR, CUSTOMER_ID);
-        request = new VehicleDto(CUSTOMER_ID, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
+        request = new VehicleRequestDto(CUSTOMER_ID, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
     }
 
     @Nested

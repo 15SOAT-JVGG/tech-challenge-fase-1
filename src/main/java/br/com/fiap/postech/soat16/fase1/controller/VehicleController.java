@@ -10,7 +10,7 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import br.com.fiap.postech.soat16.fase1.controller.docs.VehicleControllerDocs;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.service.VehicleService;
@@ -50,7 +50,7 @@ public class VehicleController implements VehicleControllerDocs {
 
     @POST
     @Override
-    public Uni<Response> create(@RequestBody @Valid VehicleDto dto) {
+    public Uni<Response> create(@RequestBody @Valid VehicleRequestDto dto) {
         return vehicleService.create(dto)
                 .replaceWith(Response.status(Response.Status.CREATED).build());
     }
@@ -59,7 +59,7 @@ public class VehicleController implements VehicleControllerDocs {
     @Path("/{id}")
     @Override
     public Uni<Response> update(@PathParam("id") UUID id,
-                                @RequestBody @Valid VehicleDto dto) {
+                                @RequestBody @Valid VehicleRequestDto dto) {
         return vehicleService.update(id, dto)
                 .map(updated -> Response.ok(updated).build());
     }

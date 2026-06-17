@@ -16,7 +16,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 
@@ -71,7 +71,7 @@ public interface VehicleControllerDocs {
     @APIResponse(responseCode = "409", description = "License plate already registered")
     Uni<Response> create(
             @RequestBody(description = "Vehicle data for registration")
-            @Valid VehicleDto body);
+            @Valid VehicleRequestDto body);
 
     @PUT
     @Path("/{id}")
@@ -84,7 +84,7 @@ public interface VehicleControllerDocs {
             @Parameter(name = "id", description = "Vehicle identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,
             @RequestBody(description = "Updated vehicle data")
-            @Valid VehicleDto body);
+            @Valid VehicleRequestDto body);
 
     @DELETE
     @Path("/{id}")

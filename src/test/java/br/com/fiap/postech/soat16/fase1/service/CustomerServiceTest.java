@@ -17,8 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateDocumentException;
@@ -124,7 +123,7 @@ class CustomerServiceTest {
         @Test
         @DisplayName("should update entity and return response")
         void shouldUpdateAndReturn() {
-            CustomerUpdateRequestDto request = new CustomerUpdateRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321");
+            CustomerRequestDto request = new CustomerRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321", "529.982.247-25");
 
             when(repository.findByCustomerId(null)).thenReturn(Uni.createFrom().item(entity));
             when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
@@ -139,7 +138,7 @@ class CustomerServiceTest {
         @Test
         @DisplayName("should throw CustomerNotFoundException when entity is missing")
         void shouldThrowNotFoundWhenMissing() {
-            CustomerUpdateRequestDto request = new CustomerUpdateRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321");
+            CustomerRequestDto request = new CustomerRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321", "529.982.247-25");
 
             when(repository.findByCustomerId(null)).thenReturn(Uni.createFrom().nullItem());
 
@@ -183,7 +182,7 @@ class CustomerServiceTest {
         @Test
         @DisplayName("create_withValidCpf_persists — valid CPF, no duplicates, completes without error")
         void create_withValidCpf_persists() {
-            CustomerCreateRequestDto request = new CustomerCreateRequestDto(
+            CustomerRequestDto request = new CustomerRequestDto(
                     "João", "Silva", "joao@example.com", PHONE, VALID_CPF_MASKED);
 
             Customer customerEntity = new Customer();
@@ -203,7 +202,7 @@ class CustomerServiceTest {
         @Test
         @DisplayName("create_withValidCnpj_persists — valid CNPJ, no duplicates, completes without error")
         void create_withValidCnpj_persists() {
-            CustomerCreateRequestDto request = new CustomerCreateRequestDto(
+            CustomerRequestDto request = new CustomerRequestDto(
                     "Empresa", "LTDA", "empresa@example.com", PHONE, VALID_CNPJ_MASKED);
 
             Customer customerEntity = new Customer();
@@ -223,7 +222,7 @@ class CustomerServiceTest {
         @Test
         @DisplayName("create_withInvalidDocument_throwsInvalidDocumentException — throws before any repo call")
         void create_withInvalidDocument_throwsInvalidDocumentException() {
-            CustomerCreateRequestDto request = new CustomerCreateRequestDto(
+            CustomerRequestDto request = new CustomerRequestDto(
                     "João", "Silva", "joao@example.com", PHONE, "123");
 
             assertThrows(InvalidDocumentException.class,
@@ -235,7 +234,7 @@ class CustomerServiceTest {
         @Test
         @DisplayName("create_withDuplicateDocument_throwsDuplicateDocumentException — existsByDocument returns true")
         void create_withDuplicateDocument_throwsDuplicateDocumentException() {
-            CustomerCreateRequestDto request = new CustomerCreateRequestDto(
+            CustomerRequestDto request = new CustomerRequestDto(
                     "João", "Silva", "joao@example.com", PHONE, VALID_CPF_MASKED);
 
             when(repository.existsByDocument(VALID_CPF_DIGITS)).thenReturn(Uni.createFrom().item(true));

@@ -20,9 +20,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.*;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 import br.com.fiap.postech.soat16.fase1.service.AttendantService;
@@ -83,7 +82,7 @@ class AttendantControllerTest {
     @Test
     @DisplayName("should return HTTP 201 when create succeeds")
     void shouldReturn201WhenCreateSucceeds() {
-        AttendantCreateRequestDto request = new AttendantCreateRequestDto(
+        AttendantRequestDto request = new AttendantRequestDto(
                 "Ana", "Silva", "ana@example.com", "5511999999999", "password123");
 
         Response result = controller.create(request);
@@ -109,8 +108,8 @@ class AttendantControllerTest {
     @Test
     @DisplayName("should return HTTP 200 when update succeeds")
     void shouldReturn200WhenUpdateSucceeds() {
-        AttendantUpdateRequestDto request = new AttendantUpdateRequestDto(
-                "Maria", "Souza", "maria@example.com", "5511888888888", true);
+        AttendantRequestDto request = new AttendantRequestDto(
+                "Maria", "Souza", "maria@example.com", "5511888888888", "1234");
 
         when(service.update(FIXED_UUID, request)).thenReturn(response);
 

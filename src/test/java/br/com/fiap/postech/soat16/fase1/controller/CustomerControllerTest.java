@@ -20,8 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.*;
 import br.com.fiap.postech.soat16.fase1.service.CustomerService;
@@ -136,7 +135,7 @@ class CustomerControllerTest {
         @Test
         @DisplayName("should return HTTP 201 when create succeeds")
         void shouldReturn201WhenCreateSucceeds() {
-            CustomerCreateRequestDto dto = new CustomerCreateRequestDto("John", "Doe", "john.doe@example.com", "5511987654321", "529.982.247-25");
+            CustomerRequestDto dto = new CustomerRequestDto("John", "Doe", "john.doe@example.com", "5511987654321", "529.982.247-25");
 
             when(service.create(dto)).thenReturn(Uni.createFrom().voidItem());
 
@@ -149,7 +148,7 @@ class CustomerControllerTest {
         @Test
         @DisplayName("should propagate DuplicateDocumentException")
         void shouldPropagateDuplicateDocumentException() {
-            CustomerCreateRequestDto dto = new CustomerCreateRequestDto("John", "Doe", "john.doe@example.com", "5511987654321", "529.982.247-25");
+            CustomerRequestDto dto = new CustomerRequestDto("John", "Doe", "john.doe@example.com", "5511987654321", "529.982.247-25");
 
             when(service.create(dto))
                     .thenReturn(Uni.createFrom().failure(new DuplicateDocumentException()));
@@ -166,7 +165,7 @@ class CustomerControllerTest {
         @Test
         @DisplayName("should return HTTP 200 with updated body")
         void shouldReturn200WithUpdatedBody() {
-            CustomerUpdateRequestDto dto = new CustomerUpdateRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321");
+            CustomerRequestDto dto = new CustomerRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321", "529.982.247-25");
             CustomerResponseDto updated = new CustomerResponseDto(FIXED_UUID, "Jane", "Doe", "jane.doe@example.com", "5511987654321",
                     "52998224725", "CPF", OffsetDateTime.now(), OffsetDateTime.now());
 
@@ -181,7 +180,7 @@ class CustomerControllerTest {
         @Test
         @DisplayName("should propagate CustomerNotFoundException")
         void shouldPropagateNotFoundException() {
-            CustomerUpdateRequestDto dto = new CustomerUpdateRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321");
+            CustomerRequestDto dto = new CustomerRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321", "529.982.247-25");
 
             when(service.update(FIXED_UUID, dto))
                     .thenReturn(Uni.createFrom().failure(new CustomerNotFoundException()));

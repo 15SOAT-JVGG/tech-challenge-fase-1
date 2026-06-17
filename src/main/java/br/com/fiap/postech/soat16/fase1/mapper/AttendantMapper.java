@@ -2,8 +2,7 @@ package br.com.fiap.postech.soat16.fase1.mapper;
 
 import org.mapstruct.Mapper;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Attendant;
@@ -37,25 +36,24 @@ public interface AttendantMapper {
         );
     }
 
-    default Attendant toEntity(AttendantCreateRequestDto request, String passwordHash) {
+    default Attendant toEntity(AttendantRequestDto request, String passwordHash) {
         if (request == null) {
             return null;
         }
         var entity = new Attendant();
-        entity.setFirstName(request.getFirstName());
-        entity.setLastName(request.getLastName());
-        entity.setEmail(request.getEmail());
-        entity.setPhoneNumber(request.getPhoneNumber());
+        entity.setFirstName(request.firstName());
+        entity.setLastName(request.lastName());
+        entity.setEmail(request.email());
+        entity.setPhoneNumber(request.phoneNumber());
         entity.setPasswordHash(passwordHash);
         entity.setActive(true);
         return entity;
     }
 
-    default void updateEntity(Attendant entity, AttendantUpdateRequestDto request) {
-        entity.setFirstName(request.getFirstName());
-        entity.setLastName(request.getLastName());
-        entity.setEmail(request.getEmail());
-        entity.setPhoneNumber(request.getPhoneNumber());
-        entity.setActive(request.getActive());
+    default void updateEntity(Attendant entity, AttendantRequestDto request) {
+        entity.setFirstName(request.firstName());
+        entity.setLastName(request.lastName());
+        entity.setEmail(request.email());
+        entity.setPhoneNumber(request.phoneNumber());
     }
 }

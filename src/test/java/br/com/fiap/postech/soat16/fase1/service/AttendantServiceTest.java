@@ -21,9 +21,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantCreateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.AttendantRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.AttendantNotFoundException;
@@ -111,7 +110,7 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should persist entity when email is unique")
         void shouldPersistWhenEmailIsUnique() {
-            AttendantCreateRequestDto request = new AttendantCreateRequestDto(
+            AttendantRequestDto request = new AttendantRequestDto(
                     "Ana", "Silva", "ana@example.com", "5511999999999", "password123");
 
             when(repository.existsByEmail("ana@example.com")).thenReturn(false);
@@ -126,7 +125,7 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should throw DuplicateAttendantEmailException when email exists")
         void shouldThrowDuplicateWhenEmailExists() {
-            AttendantCreateRequestDto request = new AttendantCreateRequestDto(
+            AttendantRequestDto request = new AttendantRequestDto(
                     "Ana", "Silva", "ana@example.com", "5511999999999", "password123");
 
             when(repository.existsByEmail("ana@example.com")).thenReturn(true);
@@ -143,8 +142,8 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should update entity and return response")
         void shouldUpdateAndReturn() {
-            AttendantUpdateRequestDto request = new AttendantUpdateRequestDto(
-                    "Maria", "Souza", "maria@example.com", "5511888888888", true);
+            AttendantRequestDto request = new AttendantRequestDto(
+                    "Maria", "Souza", "maria@example.com", "5511888888888", "1234");
 
             when(repository.findByAttendantId(FIXED_UUID)).thenReturn(Optional.of(entity));
             when(repository.existsByEmailAndDifferentId("maria@example.com", FIXED_UUID)).thenReturn(false);
@@ -160,8 +159,8 @@ class AttendantServiceTest {
         @Test
         @DisplayName("should throw DuplicateAttendantEmailException when another attendant has email")
         void shouldThrowDuplicateWhenAnotherAttendantHasEmail() {
-            AttendantUpdateRequestDto request = new AttendantUpdateRequestDto(
-                    "Maria", "Souza", "maria@example.com", "5511888888888", true);
+            AttendantRequestDto request = new AttendantRequestDto(
+                    "Maria", "Souza", "maria@example.com", "5511888888888", "1234");
 
             when(repository.findByAttendantId(FIXED_UUID)).thenReturn(Optional.of(entity));
             when(repository.existsByEmailAndDifferentId("maria@example.com", FIXED_UUID)).thenReturn(true);

@@ -18,8 +18,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerCreateRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.CustomerUpdateRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.CustomerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 
 import io.smallrye.mutiny.Uni;
@@ -68,7 +67,7 @@ public interface CustomerControllerDocs {
     @APIResponse(responseCode = "409", description = "Document already registered")
     Uni<Response> create(
             @RequestBody(description = "Customer data for registration")
-            @Valid CustomerCreateRequestDto body);
+            @Valid CustomerRequestDto body);
 
     @PUT
     @Path("/{id}")
@@ -81,7 +80,7 @@ public interface CustomerControllerDocs {
             @Parameter(name = "id", description = "Customer identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,
             @RequestBody(description = "Updated customer data. Document (CPF/CNPJ) is not updatable.")
-            @Valid CustomerUpdateRequestDto body);
+            @Valid CustomerRequestDto body);
 
     @DELETE
     @Path("/{id}")

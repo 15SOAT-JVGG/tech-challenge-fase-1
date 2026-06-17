@@ -19,7 +19,7 @@ import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
 import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
@@ -39,13 +39,13 @@ class VehicleControllerTest {
     private VehicleController controller;
 
     private VehicleResponseDto response;
-    private VehicleDto request;
+    private VehicleRequestDto request;
 
     @BeforeEach
     void setUp() {
         controller = new VehicleController(vehicleService);
         response = new VehicleResponseDto(UUID.randomUUID(), "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR, null);
-        request = new VehicleDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
+        request = new VehicleRequestDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
     }
 
     @Nested
