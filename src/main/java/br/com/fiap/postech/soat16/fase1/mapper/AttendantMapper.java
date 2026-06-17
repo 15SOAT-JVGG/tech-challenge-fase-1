@@ -36,9 +36,6 @@ public interface AttendantMapper {
     }
 
     default Attendant toEntity(AttendantRequestDto request, String passwordHash) {
-        if (request == null) {
-            return null;
-        }
         var entity = new Attendant();
         entity.setFirstName(request.firstName());
         entity.setLastName(request.lastName());
