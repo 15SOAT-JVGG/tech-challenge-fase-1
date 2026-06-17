@@ -52,7 +52,7 @@ public interface VehicleControllerDocs {
             @PathParam("id") UUID id);
 
     @GET
-    @Path("/license-plate/{license_plate}")
+    @Path("/by-license-plate/{license_plate}")
     @Operation(summary = "Get vehicle by license plate", description = "Returns a single vehicle by identifier.")
     @APIResponse(responseCode = "200", description = "Vehicle found",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
