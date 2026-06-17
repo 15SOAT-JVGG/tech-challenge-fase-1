@@ -29,7 +29,8 @@ public class VehicleController implements VehicleControllerDocs {
 
     @GET
     @Override
-    public Uni<PageableResponseDto<VehicleResponseDto>> listAll(@BeanParam @Valid PageableRequestDto pageable, @BeanParam VehicleFilterDto filter) {
+    public Uni<PageableResponseDto<VehicleResponseDto>> listAll(@BeanParam @Valid PageableRequestDto pageable,
+                                                                @BeanParam VehicleFilterDto filter) {
         return vehicleService.listAll(pageable, filter);
     }
 
@@ -57,7 +58,8 @@ public class VehicleController implements VehicleControllerDocs {
     @PUT
     @Path("/{id}")
     @Override
-    public Uni<Response> update(@PathParam("id") UUID id, @RequestBody @Valid VehicleDto dto) {
+    public Uni<Response> update(@PathParam("id") UUID id,
+                                @RequestBody @Valid VehicleDto dto) {
         return vehicleService.update(id, dto)
                 .map(updated -> Response.ok(updated).build());
     }

@@ -11,7 +11,6 @@ import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 public interface VehicleMapper {
 
     default VehicleResponseDto toResponse(Vehicle entity) {
-        if (entity == null) return null;
         return new VehicleResponseDto(
                 entity.getId(),
                 entity.getLicensePlate(),
@@ -26,8 +25,17 @@ public interface VehicleMapper {
     }
 
     default Vehicle toEntity(VehicleDto dto, Customer customer) {
-        if (dto == null) return null;
         var entity = new Vehicle();
+        buildVehicleEntity(dto, entity);
+        entity.setCustomer(customer);
+        return entity;
+    }
+
+    default void updateEntity(Vehicle vehicle, VehicleDto dto) {
+        buildVehicleEntity(dto, vehicle);
+    }
+
+    private void buildVehicleEntity(VehicleDto dto, Vehicle entity) {
         entity.setLicensePlate(dto.licensePlate());
         entity.setManufacturer(dto.manufacturer());
         entity.setModel(dto.model());
@@ -35,17 +43,5 @@ public interface VehicleMapper {
         entity.setYear(dto.year());
         entity.setKmDriven(dto.kmDriven());
         entity.setType(dto.type());
-        entity.setCustomer(customer);
-        return entity;
-    }
-
-    default void updateEntity(Vehicle vehicle, VehicleDto dto) {
-        vehicle.setLicensePlate(dto.licensePlate());
-        vehicle.setManufacturer(dto.manufacturer());
-        vehicle.setModel(dto.model());
-        vehicle.setColor(dto.color());
-        vehicle.setYear(dto.year());
-        vehicle.setKmDriven(dto.kmDriven());
-        vehicle.setType(dto.type());
     }
 }

@@ -51,7 +51,8 @@ public class VehicleService {
 
     @WithSession
     public Uni<VehicleResponseDto> findByLicensePlate(String licensePlate) {
-        return vehicleRepository.findByLicensePlate(licensePlate)
+        final String normalizedLicensePlate = licensePlate.replace("-", "").toUpperCase();
+        return vehicleRepository.findByLicensePlate(normalizedLicensePlate)
                 .onItem().ifNull().failWith(() -> new VehicleNotFoundException(licensePlate))
                 .map(vehicleMapper::toResponse);
     }
@@ -65,11 +66,7 @@ public class VehicleService {
                             if (TRUE.equals(exists)) {
                                 return Uni.createFrom().failure(new DuplicateLicensePlateException());
                             }
-                            var vehicle = vehicleMapper.toEntity(dto, customer);
-                            if (vehicle == null) {
-                                return Uni.createFrom().failure(new IllegalArgumentException("Invalid vehicle data"));
-                            }
-                            return vehicleRepository.persist(vehicle).replaceWithVoid();
+                            return vehicleRepository.persist(vehicleMapper.toEntity(dto, customer)).replaceWithVoid();
                         }));
     }
 

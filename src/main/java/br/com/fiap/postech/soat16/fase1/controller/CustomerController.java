@@ -68,7 +68,8 @@ public class CustomerController implements CustomerControllerDocs {
     @PUT
     @Path("/{id}")
     @Override
-    public Uni<Response> update(@PathParam("id") UUID id, @RequestBody @Valid CustomerUpdateRequestDto dto) {
+    public Uni<Response> update(@PathParam("id") UUID id,
+                                @RequestBody @Valid CustomerUpdateRequestDto dto) {
         return service.update(id, dto)
                 .map(updated -> Response.ok(updated).build());
     }
