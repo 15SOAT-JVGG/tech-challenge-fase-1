@@ -52,4 +52,17 @@ class AppExceptionTest {
         assertEquals("DOCUMENT_ALREADY_EXISTS", CustomerErrorCode.DOCUMENT_ALREADY_EXISTS.getCode());
         assertEquals("INVALID_DOCUMENT", CustomerErrorCode.INVALID_DOCUMENT.getCode());
     }
+
+    @Test
+    @DisplayName("AppException(message, errorCode, errorType, cause) carries the cause, type and code")
+    void constructorWithCauseCarriesAllFields() {
+        RuntimeException cause = new RuntimeException("root cause");
+        AppException ex = new AppException("failed", CustomerErrorCode.CUSTOMER_NOT_FOUND, ErrorType.NOT_FOUND, cause) {
+        };
+
+        assertEquals("failed", ex.getMessage());
+        assertEquals(cause, ex.getCause());
+        assertEquals(ErrorType.NOT_FOUND, ex.getType());
+        assertEquals("CUSTOMER_NOT_FOUND", ex.getCode());
+    }
 }

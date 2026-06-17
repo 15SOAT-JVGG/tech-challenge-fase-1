@@ -38,6 +38,21 @@ class AttendantMapperTest {
     }
 
     @Test
+    @DisplayName("should map entity to login response")
+    void shouldMapEntityToLoginResponse() {
+        UUID id = UUID.randomUUID();
+        Attendant entity = new Attendant(id, "Ana", "Silva", "ana@example.com", "5511999999999", "hash", true);
+
+        var response = mapper.toLoginResponse(entity);
+
+        assertEquals(id, response.attendantId());
+        assertEquals("Ana", response.firstName());
+        assertEquals("Silva", response.lastName());
+        assertEquals("ana@example.com", response.email());
+        assertTrue(response.authenticated());
+    }
+
+    @Test
     @DisplayName("should map create request to entity")
     void shouldMapCreateRequestToEntity() {
         AttendantRequestDto request = new AttendantRequestDto(

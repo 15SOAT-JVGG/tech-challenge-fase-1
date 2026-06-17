@@ -135,6 +135,33 @@ class CustomerControllerTest {
     }
 
     @Nested
+    @DisplayName("GET /v1/customer/by-document/{document} — findByDocument")
+    class FindByDocument {
+
+        @Test
+        @DisplayName("should return customer when found")
+        void shouldReturnCustomerWhenFound() {
+            when(service.findByDocument("52998224725")).thenReturn(Uni.createFrom().item(response));
+
+            CustomerResponseDto result = controller.findByDocument("52998224725").await().indefinitely();
+
+            assertNotNull(result);
+            assertEquals("John", result.firstName());
+            verify(service).findByDocument("52998224725");
+        }
+
+        @Test
+        @DisplayName("should propagate CustomerNotFoundException")
+        void shouldPropagateNotFoundException() {
+            when(service.findByDocument("52998224725"))
+                    .thenReturn(Uni.createFrom().failure(new CustomerNotFoundException()));
+
+            assertThrows(CustomerNotFoundException.class,
+                    () -> controller.findByDocument("52998224725").await().indefinitely());
+        }
+    }
+
+    @Nested
     @DisplayName("POST /v1/customer — create")
     class Create {
 
