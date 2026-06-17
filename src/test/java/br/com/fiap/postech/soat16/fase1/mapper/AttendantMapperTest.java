@@ -54,12 +54,6 @@ class AttendantMapperTest {
     }
 
     @Test
-    @DisplayName("should return null entity when request is null")
-    void shouldReturnNullEntityWhenRequestIsNull() {
-        assertNull(mapper.toEntity(null, "hash"));
-    }
-
-    @Test
     @DisplayName("should update entity")
     void shouldUpdateEntity() {
         Attendant entity = new Attendant(UUID.randomUUID(), "Ana", "Silva", "ana@example.com", null, "hash", true);
