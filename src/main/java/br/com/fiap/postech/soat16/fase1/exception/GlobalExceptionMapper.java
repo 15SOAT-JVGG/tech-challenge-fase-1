@@ -24,20 +24,20 @@ public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
             case BusinessException e -> errorResponse(UNPROCESSABLE_ENTITY,
                 "Unprocessable Entity", e.getMessage());
             case IllegalArgumentException e -> errorResponse(Response.Status.BAD_REQUEST, e.getMessage());
-            case WebApplicationException e -> e.getResponse(); // mantém status nativo (401, 403, etc.)
+            case WebApplicationException e -> e.getResponse(); // keeps the native status (401, 403, etc.)
             default -> handleUnexpected(exception);
         };
     }
 
     private Response handleUnexpected(Throwable exception) {
-        // Não vaza detalhes internos para o cliente; usa correlation id para o operador
+        // Does not leak internal details to the client; uses a correlation id for the operator
         String correlationId = UUID.randomUUID().toString();
-        LOG.errorf(exception, "Erro inesperado [%s]: %s", correlationId, exception.getMessage());
+        LOG.errorf(exception, "Unexpected error [%s]: %s", correlationId, exception.getMessage());
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
             .entity(Map.of(
                 "status", 500,
                 "error", "Internal Server Error",
-                "message", "Erro interno do servidor",
+                "message", "Internal server error",
                 "correlationId", correlationId,
                 "timestamp", OffsetDateTime.now().toString()
             ))

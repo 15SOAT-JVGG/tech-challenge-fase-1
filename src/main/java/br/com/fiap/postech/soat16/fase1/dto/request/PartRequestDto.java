@@ -9,13 +9,13 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 public record PartRequestDto(
-    @NotBlank(message = "Nome da peça é obrigatório") String name,
+    @NotBlank(message = "Part name is required") String name,
     String description,
-    @NotNull(message = "Preço unitário é obrigatório")
-    @DecimalMin(value = "0.01", message = "Preço deve ser maior que zero") BigDecimal unitPrice,
-    @NotNull(message = "Quantidade em estoque é obrigatória")
-    @Min(value = 0, message = "Estoque não pode ser negativo") Integer stockQuantity,
-    @NotBlank(message = "Unidade é obrigatória") String unit,
-    @Min(value = 0, message = "Estoque mínimo não pode ser negativo") Integer minimumStock,
+    @NotNull(message = "Unit price is required")
+    @DecimalMin(value = "0.01", message = "Price must be greater than zero") BigDecimal unitPrice,
+    @NotNull(message = "Stock quantity is required")
+    @Min(value = 0, message = "Stock cannot be negative") Integer stockQuantity,
+    @NotBlank(message = "Unit is required") String unit,
+    @Min(value = 0, message = "Minimum stock cannot be negative") Integer minimumStock,
     PartType partType
 ) {}

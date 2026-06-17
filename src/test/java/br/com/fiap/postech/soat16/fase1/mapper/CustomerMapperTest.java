@@ -56,14 +56,14 @@ class CustomerMapperTest {
         CustomerResponseDto result = mapper.toResponse(entity);
 
         assertNotNull(result);
-        assertEquals(id, result.getCustomerId());
-        assertEquals("John", result.getFirstName());
-        assertEquals("Doe", result.getLastName());
-        assertEquals("john@example.com", result.getEmail());
-        assertEquals("5511987654321", result.getPhoneNumber());
-        assertEquals(VALID_CPF.getValue(), result.getDocument());
-        assertEquals("CPF", result.getDocumentType());
-        assertEquals(now, result.getCreatedAt());
+        assertEquals(id, result.customerId());
+        assertEquals("John", result.firstName());
+        assertEquals("Doe", result.lastName());
+        assertEquals("john@example.com", result.email());
+        assertEquals("5511987654321", result.phoneNumber());
+        assertEquals(VALID_CPF.getValue(), result.document());
+        assertEquals("CPF", result.documentType());
+        assertEquals(now, result.createdAt());
     }
 
     @Test

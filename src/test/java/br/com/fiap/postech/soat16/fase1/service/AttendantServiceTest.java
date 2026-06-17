@@ -57,7 +57,7 @@ class AttendantServiceTest {
     void setUp() {
         service = new AttendantService(repository, mapper, passwordService);
         entity = new Attendant(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", "hash", true);
-        response = new AttendantResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", true, null, null);
+        response = new AttendantResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", true, null);
     }
 
     @Nested
@@ -91,7 +91,7 @@ class AttendantServiceTest {
 
             AttendantResponseDto result = service.findById(FIXED_UUID);
 
-            assertEquals(FIXED_UUID, result.getAttendantId());
+            assertEquals(FIXED_UUID, result.attendantId());
         }
 
         @Test

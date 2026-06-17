@@ -20,7 +20,8 @@ public interface VehicleMapper {
                 entity.getYear(),
                 entity.getKmDriven(),
                 entity.getType(),
-                entity.getCustomer().getId()
+                entity.getCustomer().getId(),
+                entity.getCreatedAt()
         );
     }
 

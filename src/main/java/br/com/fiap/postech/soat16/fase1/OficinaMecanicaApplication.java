@@ -11,8 +11,8 @@ import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 @ApplicationPath("/")
 @OpenAPIDefinition(
     info = @Info(
-        title = "Oficina Mecânica API",
-        description = "Sistema Integrado de Atendimento e Execução de OS",
+        title = "Mechanic Workshop API",
+        description = "Integrated System for Service Order Handling and Execution",
         version = "1.0.0"
     )
 )
@@ -21,7 +21,7 @@ import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
     type = SecuritySchemeType.HTTP,
     scheme = "bearer",
     bearerFormat = "JWT",
-    description = "JWT Bearer Token — use POST /auth/login para obter o token"
+    description = "JWT Bearer Token — use POST /auth/login to obtain the token"
 )
 public class OficinaMecanicaApplication extends Application {
 }

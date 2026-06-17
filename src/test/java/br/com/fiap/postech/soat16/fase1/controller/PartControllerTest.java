@@ -182,7 +182,7 @@ class PartControllerTest {
         @DisplayName("should propagate BusinessException on insufficient stock")
         void shouldPropagateBusiness() {
             when(service.adjustStock(ID, -50))
-                .thenReturn(Uni.createFrom().failure(new BusinessException("Estoque insuficiente")));
+                .thenReturn(Uni.createFrom().failure(new BusinessException("Insufficient stock")));
 
             assertThrows(BusinessException.class,
                 () -> controller.adjustStock(ID, -50).await().indefinitely());

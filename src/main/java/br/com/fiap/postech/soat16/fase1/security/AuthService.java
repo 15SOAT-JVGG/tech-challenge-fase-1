@@ -22,8 +22,8 @@ import io.smallrye.mutiny.Uni;
 public class AuthService {
 
     private static final Logger LOG = Logger.getLogger(AuthService.class);
-    private static final String INVALID_CREDENTIALS = "Credenciais inválidas";
-    // Hash dummy para comparação em tempo constante quando o usuário não existe
+    private static final String INVALID_CREDENTIALS = "Invalid credentials";
+    // Dummy hash for constant-time comparison when the user does not exist
     private static final String DUMMY_HASH =
         "$2a$10$7EqJtq98hPqEX7fNZaFWoO9vQKPdN0nW1c6jE8fXE9rH3gYxQ3s2u";
 
@@ -46,14 +46,14 @@ public class AuthService {
     }
 
     private LoginResponseDto authenticate(LoginRequestDto request, AppUser user) {
-        // Comparação em tempo constante evita timing attacks que vazam usuários válidos
+        // Constant-time comparison avoids timing attacks that leak valid usernames
         boolean validPassword = BcryptUtil.matches(
             request.password(),
             user != null ? user.getPassword() : DUMMY_HASH
         );
 
         if (user == null || !validPassword) {
-            LOG.warnf("Tentativa de login inválida para usuário=%s", request.username());
+            LOG.warnf("Invalid login attempt for user=%s", request.username());
             throw new NotAuthorizedException(INVALID_CREDENTIALS, "Bearer");
         }
 
@@ -71,7 +71,7 @@ public class AuthService {
         return userRepository.existsByUsername(username)
             .flatMap(exists -> Boolean.TRUE.equals(exists)
                 ? Uni.createFrom().failure(
-                    new IllegalArgumentException("Usuário já existe: " + username))
+                    new IllegalArgumentException("User already exists: " + username))
                 : userRepository.persist(new AppUser(username, BcryptUtil.bcryptHash(rawPassword), role))
                     .replaceWithVoid());
     }

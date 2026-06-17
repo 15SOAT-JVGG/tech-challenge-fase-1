@@ -36,80 +36,80 @@ import java.util.List;
 public interface PartControllerDocs {
 
     @GET
-    @Operation(summary = "Listar todas as peças/insumos", description = "Retorna todas as peças e insumos cadastrados.")
-    @APIResponse(responseCode = "200", description = "Peças/insumos retornados com sucesso",
+    @Operation(summary = "List all parts/supplies", description = "Returns all registered parts and supplies.")
+    @APIResponse(responseCode = "200", description = "Parts/supplies returned successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = PartResponseDto.class, type = org.eclipse.microprofile.openapi.annotations.enums.SchemaType.ARRAY)))
     Uni<List<PartResponseDto>> listAll();
 
     @GET
     @Path("/{id}")
-    @Operation(summary = "Buscar peça/insumo por ID", description = "Retorna uma única peça/insumo pelo identificador.")
-    @APIResponse(responseCode = "200", description = "Peça/insumo encontrado",
+    @Operation(summary = "Find part/supply by ID", description = "Returns a single part/supply by its identifier.")
+    @APIResponse(responseCode = "200", description = "Part/supply found",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = PartResponseDto.class)))
-    @APIResponse(responseCode = "404", description = "Peça/insumo não encontrado")
+    @APIResponse(responseCode = "404", description = "Part/supply not found")
     Uni<PartResponseDto> findById(
-            @Parameter(name = "id", description = "Identificador da peça/insumo", required = true, in = ParameterIn.PATH)
+            @Parameter(name = "id", description = "Part/supply identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") Long id);
 
     @GET
     @Path("/low-stock")
-    @Operation(summary = "Listar itens com estoque baixo",
-            description = "Retorna itens cujo estoque atual está igual ou abaixo do mínimo definido para cada peça.")
-    @APIResponse(responseCode = "200", description = "Itens com estoque baixo retornados com sucesso",
+    @Operation(summary = "List low stock items",
+            description = "Returns items whose current stock is at or below the minimum defined for each part.")
+    @APIResponse(responseCode = "200", description = "Low stock items returned successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = PartResponseDto.class, type = org.eclipse.microprofile.openapi.annotations.enums.SchemaType.ARRAY)))
     Uni<List<PartResponseDto>> findLowStock();
 
     @POST
-    @Operation(summary = "Cadastrar nova peça/insumo", description = "Cria um novo registro de peça/insumo. Restrito a ADMIN.")
-    @APIResponse(responseCode = "201", description = "Peça/insumo criado com sucesso",
+    @Operation(summary = "Register new part/supply", description = "Creates a new part/supply record. Restricted to ADMIN.")
+    @APIResponse(responseCode = "201", description = "Part/supply created successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = PartResponseDto.class)))
-    @APIResponse(responseCode = "400", description = "Corpo da requisição inválido")
+    @APIResponse(responseCode = "400", description = "Invalid request body")
     Uni<Response> create(
-            @RequestBody(description = "Dados da peça/insumo para cadastro")
+            @RequestBody(description = "Part/supply data for registration")
             @Valid PartRequestDto body);
 
     @PUT
     @Path("/{id}")
-    @Operation(summary = "Atualizar peça/insumo", description = "Substitui integralmente os dados de uma peça/insumo. Restrito a ADMIN.")
-    @APIResponse(responseCode = "200", description = "Peça/insumo atualizado com sucesso",
+    @Operation(summary = "Update part/supply", description = "Fully replaces the data of a part/supply. Restricted to ADMIN.")
+    @APIResponse(responseCode = "200", description = "Part/supply updated successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = PartResponseDto.class)))
-    @APIResponse(responseCode = "404", description = "Peça/insumo não encontrado")
+    @APIResponse(responseCode = "404", description = "Part/supply not found")
     Uni<PartResponseDto> update(
-            @Parameter(name = "id", description = "Identificador da peça/insumo", required = true, in = ParameterIn.PATH)
+            @Parameter(name = "id", description = "Part/supply identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") Long id,
-            @RequestBody(description = "Dados atualizados da peça/insumo")
+            @RequestBody(description = "Updated part/supply data")
             @Valid PartRequestDto body);
 
     @PATCH
     @Path("/{id}/stock")
     @Operation(
-            summary = "Ajustar estoque (positivo=entrada, negativo=saída) — somente ADMIN",
-            description = "Operação restrita a ADMIN. Mecânicos consomem estoque indiretamente ao adicionar peças à OS; " +
-                          "ajustes manuais de entrada/saída (compra, devolução, perda) são responsabilidade administrativa."
+            summary = "Adjust stock (positive=inbound, negative=outbound) — ADMIN only",
+            description = "Operation restricted to ADMIN. Mechanics consume stock indirectly when adding parts to a service order; " +
+                          "manual inbound/outbound adjustments (purchase, return, loss) are an administrative responsibility."
     )
-    @APIResponse(responseCode = "200", description = "Estoque ajustado com sucesso",
+    @APIResponse(responseCode = "200", description = "Stock adjusted successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = PartResponseDto.class)))
-    @APIResponse(responseCode = "400", description = "Estoque insuficiente para a saída solicitada")
-    @APIResponse(responseCode = "404", description = "Peça/insumo não encontrado")
+    @APIResponse(responseCode = "400", description = "Insufficient stock for the requested outbound movement")
+    @APIResponse(responseCode = "404", description = "Part/supply not found")
     Uni<PartResponseDto> adjustStock(
-            @Parameter(name = "id", description = "Identificador da peça/insumo", required = true, in = ParameterIn.PATH)
+            @Parameter(name = "id", description = "Part/supply identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") Long id,
-            @Parameter(name = "adjustment", description = "Quantidade a ajustar (positivo=entrada, negativo=saída)",
+            @Parameter(name = "adjustment", description = "Quantity to adjust (positive=inbound, negative=outbound)",
                     required = true, in = ParameterIn.QUERY)
             @QueryParam("adjustment") int adjustment);
 
     @DELETE
     @Path("/{id}")
-    @Operation(summary = "Excluir peça/insumo", description = "Remove permanentemente uma peça/insumo pelo identificador. Restrito a ADMIN.")
-    @APIResponse(responseCode = "204", description = "Peça/insumo excluído com sucesso")
-    @APIResponse(responseCode = "404", description = "Peça/insumo não encontrado")
+    @Operation(summary = "Delete part/supply", description = "Permanently removes a part/supply by its identifier. Restricted to ADMIN.")
+    @APIResponse(responseCode = "204", description = "Part/supply deleted successfully")
+    @APIResponse(responseCode = "404", description = "Part/supply not found")
     Uni<Response> delete(
-            @Parameter(name = "id", description = "Identificador da peça/insumo", required = true, in = ParameterIn.PATH)
+            @Parameter(name = "id", description = "Part/supply identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") Long id);
 }

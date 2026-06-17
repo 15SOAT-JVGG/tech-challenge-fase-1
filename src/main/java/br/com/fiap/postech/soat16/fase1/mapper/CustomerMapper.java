@@ -22,8 +22,7 @@ public interface CustomerMapper {
                 entity.getPhoneNumber(),
                 entity.getDocument(),
                 entity.getDocumentType() != null ? entity.getDocumentType().name() : null,
-                entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getCreatedAt()
         );
     }
 

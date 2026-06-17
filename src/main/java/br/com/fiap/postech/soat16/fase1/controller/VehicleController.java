@@ -42,7 +42,7 @@ public class VehicleController implements VehicleControllerDocs {
     }
 
     @GET
-    @Path("/license-plate/{license_plate}")
+    @Path("/by-license-plate/{license_plate}")
     @Override
     public Uni<VehicleResponseDto> findByLicensePlate(@PathParam("license_plate") String licensePlate) {
         return vehicleService.findByLicensePlate(licensePlate);

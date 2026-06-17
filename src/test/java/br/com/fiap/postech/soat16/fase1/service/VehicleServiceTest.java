@@ -60,7 +60,7 @@ class VehicleServiceTest {
         customer = new Customer();
         customer.setId(CUSTOMER_ID);
         entity = new Vehicle(VEHICLE_ID, customer, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
-        response = new VehicleResponseDto(VEHICLE_ID, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR, CUSTOMER_ID);
+        response = new VehicleResponseDto(VEHICLE_ID, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR, CUSTOMER_ID, null);
         request = new VehicleRequestDto(CUSTOMER_ID, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
     }
 

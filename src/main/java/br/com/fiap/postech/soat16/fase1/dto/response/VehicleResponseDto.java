@@ -2,6 +2,8 @@ package br.com.fiap.postech.soat16.fase1.dto.response;
 
 import br.com.fiap.postech.soat16.fase1.model.VehicleType;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 public record VehicleResponseDto(
@@ -13,5 +15,6 @@ public record VehicleResponseDto(
         Integer year,
         Long kmDriven,
         VehicleType type,
-        UUID customerId
+        UUID customerId,
+        OffsetDateTime createdAt
 ) { }

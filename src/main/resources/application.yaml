@@ -71,32 +71,32 @@ quarkus:
 
   # ── OpenAPI / Swagger UI ──────────────────────────────────────────────────--
   smallrye-openapi:
-    path: /q/openapi                 # spec em /q/openapi (JSON) e /q/openapi?format=yaml
-    info-title: API Oficina Mecânica
+    path: /q/openapi                 # spec at /q/openapi (JSON) and /q/openapi?format=yaml
+    info-title: Mechanic Workshop API
     info-version: ${project.version}
-    info-description: API de gestão da oficina mecânica (15SOAT - Tech Challenge Fase 1)
+    info-description: Mechanic workshop management API (15SOAT - Tech Challenge Phase 1)
     info-license-name: Apache 2.0
     info-license-url: https://www.apache.org/licenses/LICENSE-2.0.html
-    # Esquema Bearer JWT — habilita o botão "Authorize" no Swagger UI e adiciona
-    # o requirement de segurança às operações automaticamente (auto-add-security).
+    # Bearer JWT scheme — enables the "Authorize" button in Swagger UI and adds
+    # the security requirement to operations automatically (auto-add-security).
     security-scheme: jwt
     security-scheme-name: bearerAuth
-    security-scheme-description: Informe o token JWT obtido no endpoint de login.
+    security-scheme-description: Provide the JWT token obtained from the login endpoint.
 
   swagger-ui:
     path: /q/swagger-ui
-    title: API Oficina Mecânica
-    # Por padrão o Swagger UI só é servido em dev/test. Mantido acessível também no
-    # artefato empacotado durante a fase de desenvolvimento; em produção definir
-    # SWAGGER_UI_ENABLED=false para não expor a superfície da API (OWASP).
+    title: Mechanic Workshop API
+    # By default Swagger UI is only served in dev/test. Kept accessible also in the
+    # packaged artifact during the development phase; in production set
+    # SWAGGER_UI_ENABLED=false to avoid exposing the API surface (OWASP).
     always-include: ${SWAGGER_UI_ENABLED:true}
 
 
 # ── JWT ─────────────────────────────────────────────────────────────────────--
-# Chaves externalizadas via env. Os defaults apontam para um par RSA SOMENTE de
-# desenvolvimento (src/main/resources/jwt). Em produção, sobrescrever
-# JWT_PRIVATE_KEY_LOCATION / JWT_PUBLIC_KEY_LOCATION para secrets montados
-# (ex.: file:/etc/jwt/privateKey.pem) e NUNCA usar as chaves versionadas.
+# Keys externalized via env. The defaults point to an RSA pair for DEVELOPMENT ONLY
+# (src/main/resources/jwt). In production, override
+# JWT_PRIVATE_KEY_LOCATION / JWT_PUBLIC_KEY_LOCATION for mounted secrets
+# (e.g.: file:/etc/jwt/privateKey.pem) and NEVER use the versioned keys.
 smallrye:
   jwt:
     sign:

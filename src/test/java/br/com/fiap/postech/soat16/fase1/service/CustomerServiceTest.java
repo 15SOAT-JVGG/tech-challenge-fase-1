@@ -65,14 +65,8 @@ class CustomerServiceTest {
         entity.setDocument("52998224725");
         entity.setDocumentType(DocumentType.CPF);
 
-        response = new CustomerResponseDto();
-        response.setCustomerId(FIXED_UUID);
-        response.setFirstName("John");
-        response.setLastName("Doe");
-        response.setEmail("john.doe@example.com");
-        response.setPhoneNumber("5511987654321");
-        response.setDocument("52998224725");
-        response.setDocumentType("CPF");
+        response = new CustomerResponseDto(FIXED_UUID, "John", "Doe", "john.doe@example.com",
+                "5511987654321", "52998224725", "CPF", null);
     }
 
     @Nested
@@ -108,7 +102,7 @@ class CustomerServiceTest {
             CustomerResponseDto result = service.findById(null).await().indefinitely();
 
             assertNotNull(result);
-            assertEquals(FIXED_UUID, result.getCustomerId());
+            assertEquals(FIXED_UUID, result.customerId());
         }
 
         @Test
@@ -281,11 +275,8 @@ class CustomerServiceTest {
             customerEntity.setDocument(VALID_CPF_DIGITS);
             customerEntity.setDocumentType(DocumentType.CPF);
 
-            CustomerResponseDto expectedResponse = new CustomerResponseDto();
-            expectedResponse.setCustomerId(customerEntity.getId());
-            expectedResponse.setFirstName("João");
-            expectedResponse.setDocument(VALID_CPF_DIGITS);
-            expectedResponse.setDocumentType(DocumentType.CPF.name());
+            CustomerResponseDto expectedResponse = new CustomerResponseDto(customerEntity.getId(), "João", null,
+                    null, null, VALID_CPF_DIGITS, DocumentType.CPF.name(), null);
 
             when(repository.findByDocument(VALID_CPF_DIGITS)).thenReturn(Uni.createFrom().item(customerEntity));
             when(mapper.toResponse(customerEntity)).thenReturn(expectedResponse);
@@ -293,7 +284,7 @@ class CustomerServiceTest {
             CustomerResponseDto result = service.findByDocument(VALID_CPF_MASKED).await().indefinitely();
 
             assertNotNull(result);
-            assertEquals(VALID_CPF_DIGITS, result.getDocument());
+            assertEquals(VALID_CPF_DIGITS, result.document());
         }
 
         @Test

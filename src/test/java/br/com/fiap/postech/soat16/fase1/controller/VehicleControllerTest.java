@@ -44,7 +44,7 @@ class VehicleControllerTest {
     @BeforeEach
     void setUp() {
         controller = new VehicleController(vehicleService);
-        response = new VehicleResponseDto(UUID.randomUUID(), "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR, null);
+        response = new VehicleResponseDto(UUID.randomUUID(), "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR, null, null);
         request = new VehicleRequestDto(null, "ABC1234", "Toyota", "Corolla", "Prata", 2020, 50000L, VehicleType.CAR);
     }
 

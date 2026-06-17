@@ -11,7 +11,7 @@ import java.util.List;
 public class PartRepository implements PanacheRepository<Part> {
 
     /**
-     * Peças cujo estoque atual está igual ou abaixo do mínimo definido para cada peça.
+     * Parts whose current stock is at or below the minimum defined for each part.
      */
     public Uni<List<Part>> findLowStock() {
         return list("stockQuantity <= minimumStock");

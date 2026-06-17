@@ -21,8 +21,7 @@ public interface AttendantMapper {
                 entity.getEmail(),
                 entity.getPhoneNumber(),
                 entity.isActive(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getCreatedAt()
         );
     }
 

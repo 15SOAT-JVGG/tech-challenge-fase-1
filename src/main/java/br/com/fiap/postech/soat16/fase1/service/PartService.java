@@ -17,7 +17,7 @@ import static java.lang.Boolean.FALSE;
 @ApplicationScoped
 public class PartService {
 
-    public static final String PECA_INSUMO = "Peça/Insumo";
+    public static final String PECA_INSUMO = "Part/Supply";
 
     private final PartRepository partRepository;
 

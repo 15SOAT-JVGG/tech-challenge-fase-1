@@ -25,7 +25,7 @@ public class Vehicle extends AuditableEntity {
     @JoinColumn(name = "customer_id")
     private Customer customer;
 
-    @Pattern(regexp = "^[A-Z]{3}\\d[A-Z\\d]\\d{2}$", message = "Placa inválida")
+    @Pattern(regexp = "^[A-Z]{3}\\d[A-Z\\d]\\d{2}$", message = "Invalid license plate")
     @Column(name = "license_plate", nullable = false, length = 7, unique = true)
     private String licensePlate;
 

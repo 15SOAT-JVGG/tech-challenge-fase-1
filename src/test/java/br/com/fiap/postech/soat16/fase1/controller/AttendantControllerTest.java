@@ -42,7 +42,7 @@ class AttendantControllerTest {
     @BeforeEach
     void setUp() {
         controller = new AttendantController(service);
-        response = new AttendantResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", true, null, null);
+        response = new AttendantResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", true, null);
     }
 
     @Nested
@@ -75,7 +75,7 @@ class AttendantControllerTest {
 
         AttendantResponseDto result = controller.findById(FIXED_UUID);
 
-        assertEquals(FIXED_UUID, result.getAttendantId());
+        assertEquals(FIXED_UUID, result.attendantId());
         verify(service).findById(FIXED_UUID);
     }
 

@@ -97,7 +97,7 @@ public class Part {
     }
 
     /**
-     * Indica necessidade de reposição: estoque atual igual ou abaixo do mínimo definido para a peça.
+     * Indicates restocking is needed: current stock at or below the minimum defined for the part.
      */
     public boolean isLowStock() {
         return minimumStock != null && stockQuantity <= minimumStock;
@@ -106,7 +106,7 @@ public class Part {
     public void decreaseStock(int quantity) {
         if (this.stockQuantity < quantity) {
             throw new BusinessException(
-                "Estoque insuficiente para a peça '" + name + "'. Disponível: " + stockQuantity
+                "Insufficient stock for part '" + name + "'. Available: " + stockQuantity
             );
         }
         this.stockQuantity -= quantity;

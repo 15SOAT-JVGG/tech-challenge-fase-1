@@ -28,9 +28,9 @@ class AttendantMapperTest {
 
         var response = mapper.toResponse(entity);
 
-        assertEquals(id, response.getAttendantId());
-        assertEquals("Ana", response.getFirstName());
-        assertTrue(response.getActive());
+        assertEquals(id, response.attendantId());
+        assertEquals("Ana", response.firstName());
+        assertTrue(response.active());
     }
 
     @Test

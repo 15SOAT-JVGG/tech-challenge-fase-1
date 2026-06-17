@@ -43,7 +43,7 @@ class CustomerControllerTest {
     @BeforeEach
     void setUp() {
         controller = new CustomerController(service);
-        response = new CustomerResponseDto(FIXED_UUID, "John", "Doe", "john.doe@example.com", "5511987654321", "52998224725", "CPF", null, null);
+        response = new CustomerResponseDto(FIXED_UUID, "John", "Doe", "john.doe@example.com", "5511987654321", "52998224725", "CPF", null);
     }
 
     @Nested
@@ -67,7 +67,7 @@ class CustomerControllerTest {
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
-            assertEquals("John", result.content().getFirst().getFirstName());
+            assertEquals("John", result.content().getFirst().firstName());
             verify(service).findAll(null, 0, 10);
         }
 
@@ -113,7 +113,7 @@ class CustomerControllerTest {
             CustomerResponseDto result = controller.findById(FIXED_UUID).await().indefinitely();
 
             assertNotNull(result);
-            assertEquals("John", result.getFirstName());
+            assertEquals("John", result.firstName());
             verify(service).findById(FIXED_UUID);
         }
 
@@ -167,7 +167,7 @@ class CustomerControllerTest {
         void shouldReturn200WithUpdatedBody() {
             CustomerRequestDto dto = new CustomerRequestDto("Jane", "Doe", "jane.doe@example.com", "5511987654321", "529.982.247-25");
             CustomerResponseDto updated = new CustomerResponseDto(FIXED_UUID, "Jane", "Doe", "jane.doe@example.com", "5511987654321",
-                    "52998224725", "CPF", OffsetDateTime.now(), OffsetDateTime.now());
+                    "52998224725", "CPF", OffsetDateTime.now());
 
             when(service.update(FIXED_UUID, dto)).thenReturn(Uni.createFrom().item(updated));
 
