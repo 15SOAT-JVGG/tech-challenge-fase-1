@@ -24,6 +24,10 @@ public class VehicleRepository implements PanacheRepository<Vehicle> {
         return count("licensePlate = ?1", licensePlate).map(total -> total > 0);
     }
 
+    public Uni<Boolean> existsByCustomerId(UUID customerId) {
+        return count("customer.id = ?1", customerId).map(total -> total > 0);
+    }
+
     public Uni<Vehicle> findByVehicleId(UUID id) {
         return find("id = ?1", id).firstResult()
                 .invoke(found -> Log.infof("Vehicle lookup: id=%s found=%b", id, found != null));

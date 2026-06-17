@@ -19,6 +19,7 @@ import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
+import br.com.fiap.postech.soat16.fase1.exception.CustomerHasVehiclesException;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateDocumentException;
 import br.com.fiap.postech.soat16.fase1.exception.InvalidDocumentException;
@@ -27,6 +28,7 @@ import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Document;
 import br.com.fiap.postech.soat16.fase1.model.DocumentType;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
+import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
 
 import io.smallrye.mutiny.Uni;
 
@@ -36,6 +38,9 @@ class CustomerServiceTest {
 
     @Mock
     private CustomerRepository repository;
+
+    @Mock
+    private VehicleRepository vehicleRepository;
 
     @Mock
     private CustomerMapper mapper;
@@ -49,7 +54,7 @@ class CustomerServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CustomerService(repository, mapper);
+        service = new CustomerService(repository, vehicleRepository, mapper);
 
         entity = new Customer();
         entity.setId(FIXED_UUID);
@@ -154,6 +159,7 @@ class CustomerServiceTest {
         @Test
         @DisplayName("should delete customer when found")
         void shouldDeleteWhenFound() {
+            when(vehicleRepository.existsByCustomerId(null)).thenReturn(Uni.createFrom().item(false));
             when(repository.deleteByCustomerId(null)).thenReturn(Uni.createFrom().item(1L));
 
             assertDoesNotThrow(() -> service.delete(null).await().indefinitely());
@@ -162,10 +168,22 @@ class CustomerServiceTest {
         @Test
         @DisplayName("should throw CustomerNotFoundException when no record deleted")
         void shouldThrowWhenNoRecordDeleted() {
+            when(vehicleRepository.existsByCustomerId(null)).thenReturn(Uni.createFrom().item(false));
             when(repository.deleteByCustomerId(null)).thenReturn(Uni.createFrom().item(0L));
 
             assertThrows(CustomerNotFoundException.class,
                     () -> service.delete(null).await().indefinitely());
+        }
+
+        @Test
+        @DisplayName("should throw CustomerHasVehiclesException when customer has associated vehicles")
+        void shouldThrowWhenCustomerHasVehicles() {
+            when(vehicleRepository.existsByCustomerId(null)).thenReturn(Uni.createFrom().item(true));
+
+            assertThrows(CustomerHasVehiclesException.class,
+                    () -> service.delete(null).await().indefinitely());
+
+            verify(repository, never()).deleteByCustomerId(any());
         }
     }
 

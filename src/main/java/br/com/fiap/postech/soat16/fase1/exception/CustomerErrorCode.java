@@ -4,7 +4,8 @@ public enum CustomerErrorCode implements ErrorCode {
 
     CUSTOMER_NOT_FOUND,
     DOCUMENT_ALREADY_EXISTS,
-    INVALID_DOCUMENT;
+    INVALID_DOCUMENT,
+    CUSTOMER_HAS_VEHICLES;
 
     @Override
     public String getCode() {
