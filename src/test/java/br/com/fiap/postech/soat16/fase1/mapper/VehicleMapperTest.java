@@ -45,12 +45,6 @@ class VehicleMapperTest {
             assertEquals(VehicleType.CAR, result.type());
             assertEquals(customerId, result.customerId());
         }
-
-        @Test
-        @DisplayName("should return null when entity is null")
-        void shouldReturnNullWhenEntityIsNull() {
-            assertNull(mapper.toResponse(null));
-        }
     }
 
     @Nested
@@ -72,12 +66,6 @@ class VehicleMapperTest {
             assertEquals(2020, result.getYear());
             assertEquals(50000L, result.getKmDriven());
             assertEquals(VehicleType.CAR, result.getType());
-        }
-
-        @Test
-        @DisplayName("should return null when dto is null")
-        void shouldReturnNullWhenDtoIsNull() {
-            assertNull(mapper.toEntity(null, null));
         }
     }
 

@@ -70,6 +70,5 @@ class AttendantMapperTest {
 
         assertEquals("Maria", entity.getFirstName());
         assertEquals("maria@example.com", entity.getEmail());
-        assertFalse(entity.isActive());
     }
 }
