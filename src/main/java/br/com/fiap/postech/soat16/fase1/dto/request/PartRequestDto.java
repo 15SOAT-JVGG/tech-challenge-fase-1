@@ -19,4 +19,4 @@ public record PartRequestDto(
     @NotBlank(message = "Unit is required") String unit,
     @Min(value = 0, message = "Minimum stock cannot be negative") Integer minimumStock,
     PartType partType
-) {}
+) { }

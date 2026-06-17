@@ -2,16 +2,27 @@ package br.com.fiap.postech.soat16.fase1.model;
 
 import java.util.UUID;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 
 import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
-@Table(name="vehicle", schema = "oficina_mecanica")
+@Table(name = "vehicle", schema = "oficina_mecanica")
 @Getter
 @Setter
 @AllArgsConstructor

@@ -41,7 +41,7 @@ public class PageableRequestDto {
         for (String entry : sort) {
             String[] parts = entry.split(",", 2);
             String field = parts[0].trim();
-            Sort.Direction direction = parts.length > 1 && parts[1].trim().equalsIgnoreCase("desc")
+            Sort.Direction direction = parts.length > 1 && "desc".equalsIgnoreCase(parts[1].trim())
                     ? Sort.Direction.Descending
                     : Sort.Direction.Ascending;
             result = result == null ? Sort.by(field, direction) : result.and(field, direction);

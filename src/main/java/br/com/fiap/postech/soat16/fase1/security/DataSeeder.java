@@ -43,6 +43,7 @@ public class DataSeeder {
     @ConfigProperty(name = "app.seed.enabled", defaultValue = "true")
     boolean seedEnabled;
 
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     void onStart(@Observes StartupEvent ev) {
         if (!seedEnabled) {
             LOG.info("Initial seed disabled (app.seed.enabled=false).");
@@ -56,6 +57,7 @@ public class DataSeeder {
                     seedUser(adminUsername, adminPassword, "ADMIN")
                         .chain(() -> seedUser(mechanicUsername, mechanicPassword, "MECHANIC"))));
         } catch (Throwable e) {
+            // subscribeAndAwait declares "throws Throwable", so this catch can't be narrowed
             throw new IllegalStateException("Failed to run initial seed.", e);
         }
     }

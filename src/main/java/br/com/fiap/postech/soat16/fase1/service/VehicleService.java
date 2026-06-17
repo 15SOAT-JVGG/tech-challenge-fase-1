@@ -2,6 +2,7 @@ package br.com.fiap.postech.soat16.fase1.service;
 
 import static java.lang.Boolean.TRUE;
 
+import java.util.Locale;
 import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -51,7 +52,7 @@ public class VehicleService {
 
     @WithSession
     public Uni<VehicleResponseDto> findByLicensePlate(String licensePlate) {
-        final String normalizedLicensePlate = licensePlate.replace("-", "").toUpperCase();
+        final String normalizedLicensePlate = licensePlate.replace("-", "").toUpperCase(Locale.ROOT);
         return vehicleRepository.findByLicensePlate(normalizedLicensePlate)
                 .onItem().ifNull().failWith(() -> new VehicleNotFoundException(licensePlate))
                 .map(vehicleMapper::toResponse);

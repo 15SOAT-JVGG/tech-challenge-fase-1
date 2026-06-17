@@ -1,6 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.mapper;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.UUID;
 
@@ -17,7 +18,7 @@ import br.com.fiap.postech.soat16.fase1.model.VehicleType;
 @DisplayName("VehicleMapper — Unit Tests")
 class VehicleMapperTest {
 
-    private final VehicleMapper mapper = new VehicleMapper() {};
+    private final VehicleMapper mapper = new VehicleMapper() { };
 
     @Nested
     @DisplayName("toResponse")

@@ -13,16 +13,14 @@ import br.com.fiap.postech.soat16.fase1.dto.response.PartResponseDto;
 import br.com.fiap.postech.soat16.fase1.service.PartService;
 
 import io.smallrye.mutiny.Uni;
+import lombok.RequiredArgsConstructor;
 
 @ApplicationScoped
+@RequiredArgsConstructor
 @RolesAllowed({"ADMIN", "MECHANIC"})
 public class PartController implements PartControllerDocs {
 
     private final PartService partService;
-
-    public PartController(PartService partService) {
-        this.partService = partService;
-    }
 
     @Override
     public Uni<List<PartResponseDto>> listAll() {

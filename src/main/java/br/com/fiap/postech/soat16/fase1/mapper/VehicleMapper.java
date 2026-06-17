@@ -8,6 +8,7 @@ import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 
 @Mapper(componentModel = "cdi")
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface VehicleMapper {
 
     default VehicleResponseDto toResponse(Vehicle entity) {

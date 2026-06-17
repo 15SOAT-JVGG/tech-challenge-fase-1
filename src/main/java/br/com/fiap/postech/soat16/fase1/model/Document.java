@@ -81,13 +81,14 @@ public final class Document {
         int sum = 0;
         int weight = startWeight;
         for (int i = 0; i < length; i++) {
-            sum += digitAt(digits, i) * weight--;
+            sum += digitAt(digits, i) * weight;
+            weight--;
         }
         int remainder = sum % 11;
         return remainder < 2 ? 0 : 11 - remainder;
     }
 
-    private static int checkDigit(String digits, int[] weights) {
+    private static int checkDigit(String digits, int... weights) {
         int sum = 0;
         for (int i = 0; i < weights.length; i++) {
             sum += digitAt(digits, i) * weights[i];

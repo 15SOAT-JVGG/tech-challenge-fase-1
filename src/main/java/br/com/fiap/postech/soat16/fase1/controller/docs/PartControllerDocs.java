@@ -18,6 +18,7 @@ import jakarta.ws.rs.core.Response;
 
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.ParameterIn;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
@@ -42,7 +43,7 @@ public interface PartControllerDocs {
     @Operation(summary = "List all parts/supplies", description = "Returns all registered parts and supplies.")
     @APIResponse(responseCode = "200", description = "Parts/supplies returned successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
-                    schema = @Schema(implementation = PartResponseDto.class, type = org.eclipse.microprofile.openapi.annotations.enums.SchemaType.ARRAY)))
+                    schema = @Schema(implementation = PartResponseDto.class, type = SchemaType.ARRAY)))
     Uni<List<PartResponseDto>> listAll();
 
     @GET
@@ -62,7 +63,7 @@ public interface PartControllerDocs {
             description = "Returns items whose current stock is at or below the minimum defined for each part.")
     @APIResponse(responseCode = "200", description = "Low stock items returned successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
-                    schema = @Schema(implementation = PartResponseDto.class, type = org.eclipse.microprofile.openapi.annotations.enums.SchemaType.ARRAY)))
+                    schema = @Schema(implementation = PartResponseDto.class, type = SchemaType.ARRAY)))
     Uni<List<PartResponseDto>> findLowStock();
 
     @POST

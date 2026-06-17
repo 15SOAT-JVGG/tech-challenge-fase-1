@@ -16,4 +16,4 @@ public record AttendantResponseDto(
     String phoneNumber,
     Boolean active,
     OffsetDateTime createdAt
-) {}
+) { }

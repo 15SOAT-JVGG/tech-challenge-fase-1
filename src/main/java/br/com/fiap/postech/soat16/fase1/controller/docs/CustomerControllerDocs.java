@@ -3,7 +3,15 @@ package br.com.fiap.postech.soat16.fase1.controller.docs;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
-import jakarta.ws.rs.*;
+import jakarta.ws.rs.BeanParam;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
@@ -50,14 +58,17 @@ public interface CustomerControllerDocs {
 
     @GET
     @Path("/by-document/{document}")
-    @Operation(summary = "Find customer by document", description = "Returns a customer identified by CPF or CNPJ. Accepts both masked (e.g. 529.982.247-25) and unmasked (e.g. 52998224725) formats.")
+    @Operation(summary = "Find customer by document",
+            description = "Returns a customer identified by CPF or CNPJ. "
+                    + "Accepts both masked (e.g. 529.982.247-25) and unmasked (e.g. 52998224725) formats.")
     @APIResponse(responseCode = "200", description = "Customer found",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = CustomerResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid CPF/CNPJ format")
     @APIResponse(responseCode = "404", description = "Customer not found")
     Uni<CustomerResponseDto> findByDocument(
-            @Parameter(name = "document", description = "Customer CPF or CNPJ (with or without mask)", required = true, in = ParameterIn.PATH)
+            @Parameter(name = "document", description = "Customer CPF or CNPJ (with or without mask)",
+                    required = true, in = ParameterIn.PATH)
             @PathParam("document") String document);
 
     @POST
@@ -71,7 +82,8 @@ public interface CustomerControllerDocs {
 
     @PUT
     @Path("/{id}")
-    @Operation(summary = "Update customer", description = "Fully replaces a customer's data. Document (CPF/CNPJ) cannot be changed.")
+    @Operation(summary = "Update customer",
+            description = "Fully replaces a customer's data. Document (CPF/CNPJ) cannot be changed.")
     @APIResponse(responseCode = "200", description = "Customer updated successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = CustomerResponseDto.class)))

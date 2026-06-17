@@ -2,7 +2,12 @@ package br.com.fiap.postech.soat16.fase1.model;
 
 import java.util.UUID;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
 

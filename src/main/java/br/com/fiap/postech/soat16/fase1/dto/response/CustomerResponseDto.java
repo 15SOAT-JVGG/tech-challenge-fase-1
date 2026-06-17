@@ -17,4 +17,4 @@ public record CustomerResponseDto(
     String document,
     String documentType,
     OffsetDateTime createdAt
-) {}
+) { }
