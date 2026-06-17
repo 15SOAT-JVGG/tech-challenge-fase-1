@@ -15,6 +15,10 @@ quarkus:
   http:
     port: 8080
 
+  security:
+    jaxrs:
+      deny-unannotated-endpoints: true
+
   devservices:
     enabled: false
 

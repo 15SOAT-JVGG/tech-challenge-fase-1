@@ -23,8 +23,7 @@ import java.util.UUID;
 @ApplicationScoped
 @AllArgsConstructor
 @Path("/v1/vehicle")
-public class
-VehicleController implements VehicleControllerDocs {
+public class VehicleController implements VehicleControllerDocs {
 
     private final VehicleService vehicleService;
 
