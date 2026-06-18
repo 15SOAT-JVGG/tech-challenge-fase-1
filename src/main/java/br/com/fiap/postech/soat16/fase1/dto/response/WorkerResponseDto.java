@@ -8,8 +8,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record AttendantResponseDto(
-    UUID attendantId,
+public record WorkerResponseDto(
+    UUID workerId,
     String firstName,
     String lastName,
     String email,
