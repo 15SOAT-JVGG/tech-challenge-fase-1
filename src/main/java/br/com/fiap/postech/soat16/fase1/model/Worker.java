@@ -20,17 +20,19 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "attendant", schema = "oficina_mecanica")
+@Table(name = "worker", schema = "oficina_mecanica")
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 @AllArgsConstructor
 @NoArgsConstructor
-public class Attendant extends AuditableEntity {
+public class Worker extends AuditableEntity {
 
     @EqualsAndHashCode.Include
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "attendant_id", nullable = false)
+    @Column(name = "worker_id", nullable = false)
     private UUID id;
+
+    private WorkerProfile profile;
 
     @Column(name = "first_name", nullable = false)
     private String firstName;

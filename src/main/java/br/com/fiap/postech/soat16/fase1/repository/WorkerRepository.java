@@ -6,32 +6,32 @@ import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import br.com.fiap.postech.soat16.fase1.model.Attendant;
+import br.com.fiap.postech.soat16.fase1.model.Worker;
 
 import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import io.quarkus.logging.Log;
 import io.quarkus.panache.common.Page;
 
 @ApplicationScoped
-public class AttendantRepository implements PanacheRepository<Attendant> {
+public class WorkerRepository implements PanacheRepository<Worker> {
 
-    public List<Attendant> findPage(int page, int size) {
+    public List<Worker> findPage(int page, int size) {
         return find("ORDER BY createdAt DESC").page(Page.of(page, size)).list();
     }
 
-    public Optional<Attendant> findByAttendantId(UUID id) {
-        Optional<Attendant> found = find("id = ?1", id).firstResultOptional();
-        Log.infof("Attendant lookup: id=%s found=%b", id, found.isPresent());
+    public Optional<Worker> findByWorkerId(UUID id) {
+        Optional<Worker> found = find("id = ?1", id).firstResultOptional();
+        Log.infof("Worker lookup: id=%s found=%b", id, found.isPresent());
         return found;
     }
 
-    public Optional<Attendant> findByEmail(String email) {
+    public Optional<Worker> findByEmail(String email) {
         return find("email = ?1", email).firstResultOptional();
     }
 
-    public long deleteByAttendantId(UUID id) {
+    public long deleteByWorkerId(UUID id) {
         long deleted = delete("id = ?1", id);
-        Log.infof("Attendant deleted: id=%s deleted=%d", id, deleted);
+        Log.infof("Worker deleted: id=%s deleted=%d", id, deleted);
         return deleted;
     }
 

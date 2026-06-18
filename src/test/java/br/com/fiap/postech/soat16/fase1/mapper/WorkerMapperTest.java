@@ -9,24 +9,25 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantRequestDto;
-import br.com.fiap.postech.soat16.fase1.model.Attendant;
+import br.com.fiap.postech.soat16.fase1.dto.request.WorkerRequestDto;
+import br.com.fiap.postech.soat16.fase1.model.Worker;
+import br.com.fiap.postech.soat16.fase1.model.WorkerProfile;
 
-@DisplayName("AttendantMapper - Unit Tests")
-class AttendantMapperTest {
+@DisplayName("WorkerMapper - Unit Tests")
+class WorkerMapperTest {
 
-    private final AttendantMapper mapper = new AttendantMapper() {
+    private final WorkerMapper mapper = new WorkerMapper() {
     };
 
     @Test
     @DisplayName("should map entity to response")
     void shouldMapEntityToResponse() {
         UUID id = UUID.randomUUID();
-        Attendant entity = new Attendant(id, "Ana", "Silva", "ana@example.com", "5511999999999", "hash", true);
+        Worker entity = new Worker(id, WorkerProfile.MECHANIC, "Ana", "Silva", "ana@example.com", "5511999999999", "hash", true);
 
         var response = mapper.toResponse(entity);
 
-        assertEquals(id, response.attendantId());
+        assertEquals(id, response.workerId());
         assertEquals("Ana", response.firstName());
         assertTrue(response.active());
     }
@@ -41,11 +42,11 @@ class AttendantMapperTest {
     @DisplayName("should map entity to login response")
     void shouldMapEntityToLoginResponse() {
         UUID id = UUID.randomUUID();
-        Attendant entity = new Attendant(id, "Ana", "Silva", "ana@example.com", "5511999999999", "hash", true);
+        Worker entity = new Worker(id, WorkerProfile.MECHANIC, "Ana", "Silva", "ana@example.com", "5511999999999", "hash", true);
 
         var response = mapper.toLoginResponse(entity);
 
-        assertEquals(id, response.attendantId());
+        assertEquals(id, response.workerId());
         assertEquals("Ana", response.firstName());
         assertEquals("Silva", response.lastName());
         assertEquals("ana@example.com", response.email());
@@ -55,10 +56,10 @@ class AttendantMapperTest {
     @Test
     @DisplayName("should map create request to entity")
     void shouldMapCreateRequestToEntity() {
-        AttendantRequestDto request = new AttendantRequestDto(
-                "Ana", "Silva", "ana@example.com", "5511999999999", "password123");
+        WorkerRequestDto request = new WorkerRequestDto(
+                "Ana", "Silva", "ana@example.com", "5511999999999", "password123", WorkerProfile.MECHANIC);
 
-        Attendant entity = mapper.toEntity(request, "hash");
+        Worker entity = mapper.toEntity(request, "hash");
 
         assertEquals("Ana", entity.getFirstName());
         assertEquals("ana@example.com", entity.getEmail());
@@ -69,9 +70,9 @@ class AttendantMapperTest {
     @Test
     @DisplayName("should update entity")
     void shouldUpdateEntity() {
-        Attendant entity = new Attendant(UUID.randomUUID(), "Ana", "Silva", "ana@example.com", null, "hash", true);
-        AttendantRequestDto request = new AttendantRequestDto(
-                "Maria", "Souza", "maria@example.com", "5511888888888", "1234");
+        Worker entity = new Worker(UUID.randomUUID(), WorkerProfile.MECHANIC, "Ana", "Silva", "ana@example.com", null, "hash", true);
+        WorkerRequestDto request = new WorkerRequestDto(
+                "Maria", "Souza", "maria@example.com", "5511888888888", "1234", WorkerProfile.MECHANIC);
 
         mapper.updateEntity(entity, request);
 
