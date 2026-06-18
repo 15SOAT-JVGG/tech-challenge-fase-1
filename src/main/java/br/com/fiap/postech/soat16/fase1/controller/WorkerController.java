@@ -18,42 +18,42 @@ import jakarta.ws.rs.core.Response;
 
 import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 
-import br.com.fiap.postech.soat16.fase1.controller.docs.AttendantControllerDocs;
+import br.com.fiap.postech.soat16.fase1.controller.docs.WorkerControllerDocs;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
-import br.com.fiap.postech.soat16.fase1.service.AttendantService;
+import br.com.fiap.postech.soat16.fase1.dto.request.WorkerLoginRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.WorkerRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkerLoginResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkerResponseDto;
+import br.com.fiap.postech.soat16.fase1.service.WorkerService;
 
 import lombok.RequiredArgsConstructor;
 
 @ApplicationScoped
 @RequiredArgsConstructor
-@Path("/v1/attendant")
+@Path("/v1/worker")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
-public class AttendantController implements AttendantControllerDocs {
+public class WorkerController implements WorkerControllerDocs {
 
-    private final AttendantService service;
+    private final WorkerService service;
 
     @GET
     @Override
-    public PageableResponseDto<AttendantResponseDto> findAll(@BeanParam @Valid PageableRequestDto pageable) {
+    public PageableResponseDto<WorkerResponseDto> findAll(@BeanParam @Valid PageableRequestDto pageable) {
         return service.findAll(pageable.getQ(), pageable.getPage(), pageable.getSize());
     }
 
     @GET
     @Path("/{id}")
     @Override
-    public AttendantResponseDto findById(@PathParam("id") UUID id) {
+    public WorkerResponseDto findById(@PathParam("id") UUID id) {
         return service.findById(id);
     }
 
     @POST
     @Override
-    public Response create(@RequestBody @Valid AttendantRequestDto dto) {
+    public Response create(@RequestBody @Valid WorkerRequestDto dto) {
         service.create(dto);
         return Response.status(Response.Status.CREATED).build();
     }
@@ -61,14 +61,14 @@ public class AttendantController implements AttendantControllerDocs {
     @POST
     @Path("/login")
     @Override
-    public AttendantLoginResponseDto login(@RequestBody @Valid AttendantLoginRequestDto dto) {
+    public WorkerLoginResponseDto login(@RequestBody @Valid WorkerLoginRequestDto dto) {
         return service.login(dto);
     }
 
     @PUT
     @Path("/{id}")
     @Override
-    public Response update(@PathParam("id") UUID id, @RequestBody @Valid AttendantRequestDto dto) {
+    public Response update(@PathParam("id") UUID id, @RequestBody @Valid WorkerRequestDto dto) {
         return Response.ok(service.update(id, dto)).build();
     }
 

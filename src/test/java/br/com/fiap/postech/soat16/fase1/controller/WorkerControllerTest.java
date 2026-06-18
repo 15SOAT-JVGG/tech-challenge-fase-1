@@ -22,33 +22,34 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantLoginRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.AttendantRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantLoginResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.response.AttendantResponseDto;
-import br.com.fiap.postech.soat16.fase1.service.AttendantService;
+import br.com.fiap.postech.soat16.fase1.dto.request.WorkerLoginRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.request.WorkerRequestDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkerLoginResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkerResponseDto;
+import br.com.fiap.postech.soat16.fase1.model.WorkerProfile;
+import br.com.fiap.postech.soat16.fase1.service.WorkerService;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AttendantController - Unit Tests")
-class AttendantControllerTest {
+@DisplayName("WorkerController - Unit Tests")
+class WorkerControllerTest {
 
     @Mock
-    private AttendantService service;
+    private WorkerService service;
 
-    private AttendantController controller;
+    private WorkerController controller;
 
     private static final UUID FIXED_UUID = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
 
-    private AttendantResponseDto response;
+    private WorkerResponseDto response;
 
     @BeforeEach
     void setUp() {
-        controller = new AttendantController(service);
-        response = new AttendantResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", true, null);
+        controller = new WorkerController(service);
+        response = new WorkerResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", "5511999999999", true, null);
     }
 
     @Nested
-    @DisplayName("GET /v1/attendant")
+    @DisplayName("GET /v1/worker")
     class FindAll {
 
         @Test
@@ -56,7 +57,7 @@ class AttendantControllerTest {
         void shouldReturnPaginatedList() {
             PageableRequestDto pageable = mock(PageableRequestDto.class);
             PaginationDto pagination = new PaginationDto(0, 10, 1L, 1, false, false);
-            PageableResponseDto<AttendantResponseDto> page = new PageableResponseDto<>(List.of(response), pagination);
+            PageableResponseDto<WorkerResponseDto> page = new PageableResponseDto<>(List.of(response), pagination);
 
             when(pageable.getQ()).thenReturn(null);
             when(pageable.getPage()).thenReturn(0);
@@ -71,21 +72,21 @@ class AttendantControllerTest {
     }
 
     @Test
-    @DisplayName("should return attendant by id")
-    void shouldReturnAttendantById() {
+    @DisplayName("should return worker by id")
+    void shouldReturnWorkerById() {
         when(service.findById(FIXED_UUID)).thenReturn(response);
 
-        AttendantResponseDto result = controller.findById(FIXED_UUID);
+        WorkerResponseDto result = controller.findById(FIXED_UUID);
 
-        assertEquals(FIXED_UUID, result.attendantId());
+        assertEquals(FIXED_UUID, result.workerId());
         verify(service).findById(FIXED_UUID);
     }
 
     @Test
     @DisplayName("should return HTTP 201 when create succeeds")
     void shouldReturn201WhenCreateSucceeds() {
-        AttendantRequestDto request = new AttendantRequestDto(
-                "Ana", "Silva", "ana@example.com", "5511999999999", "password123");
+        WorkerRequestDto request = new WorkerRequestDto(
+                "Ana", "Silva", "ana@example.com", "5511999999999", "password123", WorkerProfile.MECHANIC);
 
         Response result = controller.create(request);
 
@@ -96,22 +97,22 @@ class AttendantControllerTest {
     @Test
     @DisplayName("should return login response")
     void shouldReturnLoginResponse() {
-        AttendantLoginRequestDto request = new AttendantLoginRequestDto("ana@example.com", "password123");
-        AttendantLoginResponseDto loginResponse = new AttendantLoginResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", true);
+        WorkerLoginRequestDto request = new WorkerLoginRequestDto("ana@example.com", "password123");
+        WorkerLoginResponseDto loginResponse = new WorkerLoginResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", true);
 
         when(service.login(request)).thenReturn(loginResponse);
 
-        AttendantLoginResponseDto result = controller.login(request);
+        WorkerLoginResponseDto result = controller.login(request);
 
         assertNotNull(result);
-        assertEquals(FIXED_UUID, result.attendantId());
+        assertEquals(FIXED_UUID, result.workerId());
     }
 
     @Test
     @DisplayName("should return HTTP 200 when update succeeds")
     void shouldReturn200WhenUpdateSucceeds() {
-        AttendantRequestDto request = new AttendantRequestDto(
-                "Maria", "Souza", "maria@example.com", "5511888888888", "1234");
+        WorkerRequestDto request = new WorkerRequestDto(
+                "Maria", "Souza", "maria@example.com", "5511888888888", "1234", WorkerProfile.MECHANIC);
 
         when(service.update(FIXED_UUID, request)).thenReturn(response);
 
