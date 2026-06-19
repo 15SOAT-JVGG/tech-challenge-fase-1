@@ -55,6 +55,8 @@ dentro da mesma prioridade, pelas mais recentes primeiro.
   - Se a ordem estiver em `WAITING_APPROVAL`, ela avança automaticamente para `APPROVED` (gerando
     histórico). Se já estiver em outro status, apenas o `estimatedValue` é atualizado.
   - Um orçamento já aprovado ou rejeitado não pode ser aprovado novamente (`EstimateAlreadyDecidedException`, HTTP 409).
+- Uma ordem **não pode ser aprovada** (`APPROVED`, seja pelo `PATCH /status` ou implicitamente ao
+  aprovar um orçamento), **iniciar a execução** (`IN_PROGRESS`) **nem ser fechada** (`/close`) sem um
 - Uma ordem **não pode iniciar a execução** (`IN_PROGRESS`) **nem ser fechada** (`/close`) sem um
   orçamento aprovado (`EstimateNotApprovedException`, HTTP 422).
 
@@ -158,7 +160,9 @@ curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/close \
 ```
 
 Exige status `IN_PROGRESS` e orçamento aprovado. `finalValue` é opcional — se omitido, usa o
-`estimatedValue` da ordem. Define `closedAt` e move o status para `COMPLETED`.
+`estimatedValue` da ordem. Pode ser usado para registrar um valor final diferente do orçamento
+aprovado (ex.: serviço extra identificado durante a execução ou desconto concedido); quando
+informado, deve ser maior que zero. Define `closedAt` e move o status para `COMPLETED`.
 
 ### 8. Entregar o veículo
 
@@ -192,3 +196,41 @@ curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
 | 422 | `WORK_ORDER_LOCKED` | Ordem já `DELIVERED` ou `CANCELLED`. |
 | 422 | `INVALID_STATUS_TRANSITION` | Transição de status inválida (pular etapa, ir direto para `COMPLETED`, etc.). |
 | 422 | `ESTIMATE_NOT_APPROVED` | Tentativa de iniciar (`IN_PROGRESS`) ou fechar (`/close`) sem orçamento aprovado. |
+
+---
+
+## Cobertura de testes
+
+O fluxo é validado em duas camadas, ambas no pacote `br.com.fiap.postech.soat16.fase1`:
+
+- **Unitário** — `service.WorkOrderServiceTest`: regras de negócio isoladas, repositórios mockados.
+  Cobre também transições artificiais (ex.: travas combinadas) difíceis de reproduzir via API.
+- **Integração** — `controller.WorkOrderControllerIT`: mesmo fluxo batendo no endpoint HTTP real
+  contra um PostgreSQL via Testcontainers (`./mvnw test -Pitest`, requer Docker) — valida
+  serialização JSON, mapeamento JPA/Hibernate Reactive e Bean Validation de ponta a ponta.
+
+A tabela liga cada regra já descrita neste documento ao teste que a exercita (nomes abreviados
+como `Classe.método`; todas vivem dentro de uma classe `@Nested` com o mesmo nome do endpoint):
+
+| Regra de negócio | Integração (`WorkOrderControllerIT`) | Unitário (`WorkOrderServiceTest`) |
+|---|---|---|
+| Ordem nasce em `OPEN`, `openedAt` automático | `FullLifecycle.shouldCompleteFullLifecycle`, `Create.shouldCreateWorkOrder` | `Create.shouldPersistWorkOrder...` |
+| Cliente/veículo inexistente ao criar → 404 | `Create.shouldReturn404WhenCustomerNotFound` / `...VehicleNotFound` | `Create.shouldThrow...NotFoundException` |
+| Não é permitido pular etapas (ex.: `OPEN` → `APPROVED` direto) | `UpdateStatus.shouldRejectSkippingStages` | `UpdateStatus.shouldRejectSkippingStages` |
+| `COMPLETED` só via `/close`, nunca pelo `/status` | `UpdateStatus.shouldRejectCompletedViaGenericEndpoint` | `UpdateStatus.shouldRejectJumpingDirectlyToCompleted` |
+| `CANCELLED` a partir de qualquer status não terminal | `FullLifecycle.shouldCancelFromNonTerminalStatus` | `UpdateStatus.shouldAllowCancelledFromAnyNonTerminalStatus` |
+| `DELIVERED`/`CANCELLED` bloqueiam qualquer alteração posterior (`WORK_ORDER_LOCKED`) | `FullLifecycle.shouldLockWorkOrderAfterDelivered` | `UpdateStatus.shouldThrowWorkOrderLockedException...`, `CreateEstimate`/`AddService.shouldThrowWorkOrderLockedException...` |
+| Orçamento aprovado grava `estimatedValue` na ordem | `ApproveEstimate.shouldApproveAndAdvanceStatus` | `ApproveEstimate.shouldApproveEstimateSetEstimatedValue...` |
+| Aprovar orçamento em `WAITING_APPROVAL` avança a ordem para `APPROVED` automaticamente | `ApproveEstimate.shouldApproveAndAdvanceStatus` | `ApproveEstimate.shouldApproveEstimateSetEstimatedValue...AdvanceWaitingApprovalToApproved` |
+| Orçamento já decidido não pode ser aprovado de novo → 409 | `ApproveEstimate.shouldReturn409WhenAlreadyDecided` | `ApproveEstimate.shouldThrowEstimateAlreadyDecidedException` |
+| Ordem não pode ir para `APPROVED` nem `IN_PROGRESS` sem orçamento aprovado | `UpdateStatus.shouldRejectApprovingWithoutApprovedEstimate` | `UpdateStatus.shouldThrowEstimateNotApprovedException...WhenApproving` / `...StartingExecution` |
+| `/close` exige orçamento aprovado e status `IN_PROGRESS` | `Close.shouldReturn422WhenNotInProgress` | `Close.shouldThrow...WhenNotInProgress`, `...WhenThereIsNoApprovedEstimate` |
+| `finalValue` opcional no fechamento — usa `estimatedValue` se omitido | `Close.shouldCloseUsingEstimatedValueWhenOmitted` | `Close.shouldCompleteUsingTheApprovedEstimateValueWhenFinalValueIsOmitted` |
+| `finalValue` pode divergir do orçamento (serviço extra/desconto) | `Close.shouldCloseUsingProvidedFinalValue` | `Close.shouldUseTheProvidedFinalValueWhenPresent`, `...shouldRecordHistoryTransitionToCompletedWhenFinalValueDiffersFromTheEstimate` |
+| Peça inexistente no orçamento → 404 | `CreateEstimate.shouldReturn404WhenPartNotFound` | `CreateEstimate.shouldThrowEstimatePartNotFoundException` |
+| Itens de orçamento vazios são rejeitados → 400 | `CreateEstimate.shouldReturn400WhenItemsEmpty` | — (Bean Validation, não exercida no nível de serviço) |
+| Mão de obra pode ser registrada múltiplas vezes na mesma ordem | `AddService.shouldAddService` | `AddService.shouldPersistALaborServiceLine` |
+
+Cenários de validação de payload (`@Valid`/Bean Validation, ex.: descrição em branco, preço/valor
+zero) só existem na camada de integração — só ali a requisição passa pelo filtro JAX-RS real antes
+de chegar ao serviço.

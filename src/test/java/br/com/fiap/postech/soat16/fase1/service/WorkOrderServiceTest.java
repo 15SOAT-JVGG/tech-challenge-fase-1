@@ -19,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -358,6 +359,39 @@ class WorkOrderServiceTest {
         }
 
         @Test
+        @DisplayName("should throw EstimateNotApprovedException when approving without an approved estimate")
+        void shouldThrowWhenApprovingWithoutApprovedEstimate() {
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
+            WorkOrderStatusUpdateRequestDto request = new WorkOrderStatusUpdateRequestDto(WorkOrderStatus.APPROVED);
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(false));
+
+            assertThrows(EstimateNotApprovedException.class,
+                    () -> service.updateStatus(WORK_ORDER_ID, request).await().indefinitely());
+        }
+
+        @Test
+        @DisplayName("should allow approving when an approved estimate exists")
+        void shouldAllowApprovingWithApprovedEstimate() {
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
+            WorkOrderStatusUpdateRequestDto request = new WorkOrderStatusUpdateRequestDto(WorkOrderStatus.APPROVED);
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(true));
+            when(historyRepository.persist(any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
+            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(mapper.toResponse(entity)).thenReturn(response);
+
+            service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
+
+            assertEquals(WorkOrderStatus.APPROVED, entity.getStatus());
+        }
+
+        @Test
         @DisplayName("should throw WorkOrderNotFoundException when work order does not exist")
         void shouldThrowWhenMissing() {
             WorkOrderStatusUpdateRequestDto request = new WorkOrderStatusUpdateRequestDto(WorkOrderStatus.DIAGNOSIS);
@@ -595,6 +629,31 @@ class WorkOrderServiceTest {
 
             service.close(WORK_ORDER_ID, request).await().indefinitely();
 
+            assertEquals(BigDecimal.valueOf(250), entity.getFinalValue());
+        }
+
+        @Test
+        @DisplayName("should record history transition to COMPLETED when finalValue differs from the estimate")
+        void shouldRecordHistoryWhenFinalValueDiffersFromEstimate() {
+            entity.setStatus(WorkOrderStatus.IN_PROGRESS);
+            entity.setEstimatedValue(BigDecimal.valueOf(200));
+            WorkOrderCloseRequestDto request = new WorkOrderCloseRequestDto(BigDecimal.valueOf(250));
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(true));
+            when(historyRepository.persist(any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
+            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(mapper.toResponse(entity)).thenReturn(response);
+
+            service.close(WORK_ORDER_ID, request).await().indefinitely();
+
+            ArgumentCaptor<WorkOrderHistory> historyCaptor = ArgumentCaptor.forClass(WorkOrderHistory.class);
+            verify(historyRepository).persist(historyCaptor.capture());
+            WorkOrderHistory history = historyCaptor.getValue();
+            assertEquals(WorkOrderStatus.IN_PROGRESS, history.getPreviousStatus());
+            assertEquals(WorkOrderStatus.COMPLETED, history.getNewStatus());
             assertEquals(BigDecimal.valueOf(250), entity.getFinalValue());
         }
 

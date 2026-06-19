@@ -104,7 +104,8 @@ public class WorkOrderService {
                 .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
                 .flatMap(order -> assertNotLocked(order)
                         .flatMap(v -> validateGenericTransition(order.getStatus(), request.status()))
-                        .flatMap(v -> request.status() == WorkOrderStatus.IN_PROGRESS
+                        .flatMap(v -> request.status() == WorkOrderStatus.APPROVED
+                                || request.status() == WorkOrderStatus.IN_PROGRESS
                                 ? assertHasApprovedEstimate(id)
                                 : Uni.createFrom().voidItem())
                         .flatMap(v -> changeStatus(order, request.status()))
