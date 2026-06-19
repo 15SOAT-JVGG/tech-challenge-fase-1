@@ -2,6 +2,7 @@ package br.com.fiap.postech.soat16.fase1.controller;
 
 import java.util.UUID;
 
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.BeanParam;
@@ -33,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 @Path("/v1/customer")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
+@RolesAllowed({"ADMIN", "MECHANIC"})
 public class CustomerController implements CustomerControllerDocs {
 
     private final CustomerService service;
@@ -75,6 +77,7 @@ public class CustomerController implements CustomerControllerDocs {
 
     @DELETE
     @Path("/{id}")
+    @RolesAllowed("ADMIN")
     @Override
     public Uni<Response> delete(@PathParam("id") UUID id) {
         return service.delete(id)

@@ -2,6 +2,7 @@ package br.com.fiap.postech.soat16.fase1.controller;
 
 import java.util.UUID;
 
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.BeanParam;
@@ -26,6 +27,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderStatusUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.service.WorkOrderService;
 
@@ -37,6 +39,7 @@ import lombok.RequiredArgsConstructor;
 @Path("/v1/work-orders")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
+@RolesAllowed({"ADMIN", "MECHANIC"})
 public class WorkOrderController implements WorkOrderControllerDocs {
 
     private final WorkOrderService service;
@@ -45,6 +48,14 @@ public class WorkOrderController implements WorkOrderControllerDocs {
     @Override
     public Uni<PageableResponseDto<WorkOrderResponseDto>> findAll(@BeanParam @Valid PageableRequestDto pageable) {
         return service.findAll(pageable.getQ(), pageable.getPage(), pageable.getSize());
+    }
+
+    @GET
+    @Path("/metrics/average-execution-time")
+    @RolesAllowed("ADMIN")
+    @Override
+    public Uni<WorkOrderMetricsResponseDto> averageExecutionTime() {
+        return service.averageExecutionTime();
     }
 
     @GET

@@ -2,6 +2,7 @@ package br.com.fiap.postech.soat16.fase1.controller;
 
 import java.util.UUID;
 
+import jakarta.annotation.security.PermitAll;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -24,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 @Path("/v1/public/work-orders")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
+@PermitAll
 public class PublicWorkOrderController implements PublicWorkOrderControllerDocs {
 
     private final WorkOrderService service;

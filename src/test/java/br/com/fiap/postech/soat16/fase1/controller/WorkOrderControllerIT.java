@@ -4,20 +4,26 @@ import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import jakarta.inject.Inject;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.error.ApiErrorResponseDto;
@@ -38,8 +44,10 @@ import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.vertx.VertxContextSupport;
+import io.restassured.RestAssured;
 import io.restassured.common.mapper.TypeRef;
 import io.restassured.response.Response;
+import io.smallrye.jwt.build.Jwt;
 import io.smallrye.mutiny.Uni;
 
 /**
@@ -65,6 +73,30 @@ class WorkOrderControllerIT {
 
     @Inject
     PartRepository partRepository;
+
+    // ---------------------------------------------------------------------
+    // Autenticação — as APIs administrativas exigem JWT; assinamos um token
+    // (ADMIN + MECHANIC) com a mesma chave/issuer da aplicação e o aplicamos a
+    // todas as requisições. Endpoints públicos ignoram o header.
+    // ---------------------------------------------------------------------
+
+    @BeforeAll
+    static void authenticateAllRequests() {
+        String token = Jwt.issuer("oficina-api")
+                .upn("integration-test")
+                .groups(Set.of("ADMIN", "MECHANIC"))
+                .expiresIn(Duration.ofHours(1))
+                .sign();
+        RestAssured.filters((requestSpec, responseSpec, ctx) -> {
+            requestSpec.header("Authorization", "Bearer " + token);
+            return ctx.next(requestSpec, responseSpec);
+        });
+    }
+
+    @AfterAll
+    static void clearAuthentication() {
+        RestAssured.replaceFiltersWith(java.util.List.of());
+    }
 
     // ---------------------------------------------------------------------
     // Seeding helpers
@@ -141,7 +173,8 @@ class WorkOrderControllerIT {
                 .get(WORK_ORDERS_PATH)
         .then()
                 .statusCode(200)
-                .extract().as(new TypeRef<PageableResponseDto<WorkOrderResponseDto>>() { });
+                .extract().as(new TypeRef<>() {
+                });
 
         return page.content().stream()
                 .filter(workOrder -> vehicleId.equals(workOrder.vehicleId()))
@@ -205,7 +238,7 @@ class WorkOrderControllerIT {
     private WorkOrderServiceResponseDto addService(UUID workOrderId, String description, BigDecimal price) {
         return given()
                 .contentType("application/json")
-                .body("{\"description\":\"" + description + "\",\"price\":" + price + "}")
+                .body("{\"description\":\"%s\",\"price\":%s}".formatted(description, price))
         .when()
                 .post(WORK_ORDERS_PATH + "/" + workOrderId + "/services")
         .then()
@@ -842,6 +875,34 @@ class WorkOrderControllerIT {
 
             assertEquals(EstimateStatus.APPROVED, approved.status());
             assertEquals(WorkOrderStatus.APPROVED, getWorkOrder(workOrderId).status());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /v1/work-orders/metrics/average-execution-time — tempo médio de execução")
+    class Metrics {
+
+        @Test
+        @DisplayName("deve retornar o tempo médio de execução após finalizar uma OS")
+        void shouldReturnAverageExecutionTime() {
+            UUID workOrderId = createWorkOrderInProgress(new BigDecimal("100.00"), 1);
+            given()
+                    .contentType("application/json")
+                    .body("{}")
+            .when()
+                    .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/close")
+            .then()
+                    .statusCode(200);
+
+            WorkOrderMetricsResponseDto metrics = given()
+            .when()
+                    .get(WORK_ORDERS_PATH + "/metrics/average-execution-time")
+            .then()
+                    .statusCode(200)
+                    .extract().as(WorkOrderMetricsResponseDto.class);
+
+            assertTrue(metrics.completedWorkOrders() >= 1);
+            assertNotNull(metrics.averageExecutionMinutes());
         }
     }
 }

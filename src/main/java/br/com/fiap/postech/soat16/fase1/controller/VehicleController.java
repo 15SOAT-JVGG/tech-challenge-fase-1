@@ -2,6 +2,7 @@ package br.com.fiap.postech.soat16.fase1.controller;
 
 import java.util.UUID;
 
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.BeanParam;
@@ -29,6 +30,7 @@ import lombok.AllArgsConstructor;
 @ApplicationScoped
 @AllArgsConstructor
 @Path("/v1/vehicle")
+@RolesAllowed({"ADMIN", "MECHANIC"})
 public class VehicleController implements VehicleControllerDocs {
 
     private final VehicleService vehicleService;
@@ -72,6 +74,7 @@ public class VehicleController implements VehicleControllerDocs {
 
     @DELETE
     @Path("/{id}")
+    @RolesAllowed("ADMIN")
     @Override
     public Uni<Response> delete(@PathParam("id") UUID id) {
         return vehicleService.delete(id)

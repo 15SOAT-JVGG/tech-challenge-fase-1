@@ -3,6 +3,7 @@ package br.com.fiap.postech.soat16.fase1.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
@@ -12,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -841,6 +843,41 @@ class WorkOrderServiceTest {
 
             assertThrows(WorkOrderLockedException.class,
                     () -> service.close(WORK_ORDER_ID, request).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("averageExecutionTime")
+    class AverageExecutionTime {
+
+        @Test
+        @DisplayName("should return zero and null average when there are no closed work orders")
+        void shouldReturnZeroWhenNoneClosed() {
+            when(repository.findClosed()).thenReturn(Uni.createFrom().item(List.of()));
+
+            var result = service.averageExecutionTime().await().indefinitely();
+
+            assertEquals(0, result.completedWorkOrders());
+            assertNull(result.averageExecutionMinutes());
+        }
+
+        @Test
+        @DisplayName("should compute the average execution time in minutes across closed work orders")
+        void shouldComputeAverage() {
+            LocalDateTime opened = LocalDateTime.of(2026, 1, 1, 8, 0);
+            WorkOrder first = new WorkOrder();
+            first.setOpenedAt(opened);
+            first.setClosedAt(opened.plusMinutes(60));
+            WorkOrder second = new WorkOrder();
+            second.setOpenedAt(opened);
+            second.setClosedAt(opened.plusMinutes(120));
+
+            when(repository.findClosed()).thenReturn(Uni.createFrom().item(List.of(first, second)));
+
+            var result = service.averageExecutionTime().await().indefinitely();
+
+            assertEquals(2, result.completedWorkOrders());
+            assertEquals(90.0, result.averageExecutionMinutes());
         }
     }
 }

@@ -1,6 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderStatusUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
@@ -80,6 +82,20 @@ public class WorkOrderService {
     }
 
     @WithSession
+    public Uni<WorkOrderMetricsResponseDto> averageExecutionTime() {
+        return repository.findClosed().map(orders -> {
+            if (orders.isEmpty()) {
+                return new WorkOrderMetricsResponseDto(0, null);
+            }
+            double averageMinutes = orders.stream()
+                    .mapToDouble(o -> Duration.between(o.getOpenedAt(), o.getClosedAt()).toSeconds() / 60.0)
+                    .average()
+                    .orElse(0);
+            return new WorkOrderMetricsResponseDto(orders.size(), Math.round(averageMinutes * 100) / 100.0);
+        });
+    }
+
+    @WithSession
     public Uni<WorkOrderResponseDto> findById(UUID id) {
         return repository.findByWorkOrderId(id)
                 .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
@@ -135,7 +151,7 @@ public class WorkOrderService {
                         .onItem().ifNull().failWith(EstimateNotFoundException::new)
                         .flatMap(estimate -> estimate.getStatus() == EstimateStatus.PENDING
                                 ? approve(order, estimate)
-                                : Uni.createFrom().<Estimate>failure(new EstimateAlreadyDecidedException())))
+                                : Uni.createFrom().failure(new EstimateAlreadyDecidedException())))
                 .map(estimateMapper::toResponse);
     }
 
@@ -148,7 +164,7 @@ public class WorkOrderService {
                         .onItem().ifNull().failWith(EstimateNotFoundException::new)
                         .flatMap(estimate -> estimate.getStatus() == EstimateStatus.PENDING
                                 ? reject(order, estimate)
-                                : Uni.createFrom().<Estimate>failure(new EstimateAlreadyDecidedException())))
+                                : Uni.createFrom().failure(new EstimateAlreadyDecidedException())))
                 .map(estimateMapper::toResponse);
     }
 
@@ -167,8 +183,8 @@ public class WorkOrderService {
                 .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
                 .flatMap(order -> assertNotLocked(order)
                         .flatMap(v -> order.getStatus() == WorkOrderStatus.IN_PROGRESS
-                                ? Uni.createFrom().<Void>voidItem()
-                                : Uni.createFrom().<Void>failure(new InvalidWorkOrderStatusTransitionException(
+                                ? Uni.createFrom().voidItem()
+                                : Uni.createFrom().failure(new InvalidWorkOrderStatusTransitionException(
                                         "Only work orders IN_PROGRESS can be closed")))
                         .flatMap(v -> assertHasApprovedEstimate(id))
                         .flatMap(v -> {
@@ -226,7 +242,7 @@ public class WorkOrderService {
     private Uni<Estimate> persistEstimate(WorkOrder order, List<EstimateItem> items,
             List<br.com.fiap.postech.soat16.fase1.model.WorkOrderService> services) {
         var partsAmount = items.stream().map(EstimateItem::getTotalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
-        var laborAmount = services.stream().map(service -> service.getPrice())
+        var laborAmount = services.stream().map(br.com.fiap.postech.soat16.fase1.model.WorkOrderService::getPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         var estimate = new Estimate();
         estimate.setWorkOrder(order);

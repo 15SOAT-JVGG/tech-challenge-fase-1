@@ -31,6 +31,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderStatusUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.EstimateNotApprovedException;
@@ -108,6 +109,24 @@ class WorkOrderControllerTest {
 
             assertThrows(WorkOrderNotFoundException.class,
                     () -> controller.findById(FIXED_UUID).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /v1/work-orders/metrics/average-execution-time — averageExecutionTime")
+    class AverageExecutionTime {
+
+        @Test
+        @DisplayName("should return the average execution metrics")
+        void shouldReturnMetrics() {
+            WorkOrderMetricsResponseDto metrics = new WorkOrderMetricsResponseDto(3, 45.5);
+            when(service.averageExecutionTime()).thenReturn(Uni.createFrom().item(metrics));
+
+            WorkOrderMetricsResponseDto result = controller.averageExecutionTime().await().indefinitely();
+
+            assertEquals(3, result.completedWorkOrders());
+            assertEquals(45.5, result.averageExecutionMinutes());
+            verify(service).averageExecutionTime();
         }
     }
 

@@ -31,6 +31,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderStatusUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto;
 
@@ -49,6 +50,16 @@ public interface WorkOrderControllerDocs {
                     schema = @Schema(implementation = PageableResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid query parameters")
     Uni<PageableResponseDto<WorkOrderResponseDto>> findAll(@BeanParam @Valid PageableRequestDto pageable);
+
+    @GET
+    @Path("/metrics/average-execution-time")
+    @Operation(summary = "Average execution time",
+            description = "Returns the average execution time (between opening and completion) across all "
+                    + "closed work orders, in minutes, plus the sample size.")
+    @APIResponse(responseCode = "200", description = "Metric computed successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = WorkOrderMetricsResponseDto.class)))
+    Uni<WorkOrderMetricsResponseDto> averageExecutionTime();
 
     @GET
     @Path("/{id}")

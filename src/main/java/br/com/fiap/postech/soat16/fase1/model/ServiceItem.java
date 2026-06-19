@@ -1,12 +1,11 @@
 package br.com.fiap.postech.soat16.fase1.model;
 
+import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -22,38 +21,38 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Servico ofertado pela oficina no catalogo (ex.: troca de oleo, alinhamento), com preco base.
+ * Diferente de {@link WorkOrderService}, que e a linha de mao de obra efetivamente aplicada a uma OS.
+ */
 @Entity
-@Table(name = "customer", schema = "oficina_mecanica")
+@Table(name = "service_item", schema = "oficina_mecanica")
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class Customer extends AuditableEntity {
+public class ServiceItem extends AuditableEntity {
 
     @EqualsAndHashCode.Include
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "customer_id", nullable = false)
+    @Column(name = "service_item_id", nullable = false)
     private UUID id;
 
-    @Column(name = "first_name", nullable = false)
-    private String firstName;
+    @Column(nullable = false, length = 100)
+    private String name;
 
-    @Column(name = "last_name")
-    private String lastName;
+    @Column(length = 500)
+    private String description;
 
-    @Column(name = "email")
-    private String email;
+    @Column(name = "base_price", nullable = false, precision = 10, scale = 2)
+    private BigDecimal basePrice;
 
-    @Column(name = "phone_number", nullable = false)
-    private String phoneNumber;
+    @Column(name = "estimated_duration_minutes")
+    private Integer estimatedDurationMinutes;
 
-    @Column(name = "document", nullable = false, unique = true)
-    private String document;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "document_type", nullable = false)
-    private DocumentType documentType;
+    @Column(nullable = false)
+    private boolean active;
 
     // CPD-OFF: padrao Hibernate-recomendado de equals/hashCode proxy-safe, repetido por design em todas as entidades.
     @Override
@@ -71,8 +70,8 @@ public class Customer extends AuditableEntity {
         if (thisEffectiveClass != oEffectiveClass) {
             return false;
         }
-        Customer customer = (Customer) o;
-        return getId() != null && Objects.equals(getId(), customer.getId());
+        ServiceItem that = (ServiceItem) o;
+        return getId() != null && Objects.equals(getId(), that.getId());
     }
 
     @Override

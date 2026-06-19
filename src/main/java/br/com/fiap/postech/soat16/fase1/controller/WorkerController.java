@@ -2,6 +2,8 @@ package br.com.fiap.postech.soat16.fase1.controller;
 
 import java.util.UUID;
 
+import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.BeanParam;
@@ -34,6 +36,7 @@ import lombok.RequiredArgsConstructor;
 @Path("/v1/worker")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
+@RolesAllowed("ADMIN")
 public class WorkerController implements WorkerControllerDocs {
 
     private final WorkerService service;
@@ -60,6 +63,7 @@ public class WorkerController implements WorkerControllerDocs {
 
     @POST
     @Path("/login")
+    @PermitAll
     @Override
     public WorkerLoginResponseDto login(@RequestBody @Valid WorkerLoginRequestDto dto) {
         return service.login(dto);
