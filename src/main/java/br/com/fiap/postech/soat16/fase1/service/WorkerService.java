@@ -10,10 +10,10 @@ import br.com.fiap.postech.soat16.fase1.dto.request.WorkerLoginRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkerLoginResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkerResponseDto;
-import br.com.fiap.postech.soat16.fase1.exception.WorkerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateWorkerEmailException;
 import br.com.fiap.postech.soat16.fase1.exception.InactiveWorkerException;
 import br.com.fiap.postech.soat16.fase1.exception.InvalidWorkerCredentialsException;
+import br.com.fiap.postech.soat16.fase1.exception.WorkerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.mapper.WorkerMapper;
 import br.com.fiap.postech.soat16.fase1.repository.WorkerRepository;
 
