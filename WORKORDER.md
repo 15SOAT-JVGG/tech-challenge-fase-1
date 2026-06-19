@@ -57,6 +57,7 @@ dentro da mesma prioridade, pelas mais recentes primeiro.
   - Um orçamento já aprovado ou rejeitado não pode ser aprovado novamente (`EstimateAlreadyDecidedException`, HTTP 409).
 - Uma ordem **não pode ser aprovada** (`APPROVED`, seja pelo `PATCH /status` ou implicitamente ao
   aprovar um orçamento), **iniciar a execução** (`IN_PROGRESS`) **nem ser fechada** (`/close`) sem um
+- Uma ordem **não pode iniciar a execução** (`IN_PROGRESS`) **nem ser fechada** (`/close`) sem um
   orçamento aprovado (`EstimateNotApprovedException`, HTTP 422).
 
 ---
