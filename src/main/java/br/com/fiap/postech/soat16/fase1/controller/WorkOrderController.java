@@ -86,6 +86,14 @@ public class WorkOrderController implements WorkOrderControllerDocs {
         return service.approveEstimate(id, estimateId);
     }
 
+    @PATCH
+    @Path("/{id}/estimate/{estimateId}/reject")
+    @Override
+    public Uni<EstimateResponseDto> rejectEstimate(@PathParam("id") UUID id,
+                                                    @PathParam("estimateId") UUID estimateId) {
+        return service.rejectEstimate(id, estimateId);
+    }
+
     @POST
     @Path("/{id}/services")
     @Override

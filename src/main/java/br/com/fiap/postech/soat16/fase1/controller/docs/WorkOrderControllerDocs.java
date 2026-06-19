@@ -122,6 +122,23 @@ public interface WorkOrderControllerDocs {
                     in = ParameterIn.PATH)
             @PathParam("estimateId") UUID estimateId);
 
+    @PATCH
+    @Path("/{id}/estimate/{estimateId}/reject")
+    @Operation(summary = "Reject estimate",
+            description = "Rejects a pending estimate. If the work order is WAITING_APPROVAL it is moved back to "
+                    + "DIAGNOSIS so a revised estimate can be issued. No stock is reserved on rejection.")
+    @APIResponse(responseCode = "200", description = "Estimate rejected successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = EstimateResponseDto.class)))
+    @APIResponse(responseCode = "404", description = "Work order or estimate not found")
+    @APIResponse(responseCode = "409", description = "Estimate already approved or rejected")
+    Uni<EstimateResponseDto> rejectEstimate(
+            @Parameter(name = "id", description = "Work order identifier", required = true, in = ParameterIn.PATH)
+            @PathParam("id") UUID id,
+            @Parameter(name = "estimateId", description = "Estimate identifier", required = true,
+                    in = ParameterIn.PATH)
+            @PathParam("estimateId") UUID estimateId);
+
     @POST
     @Path("/{id}/services")
     @Operation(summary = "Add service", description = "Adds a labor service line performed on the work order.")

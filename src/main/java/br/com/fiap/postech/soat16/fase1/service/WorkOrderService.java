@@ -33,6 +33,7 @@ import br.com.fiap.postech.soat16.fase1.mapper.WorkOrderServiceMapper;
 import br.com.fiap.postech.soat16.fase1.model.Estimate;
 import br.com.fiap.postech.soat16.fase1.model.EstimateItem;
 import br.com.fiap.postech.soat16.fase1.model.EstimateStatus;
+import br.com.fiap.postech.soat16.fase1.model.Part;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrderHistory;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrderStatus;
@@ -46,6 +47,7 @@ import br.com.fiap.postech.soat16.fase1.repository.WorkOrderServiceRepository;
 
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
+import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
 import lombok.RequiredArgsConstructor;
 
@@ -115,7 +117,9 @@ public class WorkOrderService {
                 .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
                 .flatMap(order -> assertNotLocked(order)
                         .flatMap(v -> buildItems(request))
-                        .flatMap(items -> persistEstimate(order, items)))
+                        .flatMap(items -> serviceRepository.findByWorkOrderId(workOrderId)
+                                .flatMap(services -> persistEstimate(order, items, services)))
+                        .flatMap(estimate -> finalizeEstimateCreation(order, estimate)))
                 .map(estimateMapper::toResponse);
     }
 
@@ -128,6 +132,19 @@ public class WorkOrderService {
                         .onItem().ifNull().failWith(EstimateNotFoundException::new)
                         .flatMap(estimate -> estimate.getStatus() == EstimateStatus.PENDING
                                 ? approve(order, estimate)
+                                : Uni.createFrom().<Estimate>failure(new EstimateAlreadyDecidedException())))
+                .map(estimateMapper::toResponse);
+    }
+
+    @WithTransaction
+    public Uni<EstimateResponseDto> rejectEstimate(UUID workOrderId, UUID estimateId) {
+        return repository.findByWorkOrderId(workOrderId)
+                .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
+                .flatMap(order -> assertNotLocked(order)
+                        .flatMap(v -> estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, workOrderId))
+                        .onItem().ifNull().failWith(EstimateNotFoundException::new)
+                        .flatMap(estimate -> estimate.getStatus() == EstimateStatus.PENDING
+                                ? reject(order, estimate)
                                 : Uni.createFrom().<Estimate>failure(new EstimateAlreadyDecidedException())))
                 .map(estimateMapper::toResponse);
     }
@@ -171,6 +188,27 @@ public class WorkOrderService {
         return orderUni.flatMap(persisted -> estimateRepository.persist(estimate));
     }
 
+    private Uni<Estimate> reject(WorkOrder order, Estimate estimate) {
+        estimate.setStatus(EstimateStatus.REJECTED);
+        // Orcamento recusado: a OS volta para diagnostico para permitir um novo orcamento.
+        Uni<WorkOrder> orderUni = order.getStatus() == WorkOrderStatus.WAITING_APPROVAL
+                ? changeStatus(order, WorkOrderStatus.DIAGNOSIS).flatMap(repository::persist)
+                : repository.persist(order);
+        return orderUni.flatMap(persisted -> estimateRepository.persist(estimate));
+    }
+
+    private Uni<Estimate> finalizeEstimateCreation(WorkOrder order, Estimate estimate) {
+        order.setEstimatedValue(estimate.getTotalAmount());
+        estimate.setSentAt(LocalDateTime.now());
+        // Geracao do orcamento move automaticamente a OS de diagnostico para "aguardando aprovacao".
+        Uni<WorkOrder> orderUni = order.getStatus() == WorkOrderStatus.DIAGNOSIS
+                ? changeStatus(order, WorkOrderStatus.WAITING_APPROVAL).flatMap(repository::persist)
+                : repository.persist(order);
+        return orderUni
+                .flatMap(saved -> notificationService.notifyEstimateReady(saved, estimate))
+                .replaceWith(estimate);
+    }
+
     private Uni<List<EstimateItem>> buildItems(EstimateRequestDto request) {
         List<Uni<EstimateItem>> itemUnis = request.items().stream()
                 .map(itemDto -> partRepository.find("id = ?1", itemDto.partId()).firstResult()
@@ -180,15 +218,53 @@ public class WorkOrderService {
         return Uni.join().all(itemUnis).andFailFast();
     }
 
-    private Uni<Estimate> persistEstimate(WorkOrder order, List<EstimateItem> items) {
-        var totalAmount = items.stream().map(EstimateItem::getTotalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+    private Uni<Estimate> persistEstimate(WorkOrder order, List<EstimateItem> items,
+            List<br.com.fiap.postech.soat16.fase1.model.WorkOrderService> services) {
+        var partsAmount = items.stream().map(EstimateItem::getTotalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+        var laborAmount = services.stream().map(service -> service.getPrice())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         var estimate = new Estimate();
         estimate.setWorkOrder(order);
         estimate.setStatus(EstimateStatus.PENDING);
-        estimate.setTotalAmount(totalAmount);
+        estimate.setPartsAmount(partsAmount);
+        estimate.setLaborAmount(laborAmount);
+        estimate.setTotalAmount(partsAmount.add(laborAmount));
         estimate.setItems(items);
         items.forEach(item -> item.setEstimate(estimate));
         return estimateRepository.persist(estimate);
+    }
+
+    /**
+     * Baixa de estoque na aprovacao do orcamento: a peca so e comprometida quando o cliente aprova.
+     * {@link Part#decreaseStock(int)} lanca {@code BusinessException} (HTTP 422) se faltar estoque,
+     * revertendo toda a transacao de aprovacao.
+     */
+    private void reserveStock(Estimate estimate) {
+        estimate.getItems().forEach(item -> {
+            Part part = item.getPart();
+            part.decreaseStock(item.getQuantity());
+            if (part.isLowStock()) {
+                Log.warnf("Estoque baixo apos reserva: peca=%s restante=%d minimo=%d",
+                        part.getName(), part.getStockQuantity(), part.getMinimumStock());
+            }
+        });
+    }
+
+    /**
+     * Restauracao de estoque no cancelamento: so faz sentido enquanto a OS esta APPROVED (pecas
+     * reservadas, mas ainda nao consumidas em execucao). Apos IN_PROGRESS as pecas ja foram usadas.
+     */
+    private Uni<Void> restoreStockIfReserved(WorkOrder order) {
+        if (order.getStatus() != WorkOrderStatus.APPROVED) {
+            return Uni.createFrom().voidItem();
+        }
+        return estimateRepository.findApprovedByWorkOrderId(order.getId())
+                .flatMap(estimate -> {
+                    if (estimate != null) {
+                        estimate.getItems().forEach(item -> item.getPart().increaseStock(item.getQuantity()));
+                    }
+                    return Uni.createFrom().voidItem();
+                });
     }
 
     private Uni<WorkOrder> changeStatus(WorkOrder order, WorkOrderStatus newStatus) {
