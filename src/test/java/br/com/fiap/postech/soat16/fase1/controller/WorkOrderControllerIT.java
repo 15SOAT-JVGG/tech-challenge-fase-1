@@ -193,6 +193,32 @@ class WorkOrderControllerIT {
                 .extract().as(EstimateResponseDto.class);
     }
 
+    private EstimateResponseDto rejectEstimate(UUID workOrderId, UUID estimateId) {
+        return given()
+        .when()
+                .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/estimate/" + estimateId + "/reject")
+        .then()
+                .statusCode(200)
+                .extract().as(EstimateResponseDto.class);
+    }
+
+    private WorkOrderServiceResponseDto addService(UUID workOrderId, String description, BigDecimal price) {
+        return given()
+                .contentType("application/json")
+                .body("{\"description\":\"" + description + "\",\"price\":" + price + "}")
+        .when()
+                .post(WORK_ORDERS_PATH + "/" + workOrderId + "/services")
+        .then()
+                .statusCode(201)
+                .extract().as(WorkOrderServiceResponseDto.class);
+    }
+
+    // Lê o estoque atual da peça direto do repositório (estabelecendo o contexto Vert.x exigido
+    // pelo Hibernate Reactive), já que não há endpoint de leitura de peça neste teste.
+    private int stockOf(UUID partId) {
+        return persistInTransaction(() -> partRepository.find("id = ?1", partId).firstResult()).getStockQuantity();
+    }
+
     // Leva a ordem até IN_PROGRESS com um orçamento aprovado, igual ao fluxo documentado no
     // WORKORDER.md: DIAGNOSIS -> WAITING_APPROVAL -> (orçamento aprovado) -> IN_PROGRESS.
     private UUID createWorkOrderInProgress(BigDecimal unitPrice, int quantity) {
@@ -698,6 +724,124 @@ class WorkOrderControllerIT {
                     .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/close")
             .then()
                     .statusCode(400);
+        }
+    }
+
+    @Nested
+    @DisplayName("Orçamento (peças + serviços), rejeição e estoque")
+    class EstimateDecisionAndStock {
+
+        @Test
+        @DisplayName("deve somar peças e serviços no total do orçamento")
+        void shouldIncludeServicesInEstimateTotal() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            addService(workOrderId, "Mão de obra", new BigDecimal("100.00"));
+
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
+
+            assertEquals(0, new BigDecimal("50.00").compareTo(estimate.partsAmount()));
+            assertEquals(0, new BigDecimal("100.00").compareTo(estimate.laborAmount()));
+            assertEquals(0, new BigDecimal("150.00").compareTo(estimate.totalAmount()));
+        }
+
+        @Test
+        @DisplayName("deve mover a OS de diagnóstico para aguardando aprovação ao gerar o orçamento")
+        void shouldAutoAdvanceToWaitingApprovalOnEstimate() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+
+            createEstimate(workOrderId, partId, 1);
+
+            assertEquals(WorkOrderStatus.WAITING_APPROVAL, getWorkOrder(workOrderId).status());
+        }
+
+        @Test
+        @DisplayName("deve recusar o orçamento e retornar a OS para diagnóstico")
+        void shouldRejectEstimateAndReturnToDiagnosis() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
+
+            EstimateResponseDto rejected = rejectEstimate(workOrderId, estimate.estimateId());
+
+            assertEquals(EstimateStatus.REJECTED, rejected.status());
+            assertEquals(WorkOrderStatus.DIAGNOSIS, getWorkOrder(workOrderId).status());
+        }
+
+        @Test
+        @DisplayName("deve dar baixa no estoque ao aprovar e restaurar ao cancelar")
+        void shouldDecreaseStockOnApprovalAndRestoreOnCancel() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 3);
+
+            assertEquals(100, stockOf(partId));
+
+            approveEstimate(workOrderId, estimate.estimateId());
+            assertEquals(97, stockOf(partId));
+
+            updateStatus(workOrderId, WorkOrderStatus.CANCELLED);
+            assertEquals(100, stockOf(partId));
+        }
+
+        @Test
+        @DisplayName("deve retornar 422 ao aprovar com estoque insuficiente")
+        void shouldReturn422WhenInsufficientStock() {
+            Part part = new Part("Peça rara", "estoque baixo", new BigDecimal("50.00"), 1, "UN");
+            UUID partId = persistInTransaction(() -> partRepository.persist(part)).getId();
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 5);
+
+            given()
+            .when()
+                    .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/estimate/" + estimate.estimateId() + "/approve")
+            .then()
+                    .statusCode(422);
+
+            assertEquals(1, stockOf(partId));
+        }
+    }
+
+    @Nested
+    @DisplayName("Canal público do cliente — /v1/public/work-orders")
+    class PublicChannel {
+
+        private static final String PUBLIC_PATH = "/v1/public/work-orders";
+
+        @Test
+        @DisplayName("cliente deve acompanhar a OS e aprovar o orçamento")
+        void shouldTrackAndApproveAsClient() {
+            UUID partId = seedPart(new BigDecimal("80.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
+
+            WorkOrderResponseDto tracked = given()
+            .when()
+                    .get(PUBLIC_PATH + "/" + workOrderId)
+            .then()
+                    .statusCode(200)
+                    .extract().as(WorkOrderResponseDto.class);
+            assertEquals(WorkOrderStatus.WAITING_APPROVAL, tracked.status());
+
+            EstimateResponseDto approved = given()
+            .when()
+                    .patch(PUBLIC_PATH + "/" + workOrderId + "/estimate/" + estimate.estimateId() + "/approve")
+            .then()
+                    .statusCode(200)
+                    .extract().as(EstimateResponseDto.class);
+
+            assertEquals(EstimateStatus.APPROVED, approved.status());
+            assertEquals(WorkOrderStatus.APPROVED, getWorkOrder(workOrderId).status());
         }
     }
 }
