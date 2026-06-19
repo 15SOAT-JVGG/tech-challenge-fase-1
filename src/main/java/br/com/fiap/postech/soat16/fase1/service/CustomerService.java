@@ -7,6 +7,7 @@ import java.util.UUID;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.ReactivePage;
 import br.com.fiap.postech.soat16.fase1.dto.request.CustomerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerHasVehiclesException;
@@ -32,13 +33,7 @@ public class CustomerService {
 
     @WithSession
     public Uni<PageableResponseDto<CustomerResponseDto>> findAll(String q, int page, int size) {
-        return Uni.combine().all()
-                .unis(repository.findPage(page, size), repository.count())
-                .asTuple()
-                .map(tuple -> {
-                    var data = tuple.getItem1().stream().map(mapper::toResponse).toList();
-                    return PageableResponseDto.of(data, page, size, tuple.getItem2());
-                });
+        return ReactivePage.of(repository.findPage(page, size), repository.count(), mapper::toResponse, page, size);
     }
 
     @WithSession

@@ -9,6 +9,7 @@ import java.util.UUID;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.ReactivePage;
 import br.com.fiap.postech.soat16.fase1.dto.request.EstimateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderCloseRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderRequestDto;
@@ -69,16 +70,11 @@ public class WorkOrderService {
     private final WorkOrderMapper mapper;
     private final EstimateMapper estimateMapper;
     private final WorkOrderServiceMapper serviceMapper;
+    private final NotificationService notificationService;
 
     @WithSession
     public Uni<PageableResponseDto<WorkOrderResponseDto>> findAll(String q, int page, int size) {
-        return Uni.combine().all()
-                .unis(repository.findPage(page, size), repository.count())
-                .asTuple()
-                .map(tuple -> {
-                    var data = tuple.getItem1().stream().map(mapper::toResponse).toList();
-                    return PageableResponseDto.of(data, page, size, tuple.getItem2());
-                });
+        return ReactivePage.of(repository.findPage(page, size), repository.count(), mapper::toResponse, page, size);
     }
 
     @WithSession
