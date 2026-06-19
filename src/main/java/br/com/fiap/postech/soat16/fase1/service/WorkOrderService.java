@@ -106,6 +106,9 @@ public class WorkOrderService {
                                 || request.status() == WorkOrderStatus.IN_PROGRESS
                                 ? assertHasApprovedEstimate(id)
                                 : Uni.createFrom().voidItem())
+                        .flatMap(v -> request.status() == WorkOrderStatus.CANCELLED
+                                ? restoreStockIfReserved(order)
+                                : Uni.createFrom().voidItem())
                         .flatMap(v -> changeStatus(order, request.status()))
                         .flatMap(repository::persist)
                         .map(mapper::toResponse));
@@ -175,10 +178,12 @@ public class WorkOrderService {
                             return changeStatus(order, WorkOrderStatus.COMPLETED);
                         })
                         .flatMap(repository::persist)
+                        .flatMap(saved -> notificationService.notifyWorkOrderCompleted(saved).replaceWith(saved))
                         .map(mapper::toResponse));
     }
 
     private Uni<Estimate> approve(WorkOrder order, Estimate estimate) {
+        reserveStock(estimate);
         estimate.setStatus(EstimateStatus.APPROVED);
         estimate.setApprovedAt(LocalDateTime.now());
         order.setEstimatedValue(estimate.getTotalAmount());
