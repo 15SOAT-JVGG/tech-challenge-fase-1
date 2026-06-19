@@ -64,16 +64,14 @@ public class WorkOrderController implements WorkOrderControllerDocs {
     @PATCH
     @Path("/{id}/status")
     @Override
-    public Uni<WorkOrderResponseDto> updateStatus(@PathParam("id") UUID id,
-                                                   @RequestBody @Valid WorkOrderStatusUpdateRequestDto dto) {
+    public Uni<WorkOrderResponseDto> updateStatus(@PathParam("id") UUID id, @RequestBody @Valid WorkOrderStatusUpdateRequestDto dto) {
         return service.updateStatus(id, dto);
     }
 
     @POST
     @Path("/{id}/estimate")
     @Override
-    public Uni<Response> createEstimate(@PathParam("id") UUID id,
-                                         @RequestBody @Valid EstimateRequestDto dto) {
+    public Uni<Response> createEstimate(@PathParam("id") UUID id, @RequestBody @Valid EstimateRequestDto dto) {
         return service.createEstimate(id, dto)
                 .map(created -> Response.status(Response.Status.CREATED).entity(created).build());
     }
@@ -81,16 +79,14 @@ public class WorkOrderController implements WorkOrderControllerDocs {
     @PATCH
     @Path("/{id}/estimate/{estimateId}/approve")
     @Override
-    public Uni<EstimateResponseDto> approveEstimate(@PathParam("id") UUID id,
-                                                     @PathParam("estimateId") UUID estimateId) {
+    public Uni<EstimateResponseDto> approveEstimate(@PathParam("id") UUID id, @PathParam("estimateId") UUID estimateId) {
         return service.approveEstimate(id, estimateId);
     }
 
     @POST
     @Path("/{id}/services")
     @Override
-    public Uni<Response> addService(@PathParam("id") UUID id,
-                                     @RequestBody @Valid WorkOrderServiceRequestDto dto) {
+    public Uni<Response> addService(@PathParam("id") UUID id, @RequestBody @Valid WorkOrderServiceRequestDto dto) {
         return service.addService(id, dto)
                 .map(created -> Response.status(Response.Status.CREATED).entity(created).build());
     }
@@ -98,8 +94,7 @@ public class WorkOrderController implements WorkOrderControllerDocs {
     @PATCH
     @Path("/{id}/close")
     @Override
-    public Uni<WorkOrderResponseDto> close(@PathParam("id") UUID id,
-                                            @RequestBody @Valid WorkOrderCloseRequestDto dto) {
+    public Uni<WorkOrderResponseDto> close(@PathParam("id") UUID id, @RequestBody @Valid WorkOrderCloseRequestDto dto) {
         return service.close(id, dto);
     }
 }
