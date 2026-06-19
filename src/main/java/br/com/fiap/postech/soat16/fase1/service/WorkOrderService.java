@@ -221,7 +221,7 @@ public class WorkOrderService {
                     ? Uni.createFrom().voidItem()
                     : Uni.createFrom().failure(new InvalidWorkOrderStatusTransitionException(current, target));
         }
-        return target.equals(FORWARD_TRANSITIONS.get(current))
+        return target == FORWARD_TRANSITIONS.get(current)
                 ? Uni.createFrom().voidItem()
                 : Uni.createFrom().failure(new InvalidWorkOrderStatusTransitionException(current, target));
     }
