@@ -1,6 +1,10 @@
 # fiap-srv-mecanica
 
-Back-end da oficina mecânica (15SOAT — Tech Challenge Fase 1). Construído com [Quarkus](https://quarkus.io/) (reactive stack), expõe uma API REST para gestão de **clientes, veículos e atendentes**, com **autenticação JWT** para as APIs administrativas.
+Back-end de uma oficina mecânica (15SOAT — Tech Challenge Fase 1): gestão de **clientes, veículos, peças/insumos e catálogo de serviços**, com o fluxo completo de **ordens de serviço** — abertura, diagnóstico, orçamento (peças + mão de obra), aprovação/rejeição pelo cliente (inclusive por um canal público, sem autenticação) e execução até a entrega. Construído com [Quarkus](https://quarkus.io/) (reactive stack) e **autenticação JWT** nas APIs administrativas.
+
+Veja também [WORKORDER.md](WORKORDER.md) para o detalhamento da máquina de estados e das regras de negócio da ordem de serviço.
+
+**Documentação DDD** (Event Storming, diagramas e Linguagem Ubíqua): [Miro](https://miro.com/app/board/uXjVHbbU2eE=/?share_link_id=729083750980).
 
 ---
 
@@ -13,6 +17,16 @@ Back-end da oficina mecânica (15SOAT — Tech Challenge Fase 1). Construído co
 | Segurança | SmallRye JWT (RS256) |
 | Observabilidade | OpenTelemetry + Micrometer + Prometheus |
 | Mapeamento | MapStruct |
+
+### Por que PostgreSQL
+
+O domínio é predominantemente **relacional e transacional**: clientes, veículos, ordens de serviço, orçamentos, itens de orçamento e peças se relacionam por chaves estrangeiras (ex.: uma OS referencia cliente e veículo; um orçamento referencia a OS e suas peças), e a baixa de estoque na aprovação do orçamento (`Part.decreaseStock`) precisa de garantias **ACID** dentro da mesma transação que aprova o orçamento — uma falha não pode deixar estoque decrementado sem o orçamento de fato aprovado, nem vice-versa. Um banco de documentos (ex.: MongoDB) exigiria modelar manualmente essas consistências que um relacional já garante nativamente.
+
+Dentro do universo de bancos relacionais, o PostgreSQL foi escolhido por:
+
+- **Suporte de primeira classe no ecossistema Quarkus** — `quarkus-reactive-pg-client` oferece um driver reativo não-bloqueante nativo (sem adaptador JDBC por trás de um pool de threads), o que importa porque toda a stack de persistência do projeto é Hibernate Reactive + Mutiny;
+- **Maturidade, gratuidade e ampla adoção** — sem custo de licença, fácil de provisionar localmente (Docker) ou em qualquer provedor cloud;
+- **Tipagem nativa de `UUID`** — todas as entidades usam UUID como chave primária (`GenerationType.UUID`); o Postgres trata isso como tipo de coluna nativo, sem precisar de `CHAR(36)`/`BINARY(16)` como em outros bancos.
 
 ---
 
