@@ -48,9 +48,20 @@ services:
       # uma senha aleatória e a registra no log na inicialização.
       APP_SEED_ADMIN_PASSWORD: ${APP_SEED_ADMIN_PASSWORD:-}
       APP_SEED_MECHANIC_PASSWORD: ${APP_SEED_MECHANIC_PASSWORD:-}
+      # Chaves JWT: a app roda em modo produção dentro do container e rejeita
+      # as chaves de desenvolvimento versionadas no repo. Gere um par local
+      # (nunca comitado) antes de subir, ex.:
+      #   mkdir -p .local-jwt
+      #   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out .local-jwt/privateKey.pem
+      #   openssl rsa -pubout -in .local-jwt/privateKey.pem -out .local-jwt/publicKey.pem
+      JWT_PRIVATE_KEY_LOCATION: file:/etc/jwt/privateKey.pem
+      JWT_PUBLIC_KEY_LOCATION: file:/etc/jwt/publicKey.pem
+
+    volumes:
+      - ../../../../.local-jwt:/etc/jwt:ro
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/q/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:8090/q/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
