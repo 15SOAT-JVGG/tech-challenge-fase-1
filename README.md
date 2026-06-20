@@ -74,10 +74,16 @@ Sobe PostgreSQL **e** a aplicação juntos. A imagem da aplicação é montada a
 # 1. Garanta o .env (com POSTGRES_PASSWORD e as senhas de seed definidas)
 cp .env.example .env
 
-# 2. Compile os artefatos
+# 2. Gere um par de chaves JWT local (ver "Segurança das chaves JWT" abaixo —
+#    a app roda em modo produção no container e rejeita as chaves de dev versionadas)
+mkdir -p .local-jwt
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out .local-jwt/privateKey.pem
+openssl rsa -pubout -in .local-jwt/privateKey.pem -out .local-jwt/publicKey.pem
+
+# 3. Compile os artefatos
 ./mvnw package -DskipTests
 
-# 3. Suba o ambiente
+# 4. Suba o ambiente
 docker compose --env-file .env -f src/main/docker/compose/docker-compose.yml up -d --build
 ```
 
@@ -261,3 +267,13 @@ java -jar target/quarkus-app/quarkus-run.jar
 ## Segurança das chaves JWT
 
 O par RSA versionado em `src/main/resources/jwt` é **somente para desenvolvimento**. Em produção, sobrescreva `JWT_PRIVATE_KEY_LOCATION` / `JWT_PUBLIC_KEY_LOCATION` apontando para secrets montados (ex.: `file:/etc/jwt/privateKey.pem`) e **nunca** utilize as chaves versionadas.
+
+Um `JwtKeyStartupGuard` falha o boot caso detecte a chave de dev (`jwt/privateKey.pem`) enquanto a app roda em `LaunchMode.NORMAL` — que é como ela sempre roda dentro do container (mesmo localmente, via Docker Compose). Por isso a **Opção A** acima pede para gerar um par de chaves local antes de subir o Compose:
+
+```shell
+mkdir -p .local-jwt
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out .local-jwt/privateKey.pem
+openssl rsa -pubout -in .local-jwt/privateKey.pem -out .local-jwt/publicKey.pem
+```
+
+O `.local-jwt/` é gitignorado e montado como volume read-only em `/etc/jwt` pelo `docker-compose.yml`, que já aponta `JWT_PRIVATE_KEY_LOCATION` / `JWT_PUBLIC_KEY_LOCATION` para esse caminho. Em dev mode (Opção B, sem container) a app continua usando a chave versionada normalmente, pois aí o `LaunchMode` não é `NORMAL`.
