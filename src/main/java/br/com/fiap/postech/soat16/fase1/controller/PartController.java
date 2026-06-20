@@ -2,6 +2,7 @@ package br.com.fiap.postech.soat16.fase1.controller;
 
 import java.net.URI;
 import java.util.List;
+import java.util.UUID;
 
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -28,7 +29,7 @@ public class PartController implements PartControllerDocs {
     }
 
     @Override
-    public Uni<PartResponseDto> findById(Long id) {
+    public Uni<PartResponseDto> findById(UUID id) {
         return partService.findById(id);
     }
 
@@ -46,19 +47,19 @@ public class PartController implements PartControllerDocs {
 
     @RolesAllowed("ADMIN")
     @Override
-    public Uni<PartResponseDto> update(Long id, PartRequestDto dto) {
+    public Uni<PartResponseDto> update(UUID id, PartRequestDto dto) {
         return partService.update(id, dto);
     }
 
     @RolesAllowed("ADMIN")
     @Override
-    public Uni<PartResponseDto> adjustStock(Long id, int adjustment) {
+    public Uni<PartResponseDto> adjustStock(UUID id, int adjustment) {
         return partService.adjustStock(id, adjustment);
     }
 
     @RolesAllowed("ADMIN")
     @Override
-    public Uni<Response> delete(Long id) {
+    public Uni<Response> delete(UUID id) {
         return partService.delete(id)
             .replaceWith(Response.noContent().build());
     }

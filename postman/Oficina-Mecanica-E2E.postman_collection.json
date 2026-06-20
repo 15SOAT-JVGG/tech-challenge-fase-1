@@ -1,0 +1,2629 @@
+{
+  "info": {
+    "_postman_id": "f1e6a4b2-2f4a-4e3a-8b9a-9b3c0c6f0a01",
+    "name": "Oficina Mecânica API — E2E",
+    "description": "Teste end-to-end de todos os fluxos e endpoints da API (15SOAT — Tech Challenge Fase 1). Execute as pastas em ordem (Postman Runner ou Newman) com a aplicação rodando via Docker Compose. Variáveis de estado (tokens, ids) são propagadas automaticamente entre as requisições via variáveis de coleção — não é necessário configurar nada manualmente além de base_url.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080" },
+    { "key": "admin_token", "value": "" },
+    { "key": "mechanic_token", "value": "" },
+    { "key": "customer_email", "value": "" },
+    { "key": "customer_document", "value": "" },
+    { "key": "customer_id", "value": "" },
+    { "key": "customer_disposable_email", "value": "" },
+    { "key": "customer_disposable_document", "value": "" },
+    { "key": "customer_disposable_id", "value": "" },
+    { "key": "vehicle_license_plate", "value": "" },
+    { "key": "vehicle_id", "value": "" },
+    { "key": "vehicle_disposable_license_plate", "value": "" },
+    { "key": "vehicle_disposable_id", "value": "" },
+    { "key": "worker_email", "value": "" },
+    { "key": "worker_id", "value": "" },
+    { "key": "worker_disposable_email", "value": "" },
+    { "key": "worker_disposable_id", "value": "" },
+    { "key": "part_id", "value": "" },
+    { "key": "part2_id", "value": "" },
+    { "key": "part_disposable_id", "value": "" },
+    { "key": "service_item_id", "value": "" },
+    { "key": "service_item_disposable_id", "value": "" },
+    { "key": "work_order_description", "value": "" },
+    { "key": "work_order_id", "value": "" },
+    { "key": "work_order_service_id", "value": "" },
+    { "key": "estimate_id", "value": "" },
+    { "key": "wo2_description", "value": "" },
+    { "key": "wo2_id", "value": "" },
+    { "key": "wo2_estimate1_id", "value": "" },
+    { "key": "wo2_estimate2_id", "value": "" },
+    { "key": "wo3_description", "value": "" },
+    { "key": "wo3_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "00 - Auth",
+      "item": [
+        {
+          "name": "Login - ADMIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('token present', () => pm.expect(body.token).to.be.a('string').and.not.empty);",
+                  "pm.test('role is ADMIN', () => pm.expect(body.role).to.eql('ADMIN'));",
+                  "pm.collectionVariables.set('admin_token', body.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Login - MECHANIC",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('token present', () => pm.expect(body.token).to.be.a('string').and.not.empty);",
+                  "pm.test('role is MECHANIC', () => pm.expect(body.role).to.eql('MECHANIC'));",
+                  "pm.collectionVariables.set('mechanic_token', body.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"mecanico\",\n  \"password\": \"mecanico123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Login - Invalid credentials (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"wrong-password\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/auth/login"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "01 - Customers",
+      "item": [
+        {
+          "name": "Create Customer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function checkDigit(digits, weights) {",
+                  "  let sum = 0;",
+                  "  for (let i = 0; i < weights.length; i++) sum += digits[i] * weights[i];",
+                  "  const rem = sum % 11;",
+                  "  return rem < 2 ? 0 : 11 - rem;",
+                  "}",
+                  "function randomCpf() {",
+                  "  let base;",
+                  "  do { base = Array.from({length: 9}, () => Math.floor(Math.random() * 10)); }",
+                  "  while (new Set(base).size === 1);",
+                  "  const d1 = checkDigit(base, [10,9,8,7,6,5,4,3,2]);",
+                  "  const d2 = checkDigit(base.concat([d1]), [11,10,9,8,7,6,5,4,3,2]);",
+                  "  return base.concat([d1, d2]).join('');",
+                  "}",
+                  "pm.collectionVariables.set('customer_document', randomCpf());",
+                  "pm.collectionVariables.set('customer_email', `cliente.e2e.${Date.now()}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Maria\",\n  \"lastName\": \"Oliveira\",\n  \"email\": \"{{customer_email}}\",\n  \"phoneNumber\": \"11999990000\",\n  \"document\": \"{{customer_document}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/customer"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Customer by Document (capture id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('email matches', () => pm.expect(body.email).to.eql(pm.collectionVariables.get('customer_email')));",
+                  "pm.collectionVariables.set('customer_id', body.customerId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/customer/by-document/{{customer_document}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Customer by Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('id matches', () => pm.expect(body.customerId).to.eql(pm.collectionVariables.get('customer_id')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/customer/{{customer_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "List Customers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('content is array', () => pm.expect(body.content).to.be.an('array'));",
+                  "pm.test('pagination present', () => pm.expect(body.pagination).to.exist);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/customer?page=0&size=10"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('lastName updated', () => pm.expect(body.lastName).to.eql('Oliveira Atualizado'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Maria\",\n  \"lastName\": \"Oliveira Atualizado\",\n  \"email\": \"{{customer_email}}\",\n  \"phoneNumber\": \"11999991111\",\n  \"document\": \"{{customer_document}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/customer/{{customer_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Customer - Validation Error (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/customer"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Customer - Invalid Document (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Invalido\",\n  \"lastName\": \"Documento\",\n  \"email\": \"invalido.e2e@example.com\",\n  \"phoneNumber\": \"11999992222\",\n  \"document\": \"12345678900\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/customer"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Customer - Duplicate Document (expect 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Outro\",\n  \"lastName\": \"Cliente\",\n  \"email\": \"outro.e2e.{{$timestamp}}@example.com\",\n  \"phoneNumber\": \"11999993333\",\n  \"document\": \"{{customer_document}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/customer"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Disposable Customer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function checkDigit(digits, weights) {",
+                  "  let sum = 0;",
+                  "  for (let i = 0; i < weights.length; i++) sum += digits[i] * weights[i];",
+                  "  const rem = sum % 11;",
+                  "  return rem < 2 ? 0 : 11 - rem;",
+                  "}",
+                  "function randomCpf() {",
+                  "  let base;",
+                  "  do { base = Array.from({length: 9}, () => Math.floor(Math.random() * 10)); }",
+                  "  while (new Set(base).size === 1);",
+                  "  const d1 = checkDigit(base, [10,9,8,7,6,5,4,3,2]);",
+                  "  const d2 = checkDigit(base.concat([d1]), [11,10,9,8,7,6,5,4,3,2]);",
+                  "  return base.concat([d1, d2]).join('');",
+                  "}",
+                  "pm.collectionVariables.set('customer_disposable_document', randomCpf());",
+                  "pm.collectionVariables.set('customer_disposable_email', `cliente.disposable.e2e.${Date.now()}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Descartavel\",\n  \"lastName\": \"Cliente\",\n  \"email\": \"{{customer_disposable_email}}\",\n  \"phoneNumber\": \"11999994444\",\n  \"document\": \"{{customer_disposable_document}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/customer"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Disposable Customer by Document (capture id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('customer_disposable_id', body.customerId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/customer/by-document/{{customer_disposable_document}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Customer as MECHANIC (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/customer/{{customer_disposable_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Customer as ADMIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/customer/{{customer_disposable_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Deleted Customer (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/customer/{{customer_disposable_id}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Vehicles",
+      "item": [
+        {
+          "name": "Create Vehicle",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function randomPlate() {",
+                  "  const letter = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));",
+                  "  const digit = () => String(Math.floor(Math.random() * 10));",
+                  "  const alnum = () => Math.random() < 0.5 ? digit() : letter();",
+                  "  return letter() + letter() + letter() + digit() + alnum() + digit() + digit();",
+                  "}",
+                  "pm.collectionVariables.set('vehicle_license_plate', randomPlate());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"licensePlate\": \"{{vehicle_license_plate}}\",\n  \"manufacturer\": \"Fiat\",\n  \"model\": \"Argo\",\n  \"color\": \"Branco\",\n  \"year\": 2022,\n  \"kmDriven\": 35000,\n  \"type\": \"CAR\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/vehicle"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Vehicle by License Plate (capture id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('vehicle_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/vehicle/by-license-plate/{{vehicle_license_plate}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Vehicle by Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('id matches', () => pm.expect(body.id).to.eql(pm.collectionVariables.get('vehicle_id')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/vehicle/{{vehicle_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "List Vehicles with Filter",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('content is array', () => pm.expect(body.content).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/vehicle?manufacturer=Fiat&page=0&size=10"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Vehicle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('kmDriven updated', () => pm.expect(body.kmDriven).to.eql(36000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"licensePlate\": \"{{vehicle_license_plate}}\",\n  \"manufacturer\": \"Fiat\",\n  \"model\": \"Argo\",\n  \"color\": \"Branco\",\n  \"year\": 2022,\n  \"kmDriven\": 36000,\n  \"type\": \"CAR\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/vehicle/{{vehicle_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Vehicle - Invalid License Plate (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"licensePlate\": \"INVALID1\",\n  \"manufacturer\": \"Fiat\",\n  \"model\": \"Argo\",\n  \"color\": \"Branco\",\n  \"year\": 2022,\n  \"kmDriven\": 1000,\n  \"type\": \"CAR\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/vehicle"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Vehicle - Customer Not Found (expect 404)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function randomPlate() {",
+                  "  const letter = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));",
+                  "  const digit = () => String(Math.floor(Math.random() * 10));",
+                  "  const alnum = () => Math.random() < 0.5 ? digit() : letter();",
+                  "  return letter() + letter() + letter() + digit() + alnum() + digit() + digit();",
+                  "}",
+                  "pm.collectionVariables.set('vehicle_orphan_license_plate', randomPlate());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"00000000-0000-0000-0000-000000000000\",\n  \"licensePlate\": \"{{vehicle_orphan_license_plate}}\",\n  \"manufacturer\": \"Fiat\",\n  \"model\": \"Argo\",\n  \"color\": \"Branco\",\n  \"year\": 2022,\n  \"kmDriven\": 1000,\n  \"type\": \"CAR\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/vehicle"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Disposable Vehicle",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function randomPlate() {",
+                  "  const letter = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));",
+                  "  const digit = () => String(Math.floor(Math.random() * 10));",
+                  "  const alnum = () => Math.random() < 0.5 ? digit() : letter();",
+                  "  return letter() + letter() + letter() + digit() + alnum() + digit() + digit();",
+                  "}",
+                  "pm.collectionVariables.set('vehicle_disposable_license_plate', randomPlate());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"licensePlate\": \"{{vehicle_disposable_license_plate}}\",\n  \"manufacturer\": \"Volkswagen\",\n  \"model\": \"Gol\",\n  \"color\": \"Preto\",\n  \"year\": 2018,\n  \"kmDriven\": 80000,\n  \"type\": \"CAR\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/vehicle"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Disposable Vehicle by Plate (capture id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('vehicle_disposable_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/vehicle/by-license-plate/{{vehicle_disposable_license_plate}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Vehicle as MECHANIC (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/vehicle/{{vehicle_disposable_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Vehicle as ADMIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/vehicle/{{vehicle_disposable_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Deleted Vehicle (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/vehicle/{{vehicle_disposable_id}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Workers",
+      "item": [
+        {
+          "name": "Create Worker",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('worker_email', `mecanico.e2e.${Date.now()}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Joao\",\n  \"lastName\": \"Pereira\",\n  \"email\": \"{{worker_email}}\",\n  \"phoneNumber\": \"11988887777\",\n  \"password\": \"SenhaForte123\",\n  \"profile\": \"MECHANIC\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/worker"
+          },
+          "response": []
+        },
+        {
+          "name": "Worker Login - valid (capture id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('authenticated true', () => pm.expect(body.authenticated).to.eql(true));",
+                  "pm.collectionVariables.set('worker_id', body.workerId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{worker_email}}\",\n  \"password\": \"SenhaForte123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/worker/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Worker Login - wrong password (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{worker_email}}\",\n  \"password\": \"wrong-password\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/worker/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Worker by Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('email matches', () => pm.expect(body.email).to.eql(pm.collectionVariables.get('worker_email')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/worker/{{worker_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "List Workers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('content is array', () => pm.expect(body.content).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/worker?page=0&size=10"
+          },
+          "response": []
+        },
+        {
+          "name": "List Workers as MECHANIC (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/worker?page=0&size=10"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Worker",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Joao\",\n  \"lastName\": \"Pereira Atualizado\",\n  \"email\": \"{{worker_email}}\",\n  \"phoneNumber\": \"11988889999\",\n  \"password\": \"SenhaForte123\",\n  \"profile\": \"MECHANIC\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/worker/{{worker_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Disposable Worker",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('worker_disposable_email', `descartavel.e2e.${Date.now()}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Descartavel\",\n  \"lastName\": \"Worker\",\n  \"email\": \"{{worker_disposable_email}}\",\n  \"phoneNumber\": \"11977776666\",\n  \"password\": \"SenhaForte123\",\n  \"profile\": \"ATTENDANT\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/worker"
+          },
+          "response": []
+        },
+        {
+          "name": "Worker Login - disposable (capture id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('worker_disposable_id', body.workerId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{worker_disposable_email}}\",\n  \"password\": \"SenhaForte123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/worker/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Worker (ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/worker/{{worker_disposable_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Deleted Worker (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/worker/{{worker_disposable_id}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Parts and Supplies",
+      "item": [
+        {
+          "name": "Create Part",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('id present', () => pm.expect(body.id).to.be.a('string').and.not.empty);",
+                  "pm.collectionVariables.set('part_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Filtro de Oleo\",\n  \"description\": \"Filtro de oleo do motor\",\n  \"unitPrice\": 29.90,\n  \"stockQuantity\": 20,\n  \"unit\": \"UN\",\n  \"minimumStock\": 5,\n  \"partType\": \"PECA\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/admin/parts"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Part #2 (for estimate rejection flow)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('part2_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Pastilha de Freio\",\n  \"description\": \"Jogo de pastilhas dianteiras\",\n  \"unitPrice\": 89.90,\n  \"stockQuantity\": 15,\n  \"unit\": \"UN\",\n  \"minimumStock\": 3,\n  \"partType\": \"PECA\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/admin/parts"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Part as MECHANIC (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Vela de Ignicao\",\n  \"unitPrice\": 15.00,\n  \"stockQuantity\": 10,\n  \"unit\": \"UN\",\n  \"partType\": \"PECA\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/admin/parts"
+          },
+          "response": []
+        },
+        {
+          "name": "List Parts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('body is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/admin/parts"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Part by Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('id matches', () => pm.expect(body.id).to.eql(pm.collectionVariables.get('part_id')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/admin/parts/{{part_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "List Low Stock Parts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('body is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/admin/parts/low-stock"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Part",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('unitPrice updated', () => pm.expect(body.unitPrice).to.eql(32.5));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Filtro de Oleo\",\n  \"description\": \"Filtro de oleo do motor - atualizado\",\n  \"unitPrice\": 32.50,\n  \"stockQuantity\": 20,\n  \"unit\": \"UN\",\n  \"minimumStock\": 5,\n  \"partType\": \"PECA\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/admin/parts/{{part_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Adjust Stock + (inbound)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('stock increased', () => pm.expect(body.stockQuantity).to.eql(30));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/admin/parts/{{part_id}}/stock?adjustment=10"
+          },
+          "response": []
+        },
+        {
+          "name": "Adjust Stock - (outbound)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('stock decreased', () => pm.expect(body.stockQuantity).to.eql(25));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/admin/parts/{{part_id}}/stock?adjustment=-5"
+          },
+          "response": []
+        },
+        {
+          "name": "Adjust Stock as MECHANIC (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/admin/parts/{{part_id}}/stock?adjustment=1"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Disposable Part",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('part_disposable_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Peca Descartavel\",\n  \"unitPrice\": 5.00,\n  \"stockQuantity\": 1,\n  \"unit\": \"UN\",\n  \"partType\": \"INSUMO\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/admin/parts"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Part (ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/admin/parts/{{part_disposable_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Deleted Part (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/admin/parts/{{part_disposable_id}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Service Catalog",
+      "item": [
+        {
+          "name": "Create Service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('service_item_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Troca de Oleo\",\n  \"description\": \"Troca de oleo e filtro\",\n  \"basePrice\": 80.00,\n  \"estimatedDurationMinutes\": 30,\n  \"active\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/admin/services"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Service as MECHANIC (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alinhamento\",\n  \"basePrice\": 60.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/admin/services"
+          },
+          "response": []
+        },
+        {
+          "name": "List Services",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('body is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/admin/services"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Service by Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('id matches', () => pm.expect(body.id).to.eql(pm.collectionVariables.get('service_item_id')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/admin/services/{{service_item_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('basePrice updated', () => pm.expect(body.basePrice).to.eql(95.0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Troca de Oleo\",\n  \"description\": \"Troca de oleo e filtro - atualizado\",\n  \"basePrice\": 95.00,\n  \"estimatedDurationMinutes\": 40,\n  \"active\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/admin/services/{{service_item_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Disposable Service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('service_item_disposable_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Servico Descartavel\",\n  \"basePrice\": 10.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/admin/services"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/admin/services/{{service_item_disposable_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Deleted Service (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/admin/services/{{service_item_disposable_id}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 - Work Orders - Happy Path",
+      "item": [
+        {
+          "name": "Create Work Order",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('work_order_description', `E2E Happy Path - troca de pastilhas ${Date.now()}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"vehicleId\": \"{{vehicle_id}}\",\n  \"description\": \"{{work_order_description}}\",\n  \"priority\": \"MEDIUM\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders"
+          },
+          "response": []
+        },
+        {
+          "name": "List Work Orders (capture id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const found = body.content.find(wo => wo.description === pm.collectionVariables.get('work_order_description'));",
+                  "pm.test('work order found in list', () => pm.expect(found).to.not.be.undefined);",
+                  "if (found) { pm.collectionVariables.set('work_order_id', found.workOrderId); pm.test('status OPEN', () => pm.expect(found.status).to.eql('OPEN')); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/work-orders?page=0&size=100"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Work Order by Id (OPEN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status OPEN', () => pm.expect(body.status).to.eql('OPEN'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/work-orders/{{work_order_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Status -> DIAGNOSIS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status DIAGNOSIS', () => pm.expect(body.status).to.eql('DIAGNOSIS'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"DIAGNOSIS\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{work_order_id}}/status"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Service (labor)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('price matches', () => pm.expect(body.price).to.eql(120.0));",
+                  "pm.collectionVariables.set('work_order_service_id', body.workOrderServiceId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Mao de obra - troca de pastilhas\",\n  \"price\": 120.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{work_order_id}}/services"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Estimate (parts)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('status PENDING', () => pm.expect(body.status).to.eql('PENDING'));",
+                  "pm.test('totalAmount = parts(2x32.50) + labor(120.00)', () => pm.expect(body.totalAmount).to.eql(185.0));",
+                  "pm.collectionVariables.set('estimate_id', body.estimateId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"partId\": \"{{part_id}}\", \"quantity\": 2 }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{work_order_id}}/estimate"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Work Order (WAITING_APPROVAL)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status WAITING_APPROVAL', () => pm.expect(body.status).to.eql('WAITING_APPROVAL'));",
+                  "pm.test('estimatedValue set', () => pm.expect(body.estimatedValue).to.eql(185.0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/work-orders/{{work_order_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Estimate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status APPROVED', () => pm.expect(body.status).to.eql('APPROVED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/work-orders/{{work_order_id}}/estimate/{{estimate_id}}/approve"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Work Order (APPROVED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status APPROVED', () => pm.expect(body.status).to.eql('APPROVED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/work-orders/{{work_order_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Status -> IN_PROGRESS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status IN_PROGRESS', () => pm.expect(body.status).to.eql('IN_PROGRESS'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{work_order_id}}/status"
+          },
+          "response": []
+        },
+        {
+          "name": "Close Work Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status COMPLETED', () => pm.expect(body.status).to.eql('COMPLETED'));",
+                  "pm.test('finalValue overridden', () => pm.expect(body.finalValue).to.eql(199.9));",
+                  "pm.test('closedAt set', () => pm.expect(body.closedAt).to.exist);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"finalValue\": 199.90\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{work_order_id}}/close"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Status -> DELIVERED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status DELIVERED', () => pm.expect(body.status).to.eql('DELIVERED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"DELIVERED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{work_order_id}}/status"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Work Order Final (DELIVERED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status DELIVERED', () => pm.expect(body.status).to.eql('DELIVERED'));",
+                  "pm.test('finalValue persisted', () => pm.expect(body.finalValue).to.eql(199.9));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/work-orders/{{work_order_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Average Execution Time Metrics (ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('completedWorkOrders >= 1', () => pm.expect(body.completedWorkOrders).to.be.at.least(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/work-orders/metrics/average-execution-time"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Metrics as MECHANIC (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/work-orders/metrics/average-execution-time"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07 - Work Orders - Rejection and Public Channel",
+      "item": [
+        {
+          "name": "Create Work Order #2",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('wo2_description', `E2E Rejection Flow - revisao geral ${Date.now()}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"vehicleId\": \"{{vehicle_id}}\",\n  \"description\": \"{{wo2_description}}\",\n  \"priority\": \"LOW\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders"
+          },
+          "response": []
+        },
+        {
+          "name": "List Work Orders (capture wo2_id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const found = body.content.find(wo => wo.description === pm.collectionVariables.get('wo2_description'));",
+                  "pm.test('work order found in list', () => pm.expect(found).to.not.be.undefined);",
+                  "if (found) pm.collectionVariables.set('wo2_id', found.workOrderId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/work-orders?page=0&size=100"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Status -> DIAGNOSIS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status DIAGNOSIS', () => pm.expect(body.status).to.eql('DIAGNOSIS'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"DIAGNOSIS\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{wo2_id}}/status"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Estimate #1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('status PENDING', () => pm.expect(body.status).to.eql('PENDING'));",
+                  "pm.test('totalAmount = 89.90', () => pm.expect(body.totalAmount).to.eql(89.9));",
+                  "pm.collectionVariables.set('wo2_estimate1_id', body.estimateId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"partId\": \"{{part2_id}}\", \"quantity\": 1 }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{wo2_id}}/estimate"
+          },
+          "response": []
+        },
+        {
+          "name": "Public - Track Work Order (no auth)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status WAITING_APPROVAL', () => pm.expect(body.status).to.eql('WAITING_APPROVAL'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/v1/public/work-orders/{{wo2_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Public - Reject Estimate #1 (no auth)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status REJECTED', () => pm.expect(body.status).to.eql('REJECTED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{base_url}}/v1/public/work-orders/{{wo2_id}}/estimate/{{wo2_estimate1_id}}/reject"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Work Order (back to DIAGNOSIS)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status DIAGNOSIS', () => pm.expect(body.status).to.eql('DIAGNOSIS'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/work-orders/{{wo2_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Estimate #2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('status PENDING', () => pm.expect(body.status).to.eql('PENDING'));",
+                  "pm.collectionVariables.set('wo2_estimate2_id', body.estimateId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"partId\": \"{{part2_id}}\", \"quantity\": 1 }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{wo2_id}}/estimate"
+          },
+          "response": []
+        },
+        {
+          "name": "Public - Approve Estimate #2 (no auth)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status APPROVED', () => pm.expect(body.status).to.eql('APPROVED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{base_url}}/v1/public/work-orders/{{wo2_id}}/estimate/{{wo2_estimate2_id}}/approve"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Work Order (APPROVED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status APPROVED', () => pm.expect(body.status).to.eql('APPROVED'));",
+                  "pm.test('estimatedValue = 89.90', () => pm.expect(body.estimatedValue).to.eql(89.9));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/work-orders/{{wo2_id}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Already-Decided Estimate #2 (expect 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/work-orders/{{wo2_id}}/estimate/{{wo2_estimate2_id}}/reject"
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Nonexistent Estimate (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{mechanic_token}}" }],
+            "url": "{{base_url}}/v1/work-orders/{{wo2_id}}/estimate/00000000-0000-0000-0000-000000000000/approve"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "08 - Work Orders - Cancellation and Locking",
+      "item": [
+        {
+          "name": "Create Work Order #3",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('wo3_description', `E2E Cancellation Flow - revisao ${Date.now()}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"vehicleId\": \"{{vehicle_id}}\",\n  \"description\": \"{{wo3_description}}\",\n  \"priority\": \"HIGH\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders"
+          },
+          "response": []
+        },
+        {
+          "name": "List Work Orders (capture wo3_id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const found = body.content.find(wo => wo.description === pm.collectionVariables.get('wo3_description'));",
+                  "pm.test('work order found in list', () => pm.expect(found).to.not.be.undefined);",
+                  "if (found) pm.collectionVariables.set('wo3_id', found.workOrderId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/work-orders?page=0&size=100"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Status -> CANCELLED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status CANCELLED', () => pm.expect(body.status).to.eql('CANCELLED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CANCELLED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{wo3_id}}/status"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Service to Cancelled WO (expect 422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Tentativa bloqueada\",\n  \"price\": 10.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{wo3_id}}/services"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Status on Cancelled WO (expect 422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"DIAGNOSIS\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{wo3_id}}/status"
+          },
+          "response": []
+        },
+        {
+          "name": "Close Cancelled WO (expect 422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{mechanic_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/work-orders/{{wo3_id}}/close"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "09 - Cross-cutting Security",
+      "item": [
+        {
+          "name": "List Customers - No Token (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/v1/customer"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Customer - No Token (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Sem\",\n  \"lastName\": \"Token\",\n  \"email\": \"sem.token@example.com\",\n  \"phoneNumber\": \"11900000000\",\n  \"document\": \"52998224725\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/v1/customer"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Nonexistent Customer (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/v1/customer/00000000-0000-0000-0000-000000000000"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
