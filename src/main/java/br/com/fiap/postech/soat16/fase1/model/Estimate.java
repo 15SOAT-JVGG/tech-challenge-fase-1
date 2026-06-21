@@ -50,11 +50,20 @@ public class Estimate extends AuditableEntity {
     @Column(nullable = false, length = 10)
     private EstimateStatus status;
 
+    @Column(name = "parts_amount", precision = 10, scale = 2)
+    private BigDecimal partsAmount;
+
+    @Column(name = "labor_amount", precision = 10, scale = 2)
+    private BigDecimal laborAmount;
+
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
+
+    @Column(name = "sent_at")
+    private LocalDateTime sentAt;
 
     @OneToMany(mappedBy = "estimate", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<EstimateItem> items = new ArrayList<>();

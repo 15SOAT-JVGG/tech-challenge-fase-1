@@ -22,8 +22,11 @@ public interface EstimateMapper {
                 entity.getId(),
                 entity.getWorkOrder().getId(),
                 entity.getStatus(),
+                entity.getPartsAmount(),
+                entity.getLaborAmount(),
                 entity.getTotalAmount(),
                 entity.getApprovedAt(),
+                entity.getSentAt(),
                 entity.getItems().stream().map(this::toItemResponse).toList()
         );
     }

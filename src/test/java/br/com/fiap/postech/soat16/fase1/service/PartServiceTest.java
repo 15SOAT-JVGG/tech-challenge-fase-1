@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,7 +41,7 @@ class PartServiceTest {
 
     private PartService service;
 
-    private static final Long ID = 1L;
+    private static final UUID ID = UUID.fromString("c3b79cde-2872-4053-9622-37605bf124a3");
 
     private Part entity;
 

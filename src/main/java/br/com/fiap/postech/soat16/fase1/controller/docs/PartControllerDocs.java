@@ -1,6 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.controller.docs;
 
 import java.util.List;
+import java.util.UUID;
 
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
@@ -55,7 +56,7 @@ public interface PartControllerDocs {
     @APIResponse(responseCode = "404", description = "Part/supply not found")
     Uni<PartResponseDto> findById(
             @Parameter(name = "id", description = "Part/supply identifier", required = true, in = ParameterIn.PATH)
-            @PathParam("id") Long id);
+            @PathParam("id") UUID id);
 
     @GET
     @Path("/low-stock")
@@ -85,7 +86,7 @@ public interface PartControllerDocs {
     @APIResponse(responseCode = "404", description = "Part/supply not found")
     Uni<PartResponseDto> update(
             @Parameter(name = "id", description = "Part/supply identifier", required = true, in = ParameterIn.PATH)
-            @PathParam("id") Long id,
+            @PathParam("id") UUID id,
             @RequestBody(description = "Updated part/supply data")
             @Valid PartRequestDto body);
 
@@ -103,7 +104,7 @@ public interface PartControllerDocs {
     @APIResponse(responseCode = "404", description = "Part/supply not found")
     Uni<PartResponseDto> adjustStock(
             @Parameter(name = "id", description = "Part/supply identifier", required = true, in = ParameterIn.PATH)
-            @PathParam("id") Long id,
+            @PathParam("id") UUID id,
             @Parameter(name = "adjustment", description = "Quantity to adjust (positive=inbound, negative=outbound)",
                     required = true, in = ParameterIn.QUERY)
             @QueryParam("adjustment") int adjustment);
@@ -115,5 +116,5 @@ public interface PartControllerDocs {
     @APIResponse(responseCode = "404", description = "Part/supply not found")
     Uni<Response> delete(
             @Parameter(name = "id", description = "Part/supply identifier", required = true, in = ParameterIn.PATH)
-            @PathParam("id") Long id);
+            @PathParam("id") UUID id);
 }

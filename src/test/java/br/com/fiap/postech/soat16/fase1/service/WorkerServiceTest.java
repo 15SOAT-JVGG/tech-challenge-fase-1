@@ -25,10 +25,10 @@ import br.com.fiap.postech.soat16.fase1.dto.request.WorkerLoginRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkerLoginResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkerResponseDto;
-import br.com.fiap.postech.soat16.fase1.exception.WorkerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateWorkerEmailException;
 import br.com.fiap.postech.soat16.fase1.exception.InactiveWorkerException;
 import br.com.fiap.postech.soat16.fase1.exception.InvalidWorkerCredentialsException;
+import br.com.fiap.postech.soat16.fase1.exception.WorkerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.mapper.WorkerMapper;
 import br.com.fiap.postech.soat16.fase1.model.Worker;
 import br.com.fiap.postech.soat16.fase1.model.WorkerProfile;
@@ -167,6 +167,18 @@ class WorkerServiceTest {
             when(repository.existsByEmailAndDifferentId("maria@example.com", FIXED_UUID)).thenReturn(true);
 
             assertThrows(DuplicateWorkerEmailException.class, () -> service.update(FIXED_UUID, request));
+        }
+
+        @Test
+        @DisplayName("should throw WorkerNotFoundException when worker is missing")
+        void shouldThrowNotFoundWhenMissing() {
+            WorkerRequestDto request = new WorkerRequestDto(
+                    "Maria", "Souza", "maria@example.com", "5511888888888", "1234", WorkerProfile.MECHANIC);
+
+            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Optional.empty());
+
+            assertThrows(WorkerNotFoundException.class, () -> service.update(FIXED_UUID, request));
+            verify(repository, never()).persist(any(Worker.class));
         }
     }
 

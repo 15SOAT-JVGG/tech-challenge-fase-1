@@ -3,14 +3,17 @@ package br.com.fiap.postech.soat16.fase1.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,6 +36,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderStatusUpdateRequest
 import br.com.fiap.postech.soat16.fase1.dto.response.EstimateResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto;
+import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.EstimateAlreadyDecidedException;
 import br.com.fiap.postech.soat16.fase1.exception.EstimateNotApprovedException;
@@ -100,6 +104,9 @@ class WorkOrderServiceTest {
     private WorkOrderServiceMapper serviceMapper;
 
     @Mock
+    private NotificationService notificationService;
+
+    @Mock
     private PanacheQuery<Part> partQuery;
 
     private WorkOrderService service;
@@ -114,14 +121,20 @@ class WorkOrderServiceTest {
     @BeforeEach
     void setUp() {
         service = new WorkOrderService(repository, historyRepository, estimateRepository, serviceRepository,
-                customerRepository, vehicleRepository, partRepository, mapper, estimateMapper, serviceMapper);
+                customerRepository, vehicleRepository, partRepository, mapper, estimateMapper, serviceMapper,
+                notificationService);
+
+        lenient().when(notificationService.notifyEstimateReady(any(), any()))
+                .thenReturn(Uni.createFrom().voidItem());
+        lenient().when(notificationService.notifyWorkOrderCompleted(any()))
+                .thenReturn(Uni.createFrom().voidItem());
 
         entity = new WorkOrder();
         entity.setId(WORK_ORDER_ID);
-        entity.setStatus(WorkOrderStatus.OPEN);
+        entity.setStatus(WorkOrderStatus.RECEIVED);
 
         response = new WorkOrderResponseDto(WORK_ORDER_ID, CUSTOMER_ID, VEHICLE_ID, "desc", null,
-                WorkOrderStatus.OPEN, null, null, null, null);
+                WorkOrderStatus.RECEIVED, null, null, null, null);
     }
 
     @Nested
@@ -221,7 +234,7 @@ class WorkOrderServiceTest {
         @Test
         @DisplayName("should move to the next status and record history")
         void shouldMoveToNextStatusAndRecordHistory() {
-            entity.setStatus(WorkOrderStatus.OPEN);
+            entity.setStatus(WorkOrderStatus.RECEIVED);
             WorkOrderStatusUpdateRequestDto request = new WorkOrderStatusUpdateRequestDto(WorkOrderStatus.DIAGNOSIS);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
@@ -250,7 +263,7 @@ class WorkOrderServiceTest {
         @Test
         @DisplayName("should reject skipping stages")
         void shouldRejectSkippingStages() {
-            entity.setStatus(WorkOrderStatus.OPEN);
+            entity.setStatus(WorkOrderStatus.RECEIVED);
             WorkOrderStatusUpdateRequestDto request = new WorkOrderStatusUpdateRequestDto(WorkOrderStatus.APPROVED);
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
 
@@ -422,13 +435,16 @@ class WorkOrderServiceTest {
 
             Estimate persistedEstimate = new Estimate();
             EstimateResponseDto estimateResponse = new EstimateResponseDto(
-                    UUID.randomUUID(), WORK_ORDER_ID, EstimateStatus.PENDING, BigDecimal.valueOf(20), null, List.of());
+                    UUID.randomUUID(), WORK_ORDER_ID, EstimateStatus.PENDING, BigDecimal.valueOf(20), BigDecimal.ZERO,
+                    BigDecimal.valueOf(20), null, null, List.of());
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(partRepository.find("id = ?1", partId)).thenReturn(partQuery);
             when(partQuery.firstResult()).thenReturn(Uni.createFrom().item(part));
             when(estimateMapper.toItemEntity(itemDto, part)).thenReturn(item);
+            when(serviceRepository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(List.of()));
             when(estimateRepository.persist(any(Estimate.class))).thenReturn(Uni.createFrom().item(persistedEstimate));
+            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
             when(estimateMapper.toResponse(persistedEstimate)).thenReturn(estimateResponse);
 
             EstimateResponseDto result = service.createEstimate(WORK_ORDER_ID, request).await().indefinitely();
@@ -488,7 +504,8 @@ class WorkOrderServiceTest {
             when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.persist(estimate)).thenReturn(Uni.createFrom().item(estimate));
             when(estimateMapper.toResponse(estimate)).thenReturn(new EstimateResponseDto(
-                    estimateId, WORK_ORDER_ID, EstimateStatus.APPROVED, BigDecimal.valueOf(100), null, List.of()));
+                    estimateId, WORK_ORDER_ID, EstimateStatus.APPROVED, BigDecimal.valueOf(100), BigDecimal.ZERO,
+                    BigDecimal.valueOf(100), null, null, List.of()));
 
             service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
 
@@ -514,7 +531,8 @@ class WorkOrderServiceTest {
             when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.persist(estimate)).thenReturn(Uni.createFrom().item(estimate));
             when(estimateMapper.toResponse(estimate)).thenReturn(new EstimateResponseDto(
-                    estimateId, WORK_ORDER_ID, EstimateStatus.APPROVED, BigDecimal.valueOf(50), null, List.of()));
+                    estimateId, WORK_ORDER_ID, EstimateStatus.APPROVED, BigDecimal.valueOf(50), BigDecimal.ZERO,
+                    BigDecimal.valueOf(50), null, null, List.of()));
 
             service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
 
@@ -547,6 +565,140 @@ class WorkOrderServiceTest {
 
             assertThrows(EstimateNotFoundException.class,
                     () -> service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("rejectEstimate")
+    class RejectEstimate {
+
+        @Test
+        @DisplayName("should reject a pending estimate and move WAITING_APPROVAL back to DIAGNOSIS")
+        void shouldRejectAndReturnToDiagnosis() {
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
+            UUID estimateId = UUID.randomUUID();
+            Estimate estimate = new Estimate();
+            estimate.setId(estimateId);
+            estimate.setWorkOrder(entity);
+            estimate.setStatus(EstimateStatus.PENDING);
+            estimate.setTotalAmount(BigDecimal.valueOf(100));
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(estimate));
+            when(historyRepository.persist(any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
+            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.persist(estimate)).thenReturn(Uni.createFrom().item(estimate));
+            when(estimateMapper.toResponse(estimate)).thenReturn(new EstimateResponseDto(
+                    estimateId, WORK_ORDER_ID, EstimateStatus.REJECTED, BigDecimal.valueOf(100), BigDecimal.ZERO,
+                    BigDecimal.valueOf(100), null, null, List.of()));
+
+            service.rejectEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
+
+            assertEquals(EstimateStatus.REJECTED, estimate.getStatus());
+            assertEquals(WorkOrderStatus.DIAGNOSIS, entity.getStatus());
+        }
+
+        @Test
+        @DisplayName("should throw EstimateAlreadyDecidedException when estimate is not PENDING")
+        void shouldThrowWhenAlreadyDecided() {
+            UUID estimateId = UUID.randomUUID();
+            Estimate estimate = new Estimate();
+            estimate.setStatus(EstimateStatus.APPROVED);
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(estimate));
+
+            assertThrows(EstimateAlreadyDecidedException.class,
+                    () -> service.rejectEstimate(WORK_ORDER_ID, estimateId).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("stock management")
+    class StockManagement {
+
+        private Estimate estimateWithItem(Part part, int quantity) {
+            EstimateItem item = new EstimateItem();
+            item.setPart(part);
+            item.setQuantity(quantity);
+            item.setUnitPrice(part.getUnitPrice());
+            item.setTotalPrice(part.getUnitPrice().multiply(BigDecimal.valueOf(quantity)));
+            Estimate estimate = new Estimate();
+            estimate.setWorkOrder(entity);
+            estimate.setStatus(EstimateStatus.PENDING);
+            estimate.setTotalAmount(item.getTotalPrice());
+            estimate.setItems(new java.util.ArrayList<>(List.of(item)));
+            return estimate;
+        }
+
+        @Test
+        @DisplayName("should decrease part stock when approving the estimate")
+        void shouldDecreaseStockOnApproval() {
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
+            UUID estimateId = UUID.randomUUID();
+            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN");
+            Estimate estimate = estimateWithItem(part, 2);
+            estimate.setId(estimateId);
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(estimate));
+            when(historyRepository.persist(any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
+            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.persist(estimate)).thenReturn(Uni.createFrom().item(estimate));
+            when(estimateMapper.toResponse(estimate)).thenReturn(new EstimateResponseDto(
+                    estimateId, WORK_ORDER_ID, EstimateStatus.APPROVED, BigDecimal.valueOf(20), BigDecimal.ZERO,
+                    BigDecimal.valueOf(20), null, null, List.of()));
+
+            service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
+
+            assertEquals(3, part.getStockQuantity());
+        }
+
+        @Test
+        @DisplayName("should fail approval with insufficient stock and not change status")
+        void shouldFailApprovalWhenInsufficientStock() {
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
+            UUID estimateId = UUID.randomUUID();
+            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 1, "UN");
+            Estimate estimate = estimateWithItem(part, 5);
+            estimate.setId(estimateId);
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(estimate));
+
+            assertThrows(BusinessException.class,
+                    () -> service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely());
+            assertEquals(WorkOrderStatus.WAITING_APPROVAL, entity.getStatus());
+            assertEquals(1, part.getStockQuantity());
+        }
+
+        @Test
+        @DisplayName("should restore part stock when cancelling an APPROVED work order")
+        void shouldRestoreStockOnCancel() {
+            entity.setStatus(WorkOrderStatus.APPROVED);
+            WorkOrderStatusUpdateRequestDto request = new WorkOrderStatusUpdateRequestDto(WorkOrderStatus.CANCELLED);
+            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 3, "UN");
+            Estimate approvedEstimate = estimateWithItem(part, 2);
+            approvedEstimate.setStatus(EstimateStatus.APPROVED);
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findApprovedByWorkOrderId(WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(approvedEstimate));
+            when(historyRepository.persist(any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
+            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(mapper.toResponse(entity)).thenReturn(response);
+
+            service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
+
+            assertEquals(WorkOrderStatus.CANCELLED, entity.getStatus());
+            assertEquals(5, part.getStockQuantity());
         }
     }
 
@@ -691,6 +843,41 @@ class WorkOrderServiceTest {
 
             assertThrows(WorkOrderLockedException.class,
                     () -> service.close(WORK_ORDER_ID, request).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("averageExecutionTime")
+    class AverageExecutionTime {
+
+        @Test
+        @DisplayName("should return zero and null average when there are no closed work orders")
+        void shouldReturnZeroWhenNoneClosed() {
+            when(repository.findClosed()).thenReturn(Uni.createFrom().item(List.of()));
+
+            var result = service.averageExecutionTime().await().indefinitely();
+
+            assertEquals(0, result.completedWorkOrders());
+            assertNull(result.averageExecutionMinutes());
+        }
+
+        @Test
+        @DisplayName("should compute the average execution time in minutes across closed work orders")
+        void shouldComputeAverage() {
+            LocalDateTime opened = LocalDateTime.of(2026, 1, 1, 8, 0);
+            WorkOrder first = new WorkOrder();
+            first.setOpenedAt(opened);
+            first.setClosedAt(opened.plusMinutes(60));
+            WorkOrder second = new WorkOrder();
+            second.setOpenedAt(opened);
+            second.setClosedAt(opened.plusMinutes(120));
+
+            when(repository.findClosed()).thenReturn(Uni.createFrom().item(List.of(first, second)));
+
+            var result = service.averageExecutionTime().await().indefinitely();
+
+            assertEquals(2, result.completedWorkOrders());
+            assertEquals(90.0, result.averageExecutionMinutes());
         }
     }
 }

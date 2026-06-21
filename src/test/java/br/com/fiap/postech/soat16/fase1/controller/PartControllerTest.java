@@ -39,11 +39,11 @@ class PartControllerTest {
 
     private PartController controller;
 
-    private static final Long ID = 1L;
+    private static final UUID FIXED_UUID = UUID.fromString("c3b79cde-2872-4053-9622-37605bf124a3");
+
+    private static final UUID ID = FIXED_UUID;
 
     private PartResponseDto response;
-
-    private static final UUID FIXED_UUID = UUID.fromString("c3b79cde-2872-4053-9622-37605bf124a3");
 
     @BeforeEach
     void setUp() {

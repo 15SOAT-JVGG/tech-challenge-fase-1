@@ -1,7 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.exception;
 
-import static br.com.fiap.postech.soat16.fase1.exception.WorkerErrorCode.INVALID_WORKER_CREDENTIALS;
 import static br.com.fiap.postech.soat16.fase1.exception.ErrorType.UNAUTHORIZED;
+import static br.com.fiap.postech.soat16.fase1.exception.WorkerErrorCode.INVALID_WORKER_CREDENTIALS;
 
 public class InvalidWorkerCredentialsException extends AppException {
 

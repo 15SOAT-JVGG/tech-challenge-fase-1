@@ -14,13 +14,15 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
 
 import lombok.EqualsAndHashCode;
 
 @Entity
-@Table(name = "parts")
+@Table(name = "parts", schema = "oficina_mecanica")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 public class Part {
 
     @EqualsAndHashCode.Include
@@ -56,6 +58,10 @@ public class Part {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
 
     protected Part() {
         // Required by JPA

@@ -1,7 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.exception;
 
-import static br.com.fiap.postech.soat16.fase1.exception.WorkerErrorCode.WORKER_EMAIL_ALREADY_EXISTS;
 import static br.com.fiap.postech.soat16.fase1.exception.ErrorType.CONFLICT;
+import static br.com.fiap.postech.soat16.fase1.exception.WorkerErrorCode.WORKER_EMAIL_ALREADY_EXISTS;
 
 public class DuplicateWorkerEmailException extends AppException {
 

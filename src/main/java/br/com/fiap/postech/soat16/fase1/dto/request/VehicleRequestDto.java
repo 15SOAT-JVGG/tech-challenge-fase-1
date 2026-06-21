@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 
 import br.com.fiap.postech.soat16.fase1.model.VehicleType;
 
@@ -12,6 +13,8 @@ public record VehicleRequestDto(
     @NotNull(message = "customerId cannot be blank")
     UUID customerId,
     @NotBlank(message = "licensePlate cannot be blank")
+    @Pattern(regexp = "^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$",
+        message = "licensePlate must follow the Brazilian format AAA0000 or Mercosul AAA0A00")
     String licensePlate,
     @NotBlank(message = "manufacturer cannot be blank")
     String manufacturer,

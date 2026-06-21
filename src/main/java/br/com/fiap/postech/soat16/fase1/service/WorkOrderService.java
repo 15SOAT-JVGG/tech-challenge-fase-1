@@ -1,6 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -9,12 +10,14 @@ import java.util.UUID;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.pagination.ReactivePage;
 import br.com.fiap.postech.soat16.fase1.dto.request.EstimateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderCloseRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderStatusUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
@@ -32,6 +35,7 @@ import br.com.fiap.postech.soat16.fase1.mapper.WorkOrderServiceMapper;
 import br.com.fiap.postech.soat16.fase1.model.Estimate;
 import br.com.fiap.postech.soat16.fase1.model.EstimateItem;
 import br.com.fiap.postech.soat16.fase1.model.EstimateStatus;
+import br.com.fiap.postech.soat16.fase1.model.Part;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrderHistory;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrderStatus;
@@ -45,6 +49,7 @@ import br.com.fiap.postech.soat16.fase1.repository.WorkOrderServiceRepository;
 
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
+import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
 import lombok.RequiredArgsConstructor;
 
@@ -53,7 +58,7 @@ import lombok.RequiredArgsConstructor;
 public class WorkOrderService {
 
     private static final Map<WorkOrderStatus, WorkOrderStatus> FORWARD_TRANSITIONS = Map.of(
-            WorkOrderStatus.OPEN, WorkOrderStatus.DIAGNOSIS,
+            WorkOrderStatus.RECEIVED, WorkOrderStatus.DIAGNOSIS,
             WorkOrderStatus.DIAGNOSIS, WorkOrderStatus.WAITING_APPROVAL,
             WorkOrderStatus.WAITING_APPROVAL, WorkOrderStatus.APPROVED,
             WorkOrderStatus.APPROVED, WorkOrderStatus.IN_PROGRESS
@@ -69,16 +74,25 @@ public class WorkOrderService {
     private final WorkOrderMapper mapper;
     private final EstimateMapper estimateMapper;
     private final WorkOrderServiceMapper serviceMapper;
+    private final NotificationService notificationService;
 
     @WithSession
     public Uni<PageableResponseDto<WorkOrderResponseDto>> findAll(String q, int page, int size) {
-        return Uni.combine().all()
-                .unis(repository.findPage(page, size), repository.count())
-                .asTuple()
-                .map(tuple -> {
-                    var data = tuple.getItem1().stream().map(mapper::toResponse).toList();
-                    return PageableResponseDto.of(data, page, size, tuple.getItem2());
-                });
+        return ReactivePage.of(repository.findPage(page, size), repository.count(), mapper::toResponse, page, size);
+    }
+
+    @WithSession
+    public Uni<WorkOrderMetricsResponseDto> averageExecutionTime() {
+        return repository.findClosed().map(orders -> {
+            if (orders.isEmpty()) {
+                return new WorkOrderMetricsResponseDto(0, null);
+            }
+            double averageMinutes = orders.stream()
+                    .mapToDouble(o -> Duration.between(o.getOpenedAt(), o.getClosedAt()).toSeconds() / 60.0)
+                    .average()
+                    .orElse(0);
+            return new WorkOrderMetricsResponseDto(orders.size(), Math.round(averageMinutes * 100) / 100.0);
+        });
     }
 
     @WithSession
@@ -108,6 +122,9 @@ public class WorkOrderService {
                                 || request.status() == WorkOrderStatus.IN_PROGRESS
                                 ? assertHasApprovedEstimate(id)
                                 : Uni.createFrom().voidItem())
+                        .flatMap(v -> request.status() == WorkOrderStatus.CANCELLED
+                                ? restoreStockIfReserved(order)
+                                : Uni.createFrom().voidItem())
                         .flatMap(v -> changeStatus(order, request.status()))
                         .flatMap(repository::persist)
                         .map(mapper::toResponse));
@@ -119,7 +136,9 @@ public class WorkOrderService {
                 .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
                 .flatMap(order -> assertNotLocked(order)
                         .flatMap(v -> buildItems(request))
-                        .flatMap(items -> persistEstimate(order, items)))
+                        .flatMap(items -> serviceRepository.findByWorkOrderId(workOrderId)
+                                .flatMap(services -> persistEstimate(order, items, services)))
+                        .flatMap(estimate -> finalizeEstimateCreation(order, estimate)))
                 .map(estimateMapper::toResponse);
     }
 
@@ -132,7 +151,20 @@ public class WorkOrderService {
                         .onItem().ifNull().failWith(EstimateNotFoundException::new)
                         .flatMap(estimate -> estimate.getStatus() == EstimateStatus.PENDING
                                 ? approve(order, estimate)
-                                : Uni.createFrom().<Estimate>failure(new EstimateAlreadyDecidedException())))
+                                : Uni.createFrom().failure(new EstimateAlreadyDecidedException())))
+                .map(estimateMapper::toResponse);
+    }
+
+    @WithTransaction
+    public Uni<EstimateResponseDto> rejectEstimate(UUID workOrderId, UUID estimateId) {
+        return repository.findByWorkOrderId(workOrderId)
+                .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
+                .flatMap(order -> assertNotLocked(order)
+                        .flatMap(v -> estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, workOrderId))
+                        .onItem().ifNull().failWith(EstimateNotFoundException::new)
+                        .flatMap(estimate -> estimate.getStatus() == EstimateStatus.PENDING
+                                ? reject(order, estimate)
+                                : Uni.createFrom().failure(new EstimateAlreadyDecidedException())))
                 .map(estimateMapper::toResponse);
     }
 
@@ -151,8 +183,8 @@ public class WorkOrderService {
                 .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
                 .flatMap(order -> assertNotLocked(order)
                         .flatMap(v -> order.getStatus() == WorkOrderStatus.IN_PROGRESS
-                                ? Uni.createFrom().<Void>voidItem()
-                                : Uni.createFrom().<Void>failure(new InvalidWorkOrderStatusTransitionException(
+                                ? Uni.createFrom().voidItem()
+                                : Uni.createFrom().failure(new InvalidWorkOrderStatusTransitionException(
                                         "Only work orders IN_PROGRESS can be closed")))
                         .flatMap(v -> assertHasApprovedEstimate(id))
                         .flatMap(v -> {
@@ -162,10 +194,12 @@ public class WorkOrderService {
                             return changeStatus(order, WorkOrderStatus.COMPLETED);
                         })
                         .flatMap(repository::persist)
+                        .flatMap(saved -> notificationService.notifyWorkOrderCompleted(saved).replaceWith(saved))
                         .map(mapper::toResponse));
     }
 
     private Uni<Estimate> approve(WorkOrder order, Estimate estimate) {
+        reserveStock(estimate);
         estimate.setStatus(EstimateStatus.APPROVED);
         estimate.setApprovedAt(LocalDateTime.now());
         order.setEstimatedValue(estimate.getTotalAmount());
@@ -173,6 +207,27 @@ public class WorkOrderService {
                 ? changeStatus(order, WorkOrderStatus.APPROVED).flatMap(repository::persist)
                 : repository.persist(order);
         return orderUni.flatMap(persisted -> estimateRepository.persist(estimate));
+    }
+
+    private Uni<Estimate> reject(WorkOrder order, Estimate estimate) {
+        estimate.setStatus(EstimateStatus.REJECTED);
+        // Orcamento recusado: a OS volta para diagnostico para permitir um novo orcamento.
+        Uni<WorkOrder> orderUni = order.getStatus() == WorkOrderStatus.WAITING_APPROVAL
+                ? changeStatus(order, WorkOrderStatus.DIAGNOSIS).flatMap(repository::persist)
+                : repository.persist(order);
+        return orderUni.flatMap(persisted -> estimateRepository.persist(estimate));
+    }
+
+    private Uni<Estimate> finalizeEstimateCreation(WorkOrder order, Estimate estimate) {
+        order.setEstimatedValue(estimate.getTotalAmount());
+        estimate.setSentAt(LocalDateTime.now());
+        // Geracao do orcamento move automaticamente a OS de diagnostico para "aguardando aprovacao".
+        Uni<WorkOrder> orderUni = order.getStatus() == WorkOrderStatus.DIAGNOSIS
+                ? changeStatus(order, WorkOrderStatus.WAITING_APPROVAL).flatMap(repository::persist)
+                : repository.persist(order);
+        return orderUni
+                .flatMap(saved -> notificationService.notifyEstimateReady(saved, estimate))
+                .replaceWith(estimate);
     }
 
     private Uni<List<EstimateItem>> buildItems(EstimateRequestDto request) {
@@ -184,15 +239,53 @@ public class WorkOrderService {
         return Uni.join().all(itemUnis).andFailFast();
     }
 
-    private Uni<Estimate> persistEstimate(WorkOrder order, List<EstimateItem> items) {
-        var totalAmount = items.stream().map(EstimateItem::getTotalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+    private Uni<Estimate> persistEstimate(WorkOrder order, List<EstimateItem> items,
+            List<br.com.fiap.postech.soat16.fase1.model.WorkOrderService> services) {
+        var partsAmount = items.stream().map(EstimateItem::getTotalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+        var laborAmount = services.stream().map(br.com.fiap.postech.soat16.fase1.model.WorkOrderService::getPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         var estimate = new Estimate();
         estimate.setWorkOrder(order);
         estimate.setStatus(EstimateStatus.PENDING);
-        estimate.setTotalAmount(totalAmount);
+        estimate.setPartsAmount(partsAmount);
+        estimate.setLaborAmount(laborAmount);
+        estimate.setTotalAmount(partsAmount.add(laborAmount));
         estimate.setItems(items);
         items.forEach(item -> item.setEstimate(estimate));
         return estimateRepository.persist(estimate);
+    }
+
+    /**
+     * Baixa de estoque na aprovacao do orcamento: a peca so e comprometida quando o cliente aprova.
+     * {@link Part#decreaseStock(int)} lanca {@code BusinessException} (HTTP 422) se faltar estoque,
+     * revertendo toda a transacao de aprovacao.
+     */
+    private void reserveStock(Estimate estimate) {
+        estimate.getItems().forEach(item -> {
+            Part part = item.getPart();
+            part.decreaseStock(item.getQuantity());
+            if (part.isLowStock()) {
+                Log.warnf("Estoque baixo apos reserva: peca=%s restante=%d minimo=%d",
+                        part.getName(), part.getStockQuantity(), part.getMinimumStock());
+            }
+        });
+    }
+
+    /**
+     * Restauracao de estoque no cancelamento: so faz sentido enquanto a OS esta APPROVED (pecas
+     * reservadas, mas ainda nao consumidas em execucao). Apos IN_PROGRESS as pecas ja foram usadas.
+     */
+    private Uni<Void> restoreStockIfReserved(WorkOrder order) {
+        if (order.getStatus() != WorkOrderStatus.APPROVED) {
+            return Uni.createFrom().voidItem();
+        }
+        return estimateRepository.findApprovedByWorkOrderId(order.getId())
+                .flatMap(estimate -> {
+                    if (estimate != null) {
+                        estimate.getItems().forEach(item -> item.getPart().increaseStock(item.getQuantity()));
+                    }
+                    return Uni.createFrom().voidItem();
+                });
     }
 
     private Uni<WorkOrder> changeStatus(WorkOrder order, WorkOrderStatus newStatus) {
@@ -225,7 +318,7 @@ public class WorkOrderService {
                     ? Uni.createFrom().voidItem()
                     : Uni.createFrom().failure(new InvalidWorkOrderStatusTransitionException(current, target));
         }
-        return target.equals(FORWARD_TRANSITIONS.get(current))
+        return target == FORWARD_TRANSITIONS.get(current)
                 ? Uni.createFrom().voidItem()
                 : Uni.createFrom().failure(new InvalidWorkOrderStatusTransitionException(current, target));
     }

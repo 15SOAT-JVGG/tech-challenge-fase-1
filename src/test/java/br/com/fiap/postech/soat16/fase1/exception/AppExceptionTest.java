@@ -3,6 +3,8 @@ package br.com.fiap.postech.soat16.fase1.exception;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -51,6 +53,46 @@ class AppExceptionTest {
         assertEquals("CUSTOMER_NOT_FOUND", CustomerErrorCode.CUSTOMER_NOT_FOUND.getCode());
         assertEquals("DOCUMENT_ALREADY_EXISTS", CustomerErrorCode.DOCUMENT_ALREADY_EXISTS.getCode());
         assertEquals("INVALID_DOCUMENT", CustomerErrorCode.INVALID_DOCUMENT.getCode());
+    }
+
+    @Test
+    @DisplayName("WorkOrderNotFoundException() carries a generic NOT_FOUND message")
+    void workOrderNotFoundWithoutIdHasGenericMessage() {
+        WorkOrderNotFoundException ex = new WorkOrderNotFoundException();
+
+        assertEquals(ErrorType.NOT_FOUND, ex.getType());
+        assertEquals("WORK_ORDER_NOT_FOUND", ex.getCode());
+        assertEquals("Work order not found", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("WorkOrderNotFoundException(UUID) includes the id in the message")
+    void workOrderNotFoundWithIdIncludesItInMessage() {
+        UUID id = UUID.randomUUID();
+        WorkOrderNotFoundException ex = new WorkOrderNotFoundException(id);
+
+        assertEquals(ErrorType.NOT_FOUND, ex.getType());
+        assertTrue(ex.getMessage().contains(id.toString()));
+    }
+
+    @Test
+    @DisplayName("EstimateNotFoundException() carries a generic NOT_FOUND message")
+    void estimateNotFoundWithoutIdHasGenericMessage() {
+        EstimateNotFoundException ex = new EstimateNotFoundException();
+
+        assertEquals(ErrorType.NOT_FOUND, ex.getType());
+        assertEquals("ESTIMATE_NOT_FOUND", ex.getCode());
+        assertEquals("Estimate not found", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("EstimateNotFoundException(UUID) includes the id in the message")
+    void estimateNotFoundWithIdIncludesItInMessage() {
+        UUID id = UUID.randomUUID();
+        EstimateNotFoundException ex = new EstimateNotFoundException(id);
+
+        assertEquals(ErrorType.NOT_FOUND, ex.getType());
+        assertTrue(ex.getMessage().contains(id.toString()));
     }
 
     @Test

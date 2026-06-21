@@ -4,20 +4,26 @@ import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import jakarta.inject.Inject;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.error.ApiErrorResponseDto;
@@ -38,8 +44,10 @@ import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.vertx.VertxContextSupport;
+import io.restassured.RestAssured;
 import io.restassured.common.mapper.TypeRef;
 import io.restassured.response.Response;
+import io.smallrye.jwt.build.Jwt;
 import io.smallrye.mutiny.Uni;
 
 /**
@@ -65,6 +73,30 @@ class WorkOrderControllerIT {
 
     @Inject
     PartRepository partRepository;
+
+    // ---------------------------------------------------------------------
+    // Autenticação — as APIs administrativas exigem JWT; assinamos um token
+    // (ADMIN + MECHANIC) com a mesma chave/issuer da aplicação e o aplicamos a
+    // todas as requisições. Endpoints públicos ignoram o header.
+    // ---------------------------------------------------------------------
+
+    @BeforeAll
+    static void authenticateAllRequests() {
+        String token = Jwt.issuer("oficina-api")
+                .upn("integration-test")
+                .groups(Set.of("ADMIN", "MECHANIC"))
+                .expiresIn(Duration.ofHours(1))
+                .sign();
+        RestAssured.filters((requestSpec, responseSpec, ctx) -> {
+            requestSpec.header("Authorization", "Bearer " + token);
+            return ctx.next(requestSpec, responseSpec);
+        });
+    }
+
+    @AfterAll
+    static void clearAuthentication() {
+        RestAssured.replaceFiltersWith(java.util.List.of());
+    }
 
     // ---------------------------------------------------------------------
     // Seeding helpers
@@ -141,7 +173,8 @@ class WorkOrderControllerIT {
                 .get(WORK_ORDERS_PATH)
         .then()
                 .statusCode(200)
-                .extract().as(new TypeRef<PageableResponseDto<WorkOrderResponseDto>>() { });
+                .extract().as(new TypeRef<>() {
+                });
 
         return page.content().stream()
                 .filter(workOrder -> vehicleId.equals(workOrder.vehicleId()))
@@ -193,6 +226,32 @@ class WorkOrderControllerIT {
                 .extract().as(EstimateResponseDto.class);
     }
 
+    private EstimateResponseDto rejectEstimate(UUID workOrderId, UUID estimateId) {
+        return given()
+        .when()
+                .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/estimate/" + estimateId + "/reject")
+        .then()
+                .statusCode(200)
+                .extract().as(EstimateResponseDto.class);
+    }
+
+    private WorkOrderServiceResponseDto addService(UUID workOrderId, String description, BigDecimal price) {
+        return given()
+                .contentType("application/json")
+                .body("{\"description\":\"%s\",\"price\":%s}".formatted(description, price))
+        .when()
+                .post(WORK_ORDERS_PATH + "/" + workOrderId + "/services")
+        .then()
+                .statusCode(201)
+                .extract().as(WorkOrderServiceResponseDto.class);
+    }
+
+    // Lê o estoque atual da peça direto do repositório (estabelecendo o contexto Vert.x exigido
+    // pelo Hibernate Reactive), já que não há endpoint de leitura de peça neste teste.
+    private int stockOf(UUID partId) {
+        return persistInTransaction(() -> partRepository.find("id = ?1", partId).firstResult()).getStockQuantity();
+    }
+
     // Leva a ordem até IN_PROGRESS com um orçamento aprovado, igual ao fluxo documentado no
     // WORKORDER.md: DIAGNOSIS -> WAITING_APPROVAL -> (orçamento aprovado) -> IN_PROGRESS.
     private UUID createWorkOrderInProgress(BigDecimal unitPrice, int quantity) {
@@ -219,7 +278,7 @@ class WorkOrderControllerIT {
     class FullLifecycle {
 
         @Test
-        @DisplayName("deve percorrer OPEN -> DIAGNOSIS -> WAITING_APPROVAL -> APPROVED -> IN_PROGRESS -> COMPLETED -> DELIVERED")
+        @DisplayName("deve percorrer RECEIVED -> DIAGNOSIS -> WAITING_APPROVAL -> APPROVED -> IN_PROGRESS -> COMPLETED -> DELIVERED")
         void shouldCompleteFullLifecycle() {
             UUID customerId = seedCustomer();
             UUID vehicleId = seedVehicle();
@@ -228,7 +287,7 @@ class WorkOrderControllerIT {
             UUID workOrderId = createWorkOrder(customerId, vehicleId);
 
             WorkOrderResponseDto created = getWorkOrder(workOrderId);
-            assertEquals(WorkOrderStatus.OPEN, created.status());
+            assertEquals(WorkOrderStatus.RECEIVED, created.status());
             assertNotNull(created.openedAt());
             assertNull(created.closedAt());
 
@@ -322,10 +381,10 @@ class WorkOrderControllerIT {
     class Create {
 
         @Test
-        @DisplayName("deve criar a ordem com status OPEN")
+        @DisplayName("deve criar a ordem com status RECEIVED")
         void shouldCreateWorkOrder() {
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
-            assertEquals(WorkOrderStatus.OPEN, getWorkOrder(workOrderId).status());
+            assertEquals(WorkOrderStatus.RECEIVED, getWorkOrder(workOrderId).status());
         }
 
         @Test
@@ -400,7 +459,7 @@ class WorkOrderControllerIT {
         }
 
         @Test
-        @DisplayName("deve rejeitar pular etapas (OPEN -> APPROVED)")
+        @DisplayName("deve rejeitar pular etapas (RECEIVED -> APPROVED)")
         void shouldRejectSkippingStages() {
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
 
@@ -698,6 +757,152 @@ class WorkOrderControllerIT {
                     .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/close")
             .then()
                     .statusCode(400);
+        }
+    }
+
+    @Nested
+    @DisplayName("Orçamento (peças + serviços), rejeição e estoque")
+    class EstimateDecisionAndStock {
+
+        @Test
+        @DisplayName("deve somar peças e serviços no total do orçamento")
+        void shouldIncludeServicesInEstimateTotal() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            addService(workOrderId, "Mão de obra", new BigDecimal("100.00"));
+
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
+
+            assertEquals(0, new BigDecimal("50.00").compareTo(estimate.partsAmount()));
+            assertEquals(0, new BigDecimal("100.00").compareTo(estimate.laborAmount()));
+            assertEquals(0, new BigDecimal("150.00").compareTo(estimate.totalAmount()));
+        }
+
+        @Test
+        @DisplayName("deve mover a OS de diagnóstico para aguardando aprovação ao gerar o orçamento")
+        void shouldAutoAdvanceToWaitingApprovalOnEstimate() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+
+            createEstimate(workOrderId, partId, 1);
+
+            assertEquals(WorkOrderStatus.WAITING_APPROVAL, getWorkOrder(workOrderId).status());
+        }
+
+        @Test
+        @DisplayName("deve recusar o orçamento e retornar a OS para diagnóstico")
+        void shouldRejectEstimateAndReturnToDiagnosis() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
+
+            EstimateResponseDto rejected = rejectEstimate(workOrderId, estimate.estimateId());
+
+            assertEquals(EstimateStatus.REJECTED, rejected.status());
+            assertEquals(WorkOrderStatus.DIAGNOSIS, getWorkOrder(workOrderId).status());
+        }
+
+        @Test
+        @DisplayName("deve dar baixa no estoque ao aprovar e restaurar ao cancelar")
+        void shouldDecreaseStockOnApprovalAndRestoreOnCancel() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 3);
+
+            assertEquals(100, stockOf(partId));
+
+            approveEstimate(workOrderId, estimate.estimateId());
+            assertEquals(97, stockOf(partId));
+
+            updateStatus(workOrderId, WorkOrderStatus.CANCELLED);
+            assertEquals(100, stockOf(partId));
+        }
+
+        @Test
+        @DisplayName("deve retornar 422 ao aprovar com estoque insuficiente")
+        void shouldReturn422WhenInsufficientStock() {
+            Part part = new Part("Peça rara", "estoque baixo", new BigDecimal("50.00"), 1, "UN");
+            UUID partId = persistInTransaction(() -> partRepository.persist(part)).getId();
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 5);
+
+            given()
+            .when()
+                    .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/estimate/" + estimate.estimateId() + "/approve")
+            .then()
+                    .statusCode(422);
+
+            assertEquals(1, stockOf(partId));
+        }
+    }
+
+    @Nested
+    @DisplayName("Canal público do cliente — /v1/public/work-orders")
+    class PublicChannel {
+
+        private static final String PUBLIC_PATH = "/v1/public/work-orders";
+
+        @Test
+        @DisplayName("cliente deve acompanhar a OS e aprovar o orçamento")
+        void shouldTrackAndApproveAsClient() {
+            UUID partId = seedPart(new BigDecimal("80.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
+
+            WorkOrderResponseDto tracked = given()
+            .when()
+                    .get(PUBLIC_PATH + "/" + workOrderId)
+            .then()
+                    .statusCode(200)
+                    .extract().as(WorkOrderResponseDto.class);
+            assertEquals(WorkOrderStatus.WAITING_APPROVAL, tracked.status());
+
+            EstimateResponseDto approved = given()
+            .when()
+                    .patch(PUBLIC_PATH + "/" + workOrderId + "/estimate/" + estimate.estimateId() + "/approve")
+            .then()
+                    .statusCode(200)
+                    .extract().as(EstimateResponseDto.class);
+
+            assertEquals(EstimateStatus.APPROVED, approved.status());
+            assertEquals(WorkOrderStatus.APPROVED, getWorkOrder(workOrderId).status());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /v1/work-orders/metrics/average-execution-time — tempo médio de execução")
+    class Metrics {
+
+        @Test
+        @DisplayName("deve retornar o tempo médio de execução após finalizar uma OS")
+        void shouldReturnAverageExecutionTime() {
+            UUID workOrderId = createWorkOrderInProgress(new BigDecimal("100.00"), 1);
+            given()
+                    .contentType("application/json")
+                    .body("{}")
+            .when()
+                    .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/close")
+            .then()
+                    .statusCode(200);
+
+            WorkOrderMetricsResponseDto metrics = given()
+            .when()
+                    .get(WORK_ORDERS_PATH + "/metrics/average-execution-time")
+            .then()
+                    .statusCode(200)
+                    .extract().as(WorkOrderMetricsResponseDto.class);
+
+            assertTrue(metrics.completedWorkOrders() >= 1);
+            assertNotNull(metrics.averageExecutionMinutes());
         }
     }
 }

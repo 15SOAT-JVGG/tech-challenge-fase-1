@@ -3,6 +3,7 @@ package br.com.fiap.postech.soat16.fase1.service;
 import static java.lang.Boolean.FALSE;
 
 import java.util.List;
+import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -34,7 +35,7 @@ public class PartService {
     }
 
     @WithSession
-    public Uni<PartResponseDto> findById(Long id) {
+    public Uni<PartResponseDto> findById(UUID id) {
         return partRepository.findById(id)
             .onItem().ifNull().failWith(() -> new ResourceNotFoundException(PECA_INSUMO, id))
             .map(PartResponseDto::from);
@@ -54,7 +55,7 @@ public class PartService {
     }
 
     @WithTransaction
-    public Uni<PartResponseDto> update(Long id, PartRequestDto dto) {
+    public Uni<PartResponseDto> update(UUID id, PartRequestDto dto) {
         return partRepository.findById(id)
             .onItem().ifNull().failWith(() -> new ResourceNotFoundException(PECA_INSUMO, id))
             .flatMap(part -> {
@@ -66,7 +67,7 @@ public class PartService {
     }
 
     @WithTransaction
-    public Uni<PartResponseDto> adjustStock(Long id, int adjustment) {
+    public Uni<PartResponseDto> adjustStock(UUID id, int adjustment) {
         return partRepository.findById(id)
             .onItem().ifNull().failWith(() -> new ResourceNotFoundException(PECA_INSUMO, id))
             .flatMap(part -> {
@@ -81,7 +82,7 @@ public class PartService {
     }
 
     @WithTransaction
-    public Uni<Void> delete(Long id) {
+    public Uni<Void> delete(UUID id) {
         return partRepository.deleteById(id)
             .flatMap(deleted -> {
                 if (FALSE.equals(deleted)) {

@@ -16,7 +16,14 @@ public record EstimateResponseDto(
     UUID estimateId,
     UUID workOrderId,
     EstimateStatus status,
+    BigDecimal partsAmount,
+    BigDecimal laborAmount,
     BigDecimal totalAmount,
     LocalDateTime approvedAt,
+    LocalDateTime sentAt,
     List<EstimateItemResponseDto> items
-) { }
+) {
+    public EstimateResponseDto {
+        items = items == null ? List.of() : List.copyOf(items);
+    }
+}

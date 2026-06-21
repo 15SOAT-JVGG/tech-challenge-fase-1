@@ -86,7 +86,7 @@ jobs:
       fetch_depth: 0
       coverage_artifact: ${{ inputs.skip_tests == true && '' || 'coverage-xml' }}
       coverage_path: target/jacoco-report
-      sonar_enabled: true
+      sonar_enabled: false
       sonar_project_key: ${{ github.event.repository.name }}
       wait_quality_gate: true
       tailscale_tags: tag:github-actions-homelab

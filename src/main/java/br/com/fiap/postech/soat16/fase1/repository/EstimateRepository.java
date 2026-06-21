@@ -15,11 +15,17 @@ import io.smallrye.mutiny.Uni;
 public class EstimateRepository implements PanacheRepository<Estimate> {
 
     public Uni<Estimate> findByEstimateIdAndWorkOrderId(UUID estimateId, UUID workOrderId) {
-        return find("FROM Estimate e LEFT JOIN FETCH e.items WHERE e.id = ?1 AND e.workOrder.id = ?2",
-                        estimateId, workOrderId)
+        return find("FROM Estimate e LEFT JOIN FETCH e.items i LEFT JOIN FETCH i.part "
+                        + "WHERE e.id = ?1 AND e.workOrder.id = ?2", estimateId, workOrderId)
                 .firstResult()
                 .invoke(found -> Log.infof("Estimate lookup: id=%s workOrderId=%s found=%b",
                         estimateId, workOrderId, found != null));
+    }
+
+    public Uni<Estimate> findApprovedByWorkOrderId(UUID workOrderId) {
+        return find("FROM Estimate e LEFT JOIN FETCH e.items i LEFT JOIN FETCH i.part "
+                        + "WHERE e.workOrder.id = ?1 AND e.status = ?2", workOrderId, EstimateStatus.APPROVED)
+                .firstResult();
     }
 
     public Uni<Boolean> existsApprovedByWorkOrderId(UUID workOrderId) {

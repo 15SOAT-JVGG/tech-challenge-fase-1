@@ -39,7 +39,7 @@ public interface WorkOrderMapper {
         entity.setVehicle(vehicle);
         entity.setDescription(request.description());
         entity.setPriority(request.priority() != null ? request.priority() : WorkOrderPriority.MEDIUM);
-        entity.setStatus(WorkOrderStatus.OPEN);
+        entity.setStatus(WorkOrderStatus.RECEIVED);
         entity.setOpenedAt(LocalDateTime.now());
         return entity;
     }

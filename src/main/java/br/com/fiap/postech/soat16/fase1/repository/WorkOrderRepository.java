@@ -30,4 +30,8 @@ public class WorkOrderRepository implements PanacheRepository<WorkOrder> {
         return find("id = ?1", id).firstResult()
                 .invoke(found -> Log.infof("WorkOrder lookup: id=%s found=%b", id, found != null));
     }
+
+    public Uni<List<WorkOrder>> findClosed() {
+        return list("openedAt is not null and closedAt is not null");
+    }
 }

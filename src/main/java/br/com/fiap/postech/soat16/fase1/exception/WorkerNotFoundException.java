@@ -1,7 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.exception;
 
-import static br.com.fiap.postech.soat16.fase1.exception.WorkerErrorCode.WORKER_NOT_FOUND;
 import static br.com.fiap.postech.soat16.fase1.exception.ErrorType.NOT_FOUND;
+import static br.com.fiap.postech.soat16.fase1.exception.WorkerErrorCode.WORKER_NOT_FOUND;
 
 import java.util.UUID;
 

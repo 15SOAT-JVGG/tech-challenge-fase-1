@@ -31,6 +31,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderStatusUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.EstimateNotApprovedException;
@@ -60,7 +61,7 @@ class WorkOrderControllerTest {
     void setUp() {
         controller = new WorkOrderController(service);
         response = new WorkOrderResponseDto(FIXED_UUID, UUID.randomUUID(), UUID.randomUUID(), "desc",
-                WorkOrderPriority.MEDIUM, WorkOrderStatus.OPEN, null, null, null, null);
+                WorkOrderPriority.MEDIUM, WorkOrderStatus.RECEIVED, null, null, null, null);
     }
 
     @Nested
@@ -108,6 +109,24 @@ class WorkOrderControllerTest {
 
             assertThrows(WorkOrderNotFoundException.class,
                     () -> controller.findById(FIXED_UUID).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /v1/work-orders/metrics/average-execution-time — averageExecutionTime")
+    class AverageExecutionTime {
+
+        @Test
+        @DisplayName("should return the average execution metrics")
+        void shouldReturnMetrics() {
+            WorkOrderMetricsResponseDto metrics = new WorkOrderMetricsResponseDto(3, 45.5);
+            when(service.averageExecutionTime()).thenReturn(Uni.createFrom().item(metrics));
+
+            WorkOrderMetricsResponseDto result = controller.averageExecutionTime().await().indefinitely();
+
+            assertEquals(3, result.completedWorkOrders());
+            assertEquals(45.5, result.averageExecutionMinutes());
+            verify(service).averageExecutionTime();
         }
     }
 
@@ -166,7 +185,8 @@ class WorkOrderControllerTest {
             EstimateRequestDto dto = new EstimateRequestDto(
                     List.of(new EstimateItemRequestDto(UUID.randomUUID(), 1, BigDecimal.TEN)));
             EstimateResponseDto estimateResponse = new EstimateResponseDto(
-                    UUID.randomUUID(), FIXED_UUID, EstimateStatus.PENDING, BigDecimal.TEN, null, List.of());
+                    UUID.randomUUID(), FIXED_UUID, EstimateStatus.PENDING, BigDecimal.TEN, BigDecimal.ZERO,
+                    BigDecimal.TEN, null, null, List.of());
 
             when(service.createEstimate(FIXED_UUID, dto)).thenReturn(Uni.createFrom().item(estimateResponse));
 
@@ -187,7 +207,8 @@ class WorkOrderControllerTest {
         void shouldReturnApprovedEstimate() {
             UUID estimateId = UUID.randomUUID();
             EstimateResponseDto estimateResponse = new EstimateResponseDto(
-                    estimateId, FIXED_UUID, EstimateStatus.APPROVED, BigDecimal.TEN, null, List.of());
+                    estimateId, FIXED_UUID, EstimateStatus.APPROVED, BigDecimal.TEN, BigDecimal.ZERO,
+                    BigDecimal.TEN, null, null, List.of());
 
             when(service.approveEstimate(FIXED_UUID, estimateId)).thenReturn(Uni.createFrom().item(estimateResponse));
 
@@ -206,6 +227,27 @@ class WorkOrderControllerTest {
 
             assertThrows(EstimateNotApprovedException.class,
                     () -> controller.approveEstimate(FIXED_UUID, estimateId).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("PATCH /v1/work-orders/{id}/estimate/{estimateId}/reject — rejectEstimate")
+    class RejectEstimate {
+
+        @Test
+        @DisplayName("should return the rejected estimate")
+        void shouldReturnRejectedEstimate() {
+            UUID estimateId = UUID.randomUUID();
+            EstimateResponseDto estimateResponse = new EstimateResponseDto(
+                    estimateId, FIXED_UUID, EstimateStatus.REJECTED, BigDecimal.TEN, BigDecimal.ZERO,
+                    BigDecimal.TEN, null, null, List.of());
+
+            when(service.rejectEstimate(FIXED_UUID, estimateId)).thenReturn(Uni.createFrom().item(estimateResponse));
+
+            EstimateResponseDto result = controller.rejectEstimate(FIXED_UUID, estimateId).await().indefinitely();
+
+            assertEquals(EstimateStatus.REJECTED, result.status());
+            verify(service).rejectEstimate(FIXED_UUID, estimateId);
         }
     }
 
