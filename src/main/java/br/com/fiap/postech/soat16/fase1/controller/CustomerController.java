@@ -60,6 +60,7 @@ public class CustomerController implements CustomerControllerDocs {
     }
 
     @POST
+    @RolesAllowed("ADMIN")
     @Override
     public Uni<Response> create(@RequestBody @Valid CustomerRequestDto dto) {
         return service.create(dto)
@@ -68,6 +69,7 @@ public class CustomerController implements CustomerControllerDocs {
 
     @PUT
     @Path("/{id}")
+    @RolesAllowed("ADMIN")
     @Override
     public Uni<Response> update(@PathParam("id") UUID id,
                                 @RequestBody @Valid CustomerRequestDto dto) {

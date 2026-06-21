@@ -131,10 +131,10 @@ class WorkOrderServiceTest {
 
         entity = new WorkOrder();
         entity.setId(WORK_ORDER_ID);
-        entity.setStatus(WorkOrderStatus.OPEN);
+        entity.setStatus(WorkOrderStatus.RECEIVED);
 
         response = new WorkOrderResponseDto(WORK_ORDER_ID, CUSTOMER_ID, VEHICLE_ID, "desc", null,
-                WorkOrderStatus.OPEN, null, null, null, null);
+                WorkOrderStatus.RECEIVED, null, null, null, null);
     }
 
     @Nested
@@ -234,7 +234,7 @@ class WorkOrderServiceTest {
         @Test
         @DisplayName("should move to the next status and record history")
         void shouldMoveToNextStatusAndRecordHistory() {
-            entity.setStatus(WorkOrderStatus.OPEN);
+            entity.setStatus(WorkOrderStatus.RECEIVED);
             WorkOrderStatusUpdateRequestDto request = new WorkOrderStatusUpdateRequestDto(WorkOrderStatus.DIAGNOSIS);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
@@ -263,7 +263,7 @@ class WorkOrderServiceTest {
         @Test
         @DisplayName("should reject skipping stages")
         void shouldRejectSkippingStages() {
-            entity.setStatus(WorkOrderStatus.OPEN);
+            entity.setStatus(WorkOrderStatus.RECEIVED);
             WorkOrderStatusUpdateRequestDto request = new WorkOrderStatusUpdateRequestDto(WorkOrderStatus.APPROVED);
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
 

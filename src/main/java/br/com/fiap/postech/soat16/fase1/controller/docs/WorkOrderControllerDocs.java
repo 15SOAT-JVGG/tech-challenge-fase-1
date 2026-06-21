@@ -74,7 +74,7 @@ public interface WorkOrderControllerDocs {
 
     @POST
     @Operation(summary = "Open work order",
-            description = "Creates a new work order. Initial status is OPEN, default priority is MEDIUM, "
+            description = "Creates a new work order. Initial status is RECEIVED, default priority is MEDIUM, "
                     + "openedAt is set automatically.")
     @APIResponse(responseCode = "201", description = "Work order created successfully")
     @APIResponse(responseCode = "400", description = "Invalid request body")

@@ -58,7 +58,7 @@ import lombok.RequiredArgsConstructor;
 public class WorkOrderService {
 
     private static final Map<WorkOrderStatus, WorkOrderStatus> FORWARD_TRANSITIONS = Map.of(
-            WorkOrderStatus.OPEN, WorkOrderStatus.DIAGNOSIS,
+            WorkOrderStatus.RECEIVED, WorkOrderStatus.DIAGNOSIS,
             WorkOrderStatus.DIAGNOSIS, WorkOrderStatus.WAITING_APPROVAL,
             WorkOrderStatus.WAITING_APPROVAL, WorkOrderStatus.APPROVED,
             WorkOrderStatus.APPROVED, WorkOrderStatus.IN_PROGRESS
