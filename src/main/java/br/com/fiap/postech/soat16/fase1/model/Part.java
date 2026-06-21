@@ -22,6 +22,7 @@ import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "parts")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 public class Part {
 
     @EqualsAndHashCode.Include

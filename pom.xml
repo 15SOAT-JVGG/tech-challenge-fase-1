@@ -357,8 +357,6 @@
                 <configuration>
                     <excludes>
                         <exclude>br/com/fiap/postech/soat16/fase1/config/**</exclude>
-                        <exclude>br/com/fiap/postech/soat16/fase1/model/**</exclude>
-                        <exclude>br/com/fiap/postech/soat16/fase1/repository/**</exclude>
                         <exclude>**/*MapperImpl*</exclude>
                     </excludes>
                 </configuration>
