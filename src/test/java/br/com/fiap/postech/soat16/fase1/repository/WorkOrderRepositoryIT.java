@@ -100,8 +100,8 @@ class WorkOrderRepositoryIT {
         @Test
         @DisplayName("orders results by priority (URGENT first, LOW last)")
         void ordersByPriorityUrgentFirst() {
-            seed(WorkOrderPriority.LOW, WorkOrderStatus.OPEN, null);
-            WorkOrder urgent = seed(WorkOrderPriority.URGENT, WorkOrderStatus.OPEN, null);
+            seed(WorkOrderPriority.LOW, WorkOrderStatus.RECEIVED, null);
+            WorkOrder urgent = seed(WorkOrderPriority.URGENT, WorkOrderStatus.RECEIVED, null);
 
             List<WorkOrder> page = inTransaction(() -> repository.findPage(0, 100));
 
@@ -128,7 +128,7 @@ class WorkOrderRepositoryIT {
         @Test
         @DisplayName("finds a persisted work order by id")
         void findsById() {
-            WorkOrder workOrder = seed(WorkOrderPriority.MEDIUM, WorkOrderStatus.OPEN, null);
+            WorkOrder workOrder = seed(WorkOrderPriority.MEDIUM, WorkOrderStatus.RECEIVED, null);
 
             WorkOrder found = inTransaction(() -> repository.findByWorkOrderId(workOrder.getId()));
 
@@ -150,7 +150,7 @@ class WorkOrderRepositoryIT {
         @DisplayName("includes only work orders with both openedAt and closedAt set")
         void includesOnlyClosedWorkOrders() {
             WorkOrder closed = seed(WorkOrderPriority.MEDIUM, WorkOrderStatus.DELIVERED, LocalDateTime.now());
-            seed(WorkOrderPriority.MEDIUM, WorkOrderStatus.OPEN, null);
+            seed(WorkOrderPriority.MEDIUM, WorkOrderStatus.RECEIVED, null);
 
             List<WorkOrder> result = inTransaction(() -> repository.findClosed());
 

@@ -35,7 +35,7 @@ class WorkOrderTest {
         @DisplayName("work orders with the same id are equal regardless of other fields")
         void equalByIdRegardlessOfOtherFields() {
             UUID id = UUID.randomUUID();
-            WorkOrder open = workOrder(id, WorkOrderStatus.OPEN);
+            WorkOrder open = workOrder(id, WorkOrderStatus.RECEIVED);
             WorkOrder completed = workOrder(id, WorkOrderStatus.COMPLETED);
 
             assertEquals(open, completed);
@@ -45,8 +45,8 @@ class WorkOrderTest {
         @Test
         @DisplayName("work orders with different ids are not equal")
         void notEqualWhenIdsDiffer() {
-            WorkOrder a = workOrder(UUID.randomUUID(), WorkOrderStatus.OPEN);
-            WorkOrder b = workOrder(UUID.randomUUID(), WorkOrderStatus.OPEN);
+            WorkOrder a = workOrder(UUID.randomUUID(), WorkOrderStatus.RECEIVED);
+            WorkOrder b = workOrder(UUID.randomUUID(), WorkOrderStatus.RECEIVED);
 
             assertNotEquals(a, b);
         }
@@ -54,7 +54,7 @@ class WorkOrderTest {
         @Test
         @DisplayName("a work order is not equal to null or to an unrelated type")
         void notEqualToNullOrUnrelatedType() {
-            WorkOrder a = workOrder(UUID.randomUUID(), WorkOrderStatus.OPEN);
+            WorkOrder a = workOrder(UUID.randomUUID(), WorkOrderStatus.RECEIVED);
 
             assertNotEquals(null, a);
             assertNotEquals("not-a-work-order", a);
