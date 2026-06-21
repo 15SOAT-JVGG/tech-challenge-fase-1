@@ -168,6 +168,18 @@ class WorkerServiceTest {
 
             assertThrows(DuplicateWorkerEmailException.class, () -> service.update(FIXED_UUID, request));
         }
+
+        @Test
+        @DisplayName("should throw WorkerNotFoundException when worker is missing")
+        void shouldThrowNotFoundWhenMissing() {
+            WorkerRequestDto request = new WorkerRequestDto(
+                    "Maria", "Souza", "maria@example.com", "5511888888888", "1234", WorkerProfile.MECHANIC);
+
+            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Optional.empty());
+
+            assertThrows(WorkerNotFoundException.class, () -> service.update(FIXED_UUID, request));
+            verify(repository, never()).persist(any(Worker.class));
+        }
     }
 
     @Nested

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
@@ -301,6 +302,16 @@ class CustomerServiceTest {
                     () -> service.findByDocument("abc").await().indefinitely());
 
             verifyNoInteractions(repository);
+        }
+
+        @Test
+        @DisplayName("findByDocument_withUnknownDocument_throwsCustomerNotFoundException — includes the raw document in the message")
+        void findByDocument_withUnknownDocument_throwsCustomerNotFoundException() {
+            when(repository.findByDocument(VALID_CPF_DIGITS)).thenReturn(Uni.createFrom().nullItem());
+
+            CustomerNotFoundException ex = assertThrows(CustomerNotFoundException.class,
+                    () -> service.findByDocument(VALID_CPF_MASKED).await().indefinitely());
+            assertTrue(ex.getMessage().contains(VALID_CPF_MASKED));
         }
     }
 }
