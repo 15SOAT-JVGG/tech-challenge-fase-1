@@ -1,0 +1,74 @@
+# Ambiente completo da Oficina Mecânica (aplicação + PostgreSQL).
+#
+# Subir tudo com UM único comando, sem nenhuma configuração prévia:
+#
+#     docker compose up
+#
+# A imagem da aplicação é construída a partir do código-fonte (build multistage,
+# dentro do próprio Docker) — não é necessário instalar Java/Maven nem rodar
+# `mvnw package` antes. Todos os valores já vêm preenchidos; o arquivo .env é
+# OPCIONAL e serve apenas para sobrescrever os defaults abaixo.
+#
+# Após subir:
+#   - API .............. http://localhost:8080
+#   - Swagger UI ....... http://localhost:8090/q/swagger-ui
+#   - Login ............ admin / admin123   (POST /v1/auth/login)
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: oficina-mecanica-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USERNAME:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      POSTGRES_DB: ${POSTGRES_DB:-oficina}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USERNAME:-admin} -d ${POSTGRES_DB:-oficina}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - oficina_mecanica_net
+
+  app:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    image: fiap-srv-oficina-mecanica:local
+    container_name: srv-oficina-mecanica
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+      - "8090:8090"
+    environment:
+      # Conexão com o banco (host = nome do serviço/container na rede do Compose)
+      INFRA_HOST_POSTGRES: oficina-mecanica-postgres
+      POSTGRES_DB: ${POSTGRES_DB:-oficina}
+      POSTGRES_USERNAME: ${POSTGRES_USERNAME:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      # Usuários iniciais (seed) — credenciais conhecidas para gerar o token JWT
+      APP_SEED_ADMIN_USERNAME: ${APP_SEED_ADMIN_USERNAME:-admin}
+      APP_SEED_ADMIN_PASSWORD: ${APP_SEED_ADMIN_PASSWORD:-admin123}
+      APP_SEED_MECHANIC_USERNAME: ${APP_SEED_MECHANIC_USERNAME:-mecanico}
+      APP_SEED_MECHANIC_PASSWORD: ${APP_SEED_MECHANIC_PASSWORD:-mecanico123}
+      # Chaves JWT efêmeras geradas no build da imagem (uso local/demo).
+      JWT_PRIVATE_KEY_LOCATION: ${JWT_PRIVATE_KEY_LOCATION:-file:/deployments/jwt-local/privateKey.pem}
+      JWT_PUBLIC_KEY_LOCATION: ${JWT_PUBLIC_KEY_LOCATION:-file:/deployments/jwt-local/publicKey.pem}
+    networks:
+      - oficina_mecanica_net
+
+networks:
+  oficina_mecanica_net:
+    driver: bridge
+
+volumes:
+  postgres_data:

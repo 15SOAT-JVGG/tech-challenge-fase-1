@@ -61,7 +61,7 @@ class WorkOrderControllerTest {
     void setUp() {
         controller = new WorkOrderController(service);
         response = new WorkOrderResponseDto(FIXED_UUID, UUID.randomUUID(), UUID.randomUUID(), "desc",
-                WorkOrderPriority.MEDIUM, WorkOrderStatus.OPEN, null, null, null, null);
+                WorkOrderPriority.MEDIUM, WorkOrderStatus.RECEIVED, null, null, null, null);
     }
 
     @Nested

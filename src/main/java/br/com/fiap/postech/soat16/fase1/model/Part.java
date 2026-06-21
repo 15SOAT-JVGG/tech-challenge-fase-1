@@ -21,7 +21,7 @@ import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
 import lombok.EqualsAndHashCode;
 
 @Entity
-@Table(name = "parts")
+@Table(name = "parts", schema = "oficina_mecanica")
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 public class Part {
 

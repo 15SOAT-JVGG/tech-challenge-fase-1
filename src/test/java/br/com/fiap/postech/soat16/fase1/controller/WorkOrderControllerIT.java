@@ -278,7 +278,7 @@ class WorkOrderControllerIT {
     class FullLifecycle {
 
         @Test
-        @DisplayName("deve percorrer OPEN -> DIAGNOSIS -> WAITING_APPROVAL -> APPROVED -> IN_PROGRESS -> COMPLETED -> DELIVERED")
+        @DisplayName("deve percorrer RECEIVED -> DIAGNOSIS -> WAITING_APPROVAL -> APPROVED -> IN_PROGRESS -> COMPLETED -> DELIVERED")
         void shouldCompleteFullLifecycle() {
             UUID customerId = seedCustomer();
             UUID vehicleId = seedVehicle();
@@ -287,7 +287,7 @@ class WorkOrderControllerIT {
             UUID workOrderId = createWorkOrder(customerId, vehicleId);
 
             WorkOrderResponseDto created = getWorkOrder(workOrderId);
-            assertEquals(WorkOrderStatus.OPEN, created.status());
+            assertEquals(WorkOrderStatus.RECEIVED, created.status());
             assertNotNull(created.openedAt());
             assertNull(created.closedAt());
 
@@ -381,10 +381,10 @@ class WorkOrderControllerIT {
     class Create {
 
         @Test
-        @DisplayName("deve criar a ordem com status OPEN")
+        @DisplayName("deve criar a ordem com status RECEIVED")
         void shouldCreateWorkOrder() {
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
-            assertEquals(WorkOrderStatus.OPEN, getWorkOrder(workOrderId).status());
+            assertEquals(WorkOrderStatus.RECEIVED, getWorkOrder(workOrderId).status());
         }
 
         @Test
@@ -459,7 +459,7 @@ class WorkOrderControllerIT {
         }
 
         @Test
-        @DisplayName("deve rejeitar pular etapas (OPEN -> APPROVED)")
+        @DisplayName("deve rejeitar pular etapas (RECEIVED -> APPROVED)")
         void shouldRejectSkippingStages() {
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
 

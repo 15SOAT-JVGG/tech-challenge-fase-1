@@ -43,7 +43,7 @@ class WorkOrderMapperTest {
             entity.setVehicle(vehicle);
             entity.setDescription("Troca de pastilhas de freio");
             entity.setPriority(WorkOrderPriority.HIGH);
-            entity.setStatus(WorkOrderStatus.OPEN);
+            entity.setStatus(WorkOrderStatus.RECEIVED);
 
             WorkOrderResponseDto result = mapper.toResponse(entity);
 
@@ -53,7 +53,7 @@ class WorkOrderMapperTest {
             assertEquals(vehicleId, result.vehicleId());
             assertEquals("Troca de pastilhas de freio", result.description());
             assertEquals(WorkOrderPriority.HIGH, result.priority());
-            assertEquals(WorkOrderStatus.OPEN, result.status());
+            assertEquals(WorkOrderStatus.RECEIVED, result.status());
         }
     }
 
@@ -62,7 +62,7 @@ class WorkOrderMapperTest {
     class ToEntity {
 
         @Test
-        @DisplayName("should apply default priority, OPEN status and openedAt when priority is missing")
+        @DisplayName("should apply default priority, RECEIVED status and openedAt when priority is missing")
         void shouldApplyDefaultsWhenPriorityMissing() {
             WorkOrderRequestDto request = new WorkOrderRequestDto(
                     UUID.randomUUID(), UUID.randomUUID(), "Revisao geral", null);
@@ -74,7 +74,7 @@ class WorkOrderMapperTest {
             assertNotNull(result);
             assertEquals("Revisao geral", result.getDescription());
             assertEquals(WorkOrderPriority.MEDIUM, result.getPriority());
-            assertEquals(WorkOrderStatus.OPEN, result.getStatus());
+            assertEquals(WorkOrderStatus.RECEIVED, result.getStatus());
             assertEquals(customer, result.getCustomer());
             assertEquals(vehicle, result.getVehicle());
             assertNotNull(result.getOpenedAt());

@@ -5,12 +5,12 @@
 | Pasta | Cobertura |
 |---|---|
 | 00 - Auth | Login ADMIN/MECHANIC, credenciais inválidas |
-| 01 - Customers | CRUD completo, RBAC (delete só ADMIN), validação, documento duplicado/inválido |
-| 02 - Vehicles | CRUD completo, filtro por fabricante, placa inválida, cliente inexistente |
+| 01 - Customers | CRUD com **escrita só ADMIN** (MECHANIC apenas lê); RBAC (create/delete por MECHANIC → 403), validação, documento duplicado/inválido |
+| 02 - Vehicles | CRUD com **escrita só ADMIN** (MECHANIC apenas lê); filtro por fabricante, placa inválida, cliente inexistente, RBAC (create/delete por MECHANIC → 403) |
 | 03 - Workers | CRUD (ADMIN-only), login de worker (não gera JWT — só valida credenciais) |
 | 04 - Parts and Supplies | CRUD, ajuste de estoque, low-stock, RBAC (mutação só ADMIN) |
 | 05 - Service Catalog | CRUD, RBAC (mutação só ADMIN) |
-| 06 - Work Orders - Happy Path | Ciclo completo: OPEN → DIAGNOSIS → orçamento → aprovação → IN_PROGRESS → fechamento → DELIVERED, métricas |
+| 06 - Work Orders - Happy Path | Ciclo completo: RECEIVED → DIAGNOSIS → orçamento → aprovação → IN_PROGRESS → fechamento → DELIVERED, métricas |
 | 07 - Work Orders - Rejection and Public Channel | Rejeição de orçamento, novo orçamento, aprovação via canal público (sem auth) |
 | 08 - Work Orders - Cancellation and Locking | Cancelamento e bloqueio de OS cancelada |
 | 09 - Cross-cutting Security | 401 sem token, 404 para recurso inexistente |

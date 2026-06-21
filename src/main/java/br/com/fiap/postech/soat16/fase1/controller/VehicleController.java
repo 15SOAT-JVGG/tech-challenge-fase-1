@@ -57,6 +57,7 @@ public class VehicleController implements VehicleControllerDocs {
     }
 
     @POST
+    @RolesAllowed("ADMIN")
     @Override
     public Uni<Response> create(@RequestBody @Valid VehicleRequestDto dto) {
         return vehicleService.create(dto)
@@ -65,6 +66,7 @@ public class VehicleController implements VehicleControllerDocs {
 
     @PUT
     @Path("/{id}")
+    @RolesAllowed("ADMIN")
     @Override
     public Uni<Response> update(@PathParam("id") UUID id,
                                 @RequestBody @Valid VehicleRequestDto dto) {

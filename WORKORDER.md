@@ -21,19 +21,19 @@ veículo. Para detalhes de autenticação, portas e como rodar o projeto, veja o
 ## Máquina de estados (`status`)
 
 ```
-OPEN ──► DIAGNOSIS ──► WAITING_APPROVAL ──► APPROVED ──► IN_PROGRESS ──► COMPLETED ──► DELIVERED
+RECEIVED ──► DIAGNOSIS ──► WAITING_APPROVAL ──► APPROVED ──► IN_PROGRESS ──► COMPLETED ──► DELIVERED
   │            │               │               │              │
   └────────────┴───────────────┴───────────────┴──────────────┴──────────────► CANCELLED
 ```
 
-- **OPEN** é o status inicial — definido automaticamente na criação, junto com `openedAt`.
+- **RECEIVED** é o status inicial — definido automaticamente na criação, junto com `openedAt`.
 - **COMPLETED** só é alcançado pelo endpoint dedicado `PATCH /{id}/close` (não pelo `PATCH /{id}/status`).
 - **DELIVERED** só pode ser definido a partir de `COMPLETED`, via `PATCH /{id}/status`.
-- **CANCELLED** pode ser definido a partir de qualquer status não terminal (`OPEN`, `DIAGNOSIS`,
+- **CANCELLED** pode ser definido a partir de qualquer status não terminal (`RECEIVED`, `DIAGNOSIS`,
   `WAITING_APPROVAL`, `APPROVED`, `IN_PROGRESS` ou `COMPLETED`).
 - **DELIVERED** e **CANCELLED** são terminais: qualquer tentativa de alterar a ordem depois disso
   retorna erro (`WorkOrderLockedException`, HTTP 422).
-- Não é permitido **pular etapas** via `PATCH /status` (ex.: ir de `OPEN` direto para `APPROVED`).
+- Não é permitido **pular etapas** via `PATCH /status` (ex.: ir de `RECEIVED` direto para `APPROVED`).
 - Toda mudança de status (pelo `PATCH /status`, pelo `/close`, ou implicitamente ao aprovar um
   orçamento) gera um registro em `WorkOrderHistory` com status anterior, novo status e data/hora.
 
@@ -94,7 +94,7 @@ curl -s -X POST http://localhost:8080/v1/work-orders \
       }'
 ```
 
-A ordem é criada com `status = OPEN`, `openedAt` preenchido automaticamente. `priority` é opcional —
+A ordem é criada com `status = RECEIVED`, `openedAt` preenchido automaticamente. `priority` é opcional —
 se omitido, assume `MEDIUM`.
 
 ### 2. Avançar para diagnóstico
@@ -214,9 +214,9 @@ como `Classe.método`; todas vivem dentro de uma classe `@Nested` com o mesmo no
 
 | Regra de negócio | Integração (`WorkOrderControllerIT`) | Unitário (`WorkOrderServiceTest`) |
 |---|---|---|
-| Ordem nasce em `OPEN`, `openedAt` automático | `FullLifecycle.shouldCompleteFullLifecycle`, `Create.shouldCreateWorkOrder` | `Create.shouldPersistWorkOrder...` |
+| Ordem nasce em `RECEIVED`, `openedAt` automático | `FullLifecycle.shouldCompleteFullLifecycle`, `Create.shouldCreateWorkOrder` | `Create.shouldPersistWorkOrder...` |
 | Cliente/veículo inexistente ao criar → 404 | `Create.shouldReturn404WhenCustomerNotFound` / `...VehicleNotFound` | `Create.shouldThrow...NotFoundException` |
-| Não é permitido pular etapas (ex.: `OPEN` → `APPROVED` direto) | `UpdateStatus.shouldRejectSkippingStages` | `UpdateStatus.shouldRejectSkippingStages` |
+| Não é permitido pular etapas (ex.: `RECEIVED` → `APPROVED` direto) | `UpdateStatus.shouldRejectSkippingStages` | `UpdateStatus.shouldRejectSkippingStages` |
 | `COMPLETED` só via `/close`, nunca pelo `/status` | `UpdateStatus.shouldRejectCompletedViaGenericEndpoint` | `UpdateStatus.shouldRejectJumpingDirectlyToCompleted` |
 | `CANCELLED` a partir de qualquer status não terminal | `FullLifecycle.shouldCancelFromNonTerminalStatus` | `UpdateStatus.shouldAllowCancelledFromAnyNonTerminalStatus` |
 | `DELIVERED`/`CANCELLED` bloqueiam qualquer alteração posterior (`WORK_ORDER_LOCKED`) | `FullLifecycle.shouldLockWorkOrderAfterDelivered` | `UpdateStatus.shouldThrowWorkOrderLockedException...`, `CreateEstimate`/`AddService.shouldThrowWorkOrderLockedException...` |
