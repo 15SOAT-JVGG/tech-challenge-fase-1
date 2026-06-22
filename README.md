@@ -12,7 +12,6 @@ orçamentos**, além de um **canal público** para o cliente acompanhar e autori
 
 - [Funcionalidades](#funcionalidades)
 - [Tecnologias](#tecnologias)
-- [Por que PostgreSQL](#por-que-postgresql)
 - [Pré-requisitos](#pré-requisitos)
 - [Como rodar (passo a passo)](#como-rodar-passo-a-passo)
 - [Autenticação JWT](#autenticação-jwt)
@@ -53,24 +52,6 @@ orçamentos**, além de um **canal público** para o cliente acompanhar e autori
 | Observabilidade | OpenTelemetry + Micrometer/Prometheus |
 | Mapeamento | MapStruct |
 | Testes | JUnit 5, REST-assured, Testcontainers |
-
----
-
-## Por que PostgreSQL
-
-optamos por **PostgreSQL (relacional)** pelos seguintes motivos:
-
-- **Consistência forte e transações ACID** são requisito do domínio: a **baixa de estoque na
-  aprovação do orçamento** e a **restauração no cancelamento** precisam ser atômicas (ou tudo é
-  aplicado, ou nada) para não corromper o saldo de peças.
-- **Modelo fortemente relacional:** cliente → veículo → OS → (serviços, orçamento → itens → peças)
-  e histórico de status. Integridade referencial e *joins* são naturais em SQL.
-- **Invariantes e unicidade** (CPF/CNPJ e placa únicos) resolvidas com *constraints* no banco.
-- **Maturidade e custo:** open-source, amplamente adotado, com excelente suporte no ecossistema
-  Quarkus (driver reativo `reactive-pg-client` + JDBC para Flyway) e em Kubernetes.
-
-NoSQL não traria vantagem aqui: o volume de um MVP de oficina é moderado e os dados são
-relacionais e transacionais — um banco documental adicionaria complexidade de consistência sem ganho.
 
 ---
 
