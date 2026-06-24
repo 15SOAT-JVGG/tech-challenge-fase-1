@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkerRequestDto;
 import br.com.fiap.postech.soat16.fase1.model.Worker;
-import br.com.fiap.postech.soat16.fase1.model.WorkerProfile;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkerProfile;
 
 @DisplayName("WorkerMapper - Unit Tests")
 class WorkerMapperTest {

@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

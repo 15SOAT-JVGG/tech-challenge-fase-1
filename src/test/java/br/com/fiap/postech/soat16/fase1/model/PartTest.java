@@ -10,6 +10,7 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import br.com.fiap.postech.soat16.fase1.model.enums.PartType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

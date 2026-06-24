@@ -29,12 +29,12 @@ import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto
 import br.com.fiap.postech.soat16.fase1.dto.response.error.ApiErrorResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.ErrorType;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
-import br.com.fiap.postech.soat16.fase1.model.DocumentType;
-import br.com.fiap.postech.soat16.fase1.model.EstimateStatus;
+import br.com.fiap.postech.soat16.fase1.model.enums.DocumentType;
+import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.model.Part;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
-import br.com.fiap.postech.soat16.fase1.model.VehicleType;
-import br.com.fiap.postech.soat16.fase1.model.WorkOrderStatus;
+import br.com.fiap.postech.soat16.fase1.model.enums.VehicleType;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
 import br.com.fiap.postech.soat16.fase1.repository.PartRepository;
 import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;

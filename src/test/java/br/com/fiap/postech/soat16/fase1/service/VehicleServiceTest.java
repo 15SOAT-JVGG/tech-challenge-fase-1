@@ -33,7 +33,7 @@ import br.com.fiap.postech.soat16.fase1.exception.VehicleNotFoundException;
 import br.com.fiap.postech.soat16.fase1.mapper.VehicleMapper;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
-import br.com.fiap.postech.soat16.fase1.model.VehicleType;
+import br.com.fiap.postech.soat16.fase1.model.enums.VehicleType;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
 import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
 

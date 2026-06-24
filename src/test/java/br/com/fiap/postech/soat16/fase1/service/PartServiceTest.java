@@ -27,7 +27,7 @@ import br.com.fiap.postech.soat16.fase1.dto.response.PartResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
 import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
 import br.com.fiap.postech.soat16.fase1.model.Part;
-import br.com.fiap.postech.soat16.fase1.model.PartType;
+import br.com.fiap.postech.soat16.fase1.model.enums.PartType;
 import br.com.fiap.postech.soat16.fase1.repository.PartRepository;
 
 import io.smallrye.mutiny.Uni;

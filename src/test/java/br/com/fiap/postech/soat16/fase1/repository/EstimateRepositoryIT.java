@@ -17,16 +17,16 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import br.com.fiap.postech.soat16.fase1.model.Customer;
-import br.com.fiap.postech.soat16.fase1.model.DocumentType;
+import br.com.fiap.postech.soat16.fase1.model.enums.DocumentType;
 import br.com.fiap.postech.soat16.fase1.model.Estimate;
 import br.com.fiap.postech.soat16.fase1.model.EstimateItem;
-import br.com.fiap.postech.soat16.fase1.model.EstimateStatus;
+import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.model.Part;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
-import br.com.fiap.postech.soat16.fase1.model.VehicleType;
+import br.com.fiap.postech.soat16.fase1.model.enums.VehicleType;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrder;
-import br.com.fiap.postech.soat16.fase1.model.WorkOrderPriority;
-import br.com.fiap.postech.soat16.fase1.model.WorkOrderStatus;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 import br.com.fiap.postech.soat16.fase1.security.PostgresTestResource;
 
 import io.quarkus.hibernate.reactive.panache.Panache;

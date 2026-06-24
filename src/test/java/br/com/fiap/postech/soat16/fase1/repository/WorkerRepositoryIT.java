@@ -14,7 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import br.com.fiap.postech.soat16.fase1.model.Worker;
-import br.com.fiap.postech.soat16.fase1.model.WorkerProfile;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkerProfile;
 import br.com.fiap.postech.soat16.fase1.security.PostgresTestResource;
 
 import io.quarkus.test.TestTransaction;

@@ -3,6 +3,7 @@ package br.com.fiap.postech.soat16.fase1.model;
 import java.util.Objects;
 
 import br.com.fiap.postech.soat16.fase1.exception.InvalidDocumentException;
+import br.com.fiap.postech.soat16.fase1.model.enums.DocumentType;
 
 public final class Document {
 

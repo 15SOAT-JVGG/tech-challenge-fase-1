@@ -9,8 +9,8 @@ import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrder;
-import br.com.fiap.postech.soat16.fase1.model.WorkOrderPriority;
-import br.com.fiap.postech.soat16.fase1.model.WorkOrderStatus;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 
 @Mapper(componentModel = "cdi")
 public interface WorkOrderMapper {

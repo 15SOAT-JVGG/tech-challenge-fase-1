@@ -8,7 +8,7 @@ import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import br.com.fiap.postech.soat16.fase1.model.EstimateStatus;
+import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)

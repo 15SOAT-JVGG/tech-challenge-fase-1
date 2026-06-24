@@ -17,7 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import br.com.fiap.postech.soat16.fase1.model.VehicleType;
+import br.com.fiap.postech.soat16.fase1.model.enums.VehicleType;
 
 @DisplayName("VehicleRequestDto — Unit Tests")
 class VehicleRequestDtoTest {

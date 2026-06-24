@@ -5,7 +5,7 @@ import java.util.UUID;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.model.Estimate;
-import br.com.fiap.postech.soat16.fase1.model.EstimateStatus;
+import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 
 import io.quarkus.hibernate.reactive.panache.PanacheRepository;
 import io.quarkus.logging.Log;

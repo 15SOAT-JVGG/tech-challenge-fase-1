@@ -29,7 +29,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.VehicleRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.VehicleResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.DuplicateLicensePlateException;
 import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
-import br.com.fiap.postech.soat16.fase1.model.VehicleType;
+import br.com.fiap.postech.soat16.fase1.model.enums.VehicleType;
 import br.com.fiap.postech.soat16.fase1.service.VehicleService;
 
 import io.smallrye.mutiny.Uni;

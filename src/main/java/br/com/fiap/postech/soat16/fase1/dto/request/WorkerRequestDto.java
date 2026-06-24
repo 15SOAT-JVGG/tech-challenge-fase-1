@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-import br.com.fiap.postech.soat16.fase1.model.WorkerProfile;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkerProfile;
 
 public record WorkerRequestDto(
     @NotBlank(message = "firstName cannot be blank")

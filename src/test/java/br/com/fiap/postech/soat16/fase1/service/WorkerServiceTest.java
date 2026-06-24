@@ -31,7 +31,7 @@ import br.com.fiap.postech.soat16.fase1.exception.InvalidWorkerCredentialsExcept
 import br.com.fiap.postech.soat16.fase1.exception.WorkerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.mapper.WorkerMapper;
 import br.com.fiap.postech.soat16.fase1.model.Worker;
-import br.com.fiap.postech.soat16.fase1.model.WorkerProfile;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkerProfile;
 import br.com.fiap.postech.soat16.fase1.repository.WorkerRepository;
 
 @ExtendWith(MockitoExtension.class)

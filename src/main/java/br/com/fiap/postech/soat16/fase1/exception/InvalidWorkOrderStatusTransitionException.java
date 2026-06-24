@@ -3,7 +3,7 @@ package br.com.fiap.postech.soat16.fase1.exception;
 import static br.com.fiap.postech.soat16.fase1.exception.ErrorType.BUSINESS;
 import static br.com.fiap.postech.soat16.fase1.exception.WorkOrderErrorCode.INVALID_STATUS_TRANSITION;
 
-import br.com.fiap.postech.soat16.fase1.model.WorkOrderStatus;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 
 public class InvalidWorkOrderStatusTransitionException extends AppException {
 
