@@ -5,7 +5,7 @@ import java.util.UUID;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-import br.com.fiap.postech.soat16.fase1.model.WorkOrderPriority;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority;
 
 public record WorkOrderRequestDto(
     @NotNull(message = "customerId cannot be blank")

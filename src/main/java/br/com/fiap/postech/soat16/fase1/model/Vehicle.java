@@ -14,6 +14,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 
 import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+import br.com.fiap.postech.soat16.fase1.model.enums.VehicleType;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;

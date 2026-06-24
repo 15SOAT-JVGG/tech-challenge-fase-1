@@ -16,10 +16,10 @@ public class WorkOrderRepository implements PanacheRepository<WorkOrder> {
 
     private static final String ORDER_BY_PRIORITY =
             "ORDER BY CASE priority "
-            + "WHEN br.com.fiap.postech.soat16.fase1.model.WorkOrderPriority.URGENT THEN 0 "
-            + "WHEN br.com.fiap.postech.soat16.fase1.model.WorkOrderPriority.HIGH THEN 1 "
-            + "WHEN br.com.fiap.postech.soat16.fase1.model.WorkOrderPriority.MEDIUM THEN 2 "
-            + "WHEN br.com.fiap.postech.soat16.fase1.model.WorkOrderPriority.LOW THEN 3 "
+            + "WHEN br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority.URGENT THEN 0 "
+            + "WHEN br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority.HIGH THEN 1 "
+            + "WHEN br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority.MEDIUM THEN 2 "
+            + "WHEN br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority.LOW THEN 3 "
             + "ELSE 4 END, createdAt DESC";
 
     public Uni<List<WorkOrder>> findPage(int page, int size) {

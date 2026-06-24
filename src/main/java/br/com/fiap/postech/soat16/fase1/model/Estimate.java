@@ -20,6 +20,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;

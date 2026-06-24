@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
-import br.com.fiap.postech.soat16.fase1.model.VehicleType;
+import br.com.fiap.postech.soat16.fase1.model.enums.VehicleType;
 import br.com.fiap.postech.soat16.fase1.security.PostgresTestResource;
 
 import io.quarkus.hibernate.reactive.panache.Panache;

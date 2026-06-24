@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
+import br.com.fiap.postech.soat16.fase1.model.enums.PartType;
 
 @DisplayName("Part model — Unit Tests")
 class PartTest {
@@ -43,7 +44,7 @@ class PartTest {
             Part part = part();
 
             assertEquals(0, part.getMinimumStock());
-            assertEquals(PartType.PECA, part.getPartType());
+            assertEquals(PartType.PART, part.getPartType());
             assertEquals("Filtro de oleo", part.getName());
             assertEquals(new BigDecimal("35.00"), part.getUnitPrice());
             assertEquals(10, part.getStockQuantity());
@@ -56,16 +57,16 @@ class PartTest {
             Part part = new Part("Insumo", "desc", BigDecimal.TEN, 5, "UN", null, null);
 
             assertEquals(0, part.getMinimumStock());
-            assertEquals(PartType.PECA, part.getPartType());
+            assertEquals(PartType.PART, part.getPartType());
         }
 
         @Test
         @DisplayName("full constructor keeps explicit minimumStock/partType")
         void fullConstructorKeepsExplicitValues() {
-            Part part = new Part("Graxa", "desc", BigDecimal.ONE, 100, "L", 20, PartType.INSUMO);
+            Part part = new Part("Graxa", "desc", BigDecimal.ONE, 100, "L", 20, PartType.SUPPLY);
 
             assertEquals(20, part.getMinimumStock());
-            assertEquals(PartType.INSUMO, part.getPartType());
+            assertEquals(PartType.SUPPLY, part.getPartType());
         }
     }
 
@@ -78,7 +79,7 @@ class PartTest {
         void replacesAllFields() {
             Part part = part();
 
-            part.update("Novo nome", "Nova desc", new BigDecimal("99.90"), 50, "CX", 5, PartType.INSUMO);
+            part.update("Novo nome", "Nova desc", new BigDecimal("99.90"), 50, "CX", 5, PartType.SUPPLY);
 
             assertEquals("Novo nome", part.getName());
             assertEquals("Nova desc", part.getDescription());
@@ -86,7 +87,7 @@ class PartTest {
             assertEquals(50, part.getStockQuantity());
             assertEquals("CX", part.getUnit());
             assertEquals(5, part.getMinimumStock());
-            assertEquals(PartType.INSUMO, part.getPartType());
+            assertEquals(PartType.SUPPLY, part.getPartType());
         }
 
         @Test
@@ -97,7 +98,7 @@ class PartTest {
             part.update("Nome", "Desc", BigDecimal.ONE, 1, "UN", null, null);
 
             assertEquals(0, part.getMinimumStock());
-            assertEquals(PartType.PECA, part.getPartType());
+            assertEquals(PartType.PART, part.getPartType());
         }
     }
 
@@ -108,7 +109,7 @@ class PartTest {
         @Test
         @DisplayName("isLowStock is true when stock is at or below the minimum")
         void isLowStockTrueAtOrBelowMinimum() {
-            Part part = new Part("Item", "desc", BigDecimal.ONE, 5, "UN", 5, PartType.PECA);
+            Part part = new Part("Item", "desc", BigDecimal.ONE, 5, "UN", 5, PartType.PART);
 
             assertTrue(part.isLowStock());
         }
@@ -116,7 +117,7 @@ class PartTest {
         @Test
         @DisplayName("isLowStock is false when stock is above the minimum")
         void isLowStockFalseAboveMinimum() {
-            Part part = new Part("Item", "desc", BigDecimal.ONE, 10, "UN", 5, PartType.PECA);
+            Part part = new Part("Item", "desc", BigDecimal.ONE, 10, "UN", 5, PartType.PART);
 
             assertFalse(part.isLowStock());
         }

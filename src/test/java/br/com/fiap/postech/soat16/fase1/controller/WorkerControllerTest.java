@@ -26,7 +26,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.WorkerLoginRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkerLoginResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkerResponseDto;
-import br.com.fiap.postech.soat16.fase1.model.WorkerProfile;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkerProfile;
 import br.com.fiap.postech.soat16.fase1.service.WorkerService;
 
 @ExtendWith(MockitoExtension.class)

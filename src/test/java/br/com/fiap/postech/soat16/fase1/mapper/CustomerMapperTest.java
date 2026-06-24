@@ -15,7 +15,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.CustomerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.CustomerResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Document;
-import br.com.fiap.postech.soat16.fase1.model.DocumentType;
+import br.com.fiap.postech.soat16.fase1.model.enums.DocumentType;
 
 @DisplayName("CustomerMapper — Unit Tests")
 class CustomerMapperTest {

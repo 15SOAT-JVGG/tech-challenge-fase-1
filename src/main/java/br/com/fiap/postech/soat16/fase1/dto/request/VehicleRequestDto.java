@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
-import br.com.fiap.postech.soat16.fase1.model.VehicleType;
+import br.com.fiap.postech.soat16.fase1.model.enums.VehicleType;
 
 public record VehicleRequestDto(
     @NotNull(message = "customerId cannot be blank")

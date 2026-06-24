@@ -25,7 +25,7 @@ import br.com.fiap.postech.soat16.fase1.dto.request.PartRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.PartResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
 import br.com.fiap.postech.soat16.fase1.exception.ResourceNotFoundException;
-import br.com.fiap.postech.soat16.fase1.model.PartType;
+import br.com.fiap.postech.soat16.fase1.model.enums.PartType;
 import br.com.fiap.postech.soat16.fase1.service.PartService;
 
 import io.smallrye.mutiny.Uni;
@@ -49,11 +49,11 @@ class PartControllerTest {
     void setUp() {
         controller = new PartController(service);
         response = new PartResponseDto(FIXED_UUID, "Óleo 5W30", "Óleo sintético", new BigDecimal("49.90"),
-            10, "L", 5, PartType.INSUMO, false, LocalDateTime.now());
+            10, "L", 5, PartType.SUPPLY, false, LocalDateTime.now());
     }
 
     private PartRequestDto request() {
-        return new PartRequestDto("Óleo 5W30", "Óleo sintético", new BigDecimal("49.90"), 10, "L", 5, PartType.INSUMO);
+        return new PartRequestDto("Óleo 5W30", "Óleo sintético", new BigDecimal("49.90"), 10, "L", 5, PartType.SUPPLY);
     }
 
     @Nested

@@ -37,9 +37,9 @@ import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto
 import br.com.fiap.postech.soat16.fase1.exception.EstimateNotApprovedException;
 import br.com.fiap.postech.soat16.fase1.exception.WorkOrderLockedException;
 import br.com.fiap.postech.soat16.fase1.exception.WorkOrderNotFoundException;
-import br.com.fiap.postech.soat16.fase1.model.EstimateStatus;
-import br.com.fiap.postech.soat16.fase1.model.WorkOrderPriority;
-import br.com.fiap.postech.soat16.fase1.model.WorkOrderStatus;
+import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 import br.com.fiap.postech.soat16.fase1.service.WorkOrderService;
 
 import io.smallrye.mutiny.Uni;

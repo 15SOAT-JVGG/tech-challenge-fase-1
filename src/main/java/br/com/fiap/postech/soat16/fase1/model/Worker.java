@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkerProfile;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;

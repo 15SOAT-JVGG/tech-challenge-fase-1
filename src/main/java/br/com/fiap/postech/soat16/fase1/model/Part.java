@@ -17,6 +17,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
 import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
+import br.com.fiap.postech.soat16.fase1.model.enums.PartType;
 
 import lombok.EqualsAndHashCode;
 
@@ -51,7 +52,7 @@ public class Part {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "part_type", nullable = false, length = 10)
-    private PartType partType = PartType.PECA;
+    private PartType partType = PartType.PART;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -68,7 +69,7 @@ public class Part {
     }
 
     public Part(String name, String description, BigDecimal unitPrice, Integer stockQuantity, String unit) {
-        this(name, description, unitPrice, stockQuantity, unit, 0, PartType.PECA);
+        this(name, description, unitPrice, stockQuantity, unit, 0, PartType.PART);
     }
 
     public Part(String name, String description, BigDecimal unitPrice, Integer stockQuantity, String unit,
@@ -79,7 +80,7 @@ public class Part {
         this.stockQuantity = stockQuantity;
         this.unit = unit;
         this.minimumStock = minimumStock != null ? minimumStock : 0;
-        this.partType = partType != null ? partType : PartType.PECA;
+        this.partType = partType != null ? partType : PartType.PART;
     }
 
     @PrePersist
@@ -101,7 +102,7 @@ public class Part {
         this.stockQuantity = stockQuantity;
         this.unit = unit;
         this.minimumStock = minimumStock != null ? minimumStock : 0;
-        this.partType = partType != null ? partType : PartType.PECA;
+        this.partType = partType != null ? partType : PartType.PART;
     }
 
     /**

@@ -34,7 +34,7 @@ import br.com.fiap.postech.soat16.fase1.exception.InvalidDocumentException;
 import br.com.fiap.postech.soat16.fase1.mapper.CustomerMapper;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Document;
-import br.com.fiap.postech.soat16.fase1.model.DocumentType;
+import br.com.fiap.postech.soat16.fase1.model.enums.DocumentType;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
 import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
 
