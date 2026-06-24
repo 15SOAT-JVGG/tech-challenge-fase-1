@@ -5,9 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.util.UUID;
 
-import br.com.fiap.postech.soat16.fase1.model.enums.DocumentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import br.com.fiap.postech.soat16.fase1.model.enums.DocumentType;
 
 @DisplayName("Customer model — Unit Tests")
 class CustomerModelTest {

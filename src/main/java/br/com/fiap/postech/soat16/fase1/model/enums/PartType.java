@@ -5,6 +5,7 @@ package br.com.fiap.postech.soat16.fase1.model.enums;
  * per the challenge's ubiquitous language ("peças e insumos").
  */
 public enum PartType {
-    PECA,
-    INSUMO
+
+    PART,
+    SUPPLY
 }

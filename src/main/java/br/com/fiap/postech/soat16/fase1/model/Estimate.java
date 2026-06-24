@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -21,6 +20,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;

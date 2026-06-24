@@ -7,11 +7,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority;
-import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority;
+import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 
 @DisplayName("WorkOrder model — Unit Tests")
 class WorkOrderTest {

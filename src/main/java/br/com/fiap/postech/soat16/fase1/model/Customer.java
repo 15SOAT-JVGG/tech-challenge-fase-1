@@ -3,7 +3,6 @@ package br.com.fiap.postech.soat16.fase1.model;
 import java.util.Objects;
 import java.util.UUID;
 
-import br.com.fiap.postech.soat16.fase1.model.enums.DocumentType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -16,6 +15,7 @@ import jakarta.persistence.Table;
 import org.hibernate.proxy.HibernateProxy;
 
 import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+import br.com.fiap.postech.soat16.fase1.model.enums.DocumentType;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;

@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import br.com.fiap.postech.soat16.fase1.model.Estimate;
-import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrder;
+import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority;
 import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 

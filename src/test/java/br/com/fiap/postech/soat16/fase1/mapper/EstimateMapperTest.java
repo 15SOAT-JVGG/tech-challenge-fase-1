@@ -15,9 +15,9 @@ import br.com.fiap.postech.soat16.fase1.dto.request.EstimateItemRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.EstimateResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Estimate;
 import br.com.fiap.postech.soat16.fase1.model.EstimateItem;
-import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.model.Part;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrder;
+import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 
 @DisplayName("EstimateMapper — Unit Tests")
 class EstimateMapperTest {

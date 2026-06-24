@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import br.com.fiap.postech.soat16.fase1.model.enums.DocumentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -14,6 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import br.com.fiap.postech.soat16.fase1.exception.InvalidDocumentException;
+import br.com.fiap.postech.soat16.fase1.model.enums.DocumentType;
 
 @DisplayName("Document value object — Unit Tests")
 class DocumentTest {
