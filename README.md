@@ -327,3 +327,4 @@ java -jar target/quarkus-app/quarkus-run.jar
 - **Fluxo da OS:** [WORKORDER.md](WORKORDER.md).
 - **Vulnerabilidades:** [docs/RELATORIO-VULNERABILIDADES.md](docs/RELATORIO-VULNERABILIDADES.md).
 - **Collection da API:** [postman/]
+- **Board Miro:** [https://miro.com/app/board/uXjVHbbU2eE=/?share_link_id=577612273301]
