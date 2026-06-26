@@ -1747,7 +1747,7 @@
                                                                  ],
                                                       "body":  {
                                                                    "mode":  "raw",
-                                                                   "raw":  "{\n  \"name\": \"Filtro de Oleo\",\n  \"description\": \"Filtro de oleo do motor\",\n  \"unitPrice\": 29.90,\n  \"stockQuantity\": 20,\n  \"unit\": \"UN\",\n  \"minimumStock\": 5,\n  \"partType\": \"PECA\"\n}",
+                                                                   "raw":  "{\n  \"name\": \"Filtro de Oleo\",\n  \"description\": \"Filtro de oleo do motor\",\n  \"unitPrice\": 29.90,\n  \"stockQuantity\": 20,\n  \"unit\": \"UN\",\n  \"minimumStock\": 5,\n  \"partType\": \"PART\"\n}",
                                                                    "options":  {
                                                                                    "raw":  {
                                                                                                "language":  "json"
@@ -1789,7 +1789,7 @@
                                                                  ],
                                                       "body":  {
                                                                    "mode":  "raw",
-                                                                   "raw":  "{\n  \"name\": \"Pastilha de Freio\",\n  \"description\": \"Jogo de pastilhas dianteiras\",\n  \"unitPrice\": 89.90,\n  \"stockQuantity\": 15,\n  \"unit\": \"UN\",\n  \"minimumStock\": 3,\n  \"partType\": \"PECA\"\n}",
+                                                                   "raw":  "{\n  \"name\": \"Pastilha de Freio\",\n  \"description\": \"Jogo de pastilhas dianteiras\",\n  \"unitPrice\": 89.90,\n  \"stockQuantity\": 15,\n  \"unit\": \"UN\",\n  \"minimumStock\": 3,\n  \"partType\": \"PART\"\n}",
                                                                    "options":  {
                                                                                    "raw":  {
                                                                                                "language":  "json"
@@ -1829,7 +1829,7 @@
                                                                  ],
                                                       "body":  {
                                                                    "mode":  "raw",
-                                                                   "raw":  "{\n  \"name\": \"Vela de Ignicao\",\n  \"unitPrice\": 15.00,\n  \"stockQuantity\": 10,\n  \"unit\": \"UN\",\n  \"partType\": \"PECA\"\n}",
+                                                                   "raw":  "{\n  \"name\": \"Vela de Ignicao\",\n  \"unitPrice\": 15.00,\n  \"stockQuantity\": 10,\n  \"unit\": \"UN\",\n  \"partType\": \"PART\"\n}",
                                                                    "options":  {
                                                                                    "raw":  {
                                                                                                "language":  "json"
@@ -1956,7 +1956,7 @@
                                                                  ],
                                                       "body":  {
                                                                    "mode":  "raw",
-                                                                   "raw":  "{\n  \"name\": \"Filtro de Oleo\",\n  \"description\": \"Filtro de oleo do motor - atualizado\",\n  \"unitPrice\": 32.50,\n  \"stockQuantity\": 20,\n  \"unit\": \"UN\",\n  \"minimumStock\": 5,\n  \"partType\": \"PECA\"\n}",
+                                                                   "raw":  "{\n  \"name\": \"Filtro de Oleo\",\n  \"description\": \"Filtro de oleo do motor - atualizado\",\n  \"unitPrice\": 32.50,\n  \"stockQuantity\": 20,\n  \"unit\": \"UN\",\n  \"minimumStock\": 5,\n  \"partType\": \"PART\"\n}",
                                                                    "options":  {
                                                                                    "raw":  {
                                                                                                "language":  "json"
@@ -2083,7 +2083,7 @@
                                                                  ],
                                                       "body":  {
                                                                    "mode":  "raw",
-                                                                   "raw":  "{\n  \"name\": \"Peca Descartavel\",\n  \"unitPrice\": 5.00,\n  \"stockQuantity\": 1,\n  \"unit\": \"UN\",\n  \"partType\": \"INSUMO\"\n}",
+                                                                   "raw":  "{\n  \"name\": \"Peca Descartavel\",\n  \"unitPrice\": 5.00,\n  \"stockQuantity\": 1,\n  \"unit\": \"UN\",\n  \"partType\": \"SUPPLY\"\n}",
                                                                    "options":  {
                                                                                    "raw":  {
                                                                                                "language":  "json"
