@@ -1,4 +1,4 @@
-# fiap-srv-oficina-mecanica
+# tech-challenge-fase-1
 
 Back-end (MVP) do **Sistema Integrado de Atendimento e Execução de Serviços** de uma oficina
 mecânica — 16SOAT, Tech Challenge Fase 1. Construído com [Quarkus](https://quarkus.io/), aplica

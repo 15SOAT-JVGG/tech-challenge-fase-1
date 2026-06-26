@@ -40,7 +40,7 @@ services:
     build:
       context: .
       dockerfile: infra/docker/Dockerfile
-    image: fiap-srv-oficina-mecanica:local
+    image: tech-challenge-fase-1:local
     container_name: srv-oficina-mecanica
     restart: unless-stopped
     depends_on:
