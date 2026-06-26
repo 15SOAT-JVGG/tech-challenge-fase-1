@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto;
+import br.com.fiap.postech.soat16.fase1.model.ServiceItem;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrderService;
 
@@ -29,14 +30,18 @@ class WorkOrderServiceMapperTest {
         void shouldMapEntityToResponse() {
             UUID id = UUID.randomUUID();
             UUID workOrderId = UUID.randomUUID();
+            UUID serviceItemId = UUID.randomUUID();
             WorkOrder workOrder = new WorkOrder();
             workOrder.setId(workOrderId);
+            ServiceItem serviceItem = new ServiceItem();
+            serviceItem.setId(serviceItemId);
 
             WorkOrderService entity = new WorkOrderService();
             entity.setId(id);
             entity.setWorkOrder(workOrder);
             entity.setDescription("Troca de oleo");
             entity.setPrice(BigDecimal.valueOf(120));
+            entity.setServiceItem(serviceItem);
 
             WorkOrderServiceResponseDto result = mapper.toResponse(entity);
 
@@ -45,6 +50,7 @@ class WorkOrderServiceMapperTest {
             assertEquals(workOrderId, result.workOrderId());
             assertEquals("Troca de oleo", result.description());
             assertEquals(BigDecimal.valueOf(120), result.price());
+            assertEquals(serviceItemId, result.serviceItemId());
         }
     }
 
@@ -56,13 +62,16 @@ class WorkOrderServiceMapperTest {
         @DisplayName("should map request fields and set performedAt")
         void shouldMapRequestAndSetPerformedAt() {
             WorkOrder workOrder = new WorkOrder();
-            WorkOrderServiceRequestDto request = new WorkOrderServiceRequestDto("Alinhamento", BigDecimal.valueOf(90));
+            ServiceItem serviceItem = new ServiceItem();
+            WorkOrderServiceRequestDto request =
+                    new WorkOrderServiceRequestDto("Alinhamento", BigDecimal.valueOf(90), null);
 
-            WorkOrderService result = mapper.toEntity(request, workOrder);
+            WorkOrderService result = mapper.toEntity(request, workOrder, serviceItem);
 
             assertEquals(workOrder, result.getWorkOrder());
             assertEquals("Alinhamento", result.getDescription());
             assertEquals(BigDecimal.valueOf(90), result.getPrice());
+            assertEquals(serviceItem, result.getServiceItem());
             assertNotNull(result.getPerformedAt());
         }
     }

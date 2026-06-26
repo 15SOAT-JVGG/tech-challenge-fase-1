@@ -21,6 +21,7 @@ jobs:
           # tipos aceitos
           types: |
             feature
+            feat
             fix
             chore
             docs

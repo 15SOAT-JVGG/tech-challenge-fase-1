@@ -74,7 +74,7 @@ quarkus:
     path: /q/openapi                 # spec at /q/openapi (JSON) and /q/openapi?format=yaml
     info-title: Mechanic Workshop API
     info-version: ${project.version}
-    info-description: Mechanic workshop management API (15SOAT - Tech Challenge Phase 1)
+    info-description: Mechanic workshop management API (16SOAT - Tech Challenge Phase 1)
     info-license-name: Apache 2.0
     info-license-url: https://www.apache.org/licenses/LICENSE-2.0.html
     # Bearer JWT scheme — enables the "Authorize" button in Swagger UI and adds

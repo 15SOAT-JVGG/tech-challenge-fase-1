@@ -61,10 +61,12 @@ import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
 import br.com.fiap.postech.soat16.fase1.repository.EstimateRepository;
 import br.com.fiap.postech.soat16.fase1.repository.PartRepository;
+import br.com.fiap.postech.soat16.fase1.repository.ServiceItemRepository;
 import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
 import br.com.fiap.postech.soat16.fase1.repository.WorkOrderHistoryRepository;
 import br.com.fiap.postech.soat16.fase1.repository.WorkOrderRepository;
 import br.com.fiap.postech.soat16.fase1.repository.WorkOrderServiceRepository;
+import br.com.fiap.postech.soat16.fase1.repository.WorkerRepository;
 
 import io.quarkus.hibernate.reactive.panache.PanacheQuery;
 import io.smallrye.mutiny.Uni;
@@ -95,6 +97,12 @@ class WorkOrderServiceTest {
     private PartRepository partRepository;
 
     @Mock
+    private WorkerRepository workerRepository;
+
+    @Mock
+    private ServiceItemRepository serviceItemRepository;
+
+    @Mock
     private WorkOrderMapper mapper;
 
     @Mock
@@ -121,8 +129,8 @@ class WorkOrderServiceTest {
     @BeforeEach
     void setUp() {
         service = new WorkOrderService(repository, historyRepository, estimateRepository, serviceRepository,
-                customerRepository, vehicleRepository, partRepository, mapper, estimateMapper, serviceMapper,
-                notificationService);
+                customerRepository, vehicleRepository, partRepository, workerRepository, serviceItemRepository,
+                mapper, estimateMapper, serviceMapper, notificationService);
 
         lenient().when(notificationService.notifyEstimateReady(any(), any()))
                 .thenReturn(Uni.createFrom().voidItem());
@@ -134,7 +142,7 @@ class WorkOrderServiceTest {
         entity.setStatus(WorkOrderStatus.RECEIVED);
 
         response = new WorkOrderResponseDto(WORK_ORDER_ID, CUSTOMER_ID, VEHICLE_ID, "desc", null,
-                WorkOrderStatus.RECEIVED, null, null, null, null);
+                WorkOrderStatus.RECEIVED, null, null, null, null, null);
     }
 
     @Nested
@@ -190,11 +198,11 @@ class WorkOrderServiceTest {
         void shouldPersistWhenCustomerAndVehicleExist() {
             Customer customer = new Customer();
             Vehicle vehicle = new Vehicle();
-            WorkOrderRequestDto request = new WorkOrderRequestDto(CUSTOMER_ID, VEHICLE_ID, "desc", null);
+            WorkOrderRequestDto request = new WorkOrderRequestDto(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
 
             when(customerRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
             when(vehicleRepository.findByVehicleId(VEHICLE_ID)).thenReturn(Uni.createFrom().item(vehicle));
-            when(mapper.toEntity(request, customer, vehicle)).thenReturn(entity);
+            when(mapper.toEntity(request, customer, vehicle, null)).thenReturn(entity);
             when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
 
             assertDoesNotThrow(() -> service.create(request).await().indefinitely());
@@ -204,7 +212,7 @@ class WorkOrderServiceTest {
         @Test
         @DisplayName("should throw CustomerNotFoundException when customer does not exist")
         void shouldThrowWhenCustomerMissing() {
-            WorkOrderRequestDto request = new WorkOrderRequestDto(CUSTOMER_ID, VEHICLE_ID, "desc", null);
+            WorkOrderRequestDto request = new WorkOrderRequestDto(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
             when(customerRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Uni.createFrom().nullItem());
 
             assertThrows(CustomerNotFoundException.class,
@@ -216,7 +224,7 @@ class WorkOrderServiceTest {
         @DisplayName("should throw VehicleNotFoundException when vehicle does not exist")
         void shouldThrowWhenVehicleMissing() {
             Customer customer = new Customer();
-            WorkOrderRequestDto request = new WorkOrderRequestDto(CUSTOMER_ID, VEHICLE_ID, "desc", null);
+            WorkOrderRequestDto request = new WorkOrderRequestDto(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
 
             when(customerRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
             when(vehicleRepository.findByVehicleId(VEHICLE_ID)).thenReturn(Uni.createFrom().nullItem());
@@ -709,14 +717,14 @@ class WorkOrderServiceTest {
         @Test
         @DisplayName("should persist a labor service line")
         void shouldPersistServiceLine() {
-            WorkOrderServiceRequestDto request = new WorkOrderServiceRequestDto("Troca de oleo", BigDecimal.TEN);
+            WorkOrderServiceRequestDto request = new WorkOrderServiceRequestDto("Troca de oleo", BigDecimal.TEN, null);
             br.com.fiap.postech.soat16.fase1.model.WorkOrderService lineEntity =
                     new br.com.fiap.postech.soat16.fase1.model.WorkOrderService();
             WorkOrderServiceResponseDto lineResponse = new WorkOrderServiceResponseDto(
-                    UUID.randomUUID(), WORK_ORDER_ID, "Troca de oleo", BigDecimal.TEN, null);
+                    UUID.randomUUID(), WORK_ORDER_ID, "Troca de oleo", BigDecimal.TEN, null, null);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(serviceMapper.toEntity(request, entity)).thenReturn(lineEntity);
+            when(serviceMapper.toEntity(request, entity, null)).thenReturn(lineEntity);
             when(serviceRepository.persist(lineEntity)).thenReturn(Uni.createFrom().item(lineEntity));
             when(serviceMapper.toResponse(lineEntity)).thenReturn(lineResponse);
 
@@ -727,10 +735,49 @@ class WorkOrderServiceTest {
         }
 
         @Test
+        @DisplayName("should resolve and persist the referenced service item when serviceItemId is provided")
+        void shouldResolveServiceItem() {
+            UUID serviceItemId = UUID.randomUUID();
+            br.com.fiap.postech.soat16.fase1.model.ServiceItem serviceItem =
+                    new br.com.fiap.postech.soat16.fase1.model.ServiceItem();
+            serviceItem.setId(serviceItemId);
+            WorkOrderServiceRequestDto request =
+                    new WorkOrderServiceRequestDto("Troca de oleo", BigDecimal.TEN, serviceItemId);
+            br.com.fiap.postech.soat16.fase1.model.WorkOrderService lineEntity =
+                    new br.com.fiap.postech.soat16.fase1.model.WorkOrderService();
+            WorkOrderServiceResponseDto lineResponse = new WorkOrderServiceResponseDto(
+                    UUID.randomUUID(), WORK_ORDER_ID, "Troca de oleo", BigDecimal.TEN, null, serviceItemId);
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(serviceItemRepository.findById(serviceItemId)).thenReturn(Uni.createFrom().item(serviceItem));
+            when(serviceMapper.toEntity(request, entity, serviceItem)).thenReturn(lineEntity);
+            when(serviceRepository.persist(lineEntity)).thenReturn(Uni.createFrom().item(lineEntity));
+            when(serviceMapper.toResponse(lineEntity)).thenReturn(lineResponse);
+
+            WorkOrderServiceResponseDto result = service.addService(WORK_ORDER_ID, request).await().indefinitely();
+
+            assertEquals(serviceItemId, result.serviceItemId());
+        }
+
+        @Test
+        @DisplayName("should throw ServiceItemNotFoundException when referenced service item does not exist")
+        void shouldThrowWhenServiceItemMissing() {
+            UUID serviceItemId = UUID.randomUUID();
+            WorkOrderServiceRequestDto request =
+                    new WorkOrderServiceRequestDto("Troca de oleo", BigDecimal.TEN, serviceItemId);
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(serviceItemRepository.findById(serviceItemId)).thenReturn(Uni.createFrom().nullItem());
+
+            assertThrows(br.com.fiap.postech.soat16.fase1.exception.ServiceItemNotFoundException.class,
+                    () -> service.addService(WORK_ORDER_ID, request).await().indefinitely());
+        }
+
+        @Test
         @DisplayName("should throw WorkOrderLockedException when work order is delivered or cancelled")
         void shouldThrowWhenLocked() {
             entity.setStatus(WorkOrderStatus.DELIVERED);
-            WorkOrderServiceRequestDto request = new WorkOrderServiceRequestDto("Troca de oleo", BigDecimal.TEN);
+            WorkOrderServiceRequestDto request = new WorkOrderServiceRequestDto("Troca de oleo", BigDecimal.TEN, null);
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
 
             assertThrows(WorkOrderLockedException.class,

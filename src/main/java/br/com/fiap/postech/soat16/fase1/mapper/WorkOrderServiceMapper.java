@@ -6,6 +6,7 @@ import org.mapstruct.Mapper;
 
 import br.com.fiap.postech.soat16.fase1.dto.request.WorkOrderServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderServiceResponseDto;
+import br.com.fiap.postech.soat16.fase1.model.ServiceItem;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrderService;
 
@@ -21,16 +22,18 @@ public interface WorkOrderServiceMapper {
                 entity.getWorkOrder().getId(),
                 entity.getDescription(),
                 entity.getPrice(),
-                entity.getPerformedAt()
+                entity.getPerformedAt(),
+                entity.getServiceItem() != null ? entity.getServiceItem().getId() : null
         );
     }
 
-    default WorkOrderService toEntity(WorkOrderServiceRequestDto request, WorkOrder workOrder) {
+    default WorkOrderService toEntity(WorkOrderServiceRequestDto request, WorkOrder workOrder, ServiceItem serviceItem) {
         var entity = new WorkOrderService();
         entity.setWorkOrder(workOrder);
         entity.setDescription(request.description());
         entity.setPrice(request.price());
         entity.setPerformedAt(LocalDateTime.now());
+        entity.setServiceItem(serviceItem);
         return entity;
     }
 }

@@ -1,7 +1,7 @@
-# fiap-srv-oficina-mecanica
+# tech-challenge-fase-1
 
 Back-end (MVP) do **Sistema Integrado de Atendimento e Execução de Serviços** de uma oficina
-mecânica — 15SOAT, Tech Challenge Fase 1. Construído com [Quarkus](https://quarkus.io/), aplica
+mecânica — 16SOAT, Tech Challenge Fase 1. Construído com [Quarkus](https://quarkus.io/), aplica
 **Domain-Driven Design**, expõe uma **API REST documentada (Swagger)** e cobre a gestão de
 **ordens de serviço, clientes, veículos, serviços, peças/insumos (com controle de estoque) e
 orçamentos**, além de um **canal público** para o cliente acompanhar e autorizar o serviço.
@@ -271,10 +271,10 @@ dinamicamente). Ver [postman/README.md](postman/README.md).
 
 ```powershell
 # Newman via Docker (API no ar), Windows/PowerShell:
-docker run --rm --add-host=host.docker.internal:host-gateway `
+docker run --rm --network=tech-challenge_oficina_mecanica_net `
   -v "${PWD}\postman:/etc/newman" -t postman/newman:latest `
   run /etc/newman/Oficina-Mecanica-E2E.postman_collection.json `
-  --env-var base_url=http://host.docker.internal:8080
+  --env-var base_url=http://srv-oficina-mecanica:8080
 ```
 
 ---

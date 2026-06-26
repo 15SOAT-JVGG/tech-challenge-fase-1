@@ -27,19 +27,19 @@ No Windows, rode no **PowerShell** (mais confiável — sem problemas de traduç
 
 ```powershell
 cd C:\dev\git\fiap\tech-challenge
-docker run --rm --add-host=host.docker.internal:host-gateway `
+docker run --rm --network=tech-challenge_oficina_mecanica_net `
   -v "${PWD}\postman:/etc/newman" -t postman/newman:latest `
   run /etc/newman/Oficina-Mecanica-E2E.postman_collection.json `
-  --env-var base_url=http://host.docker.internal:8080
+  --env-var base_url=http://srv-oficina-mecanica:8080
 ```
 
 No Linux/macOS (bash):
 
 ```shell
-docker run --rm --add-host=host.docker.internal:host-gateway \
+docker run --rm --network=tech-challenge_oficina_mecanica_net \
   -v "$(pwd)/postman:/etc/newman" -t postman/newman:latest \
   run /etc/newman/Oficina-Mecanica-E2E.postman_collection.json \
-  --env-var base_url=http://host.docker.internal:8080
+  --env-var base_url=http://srv-oficina-mecanica:8080
 ```
 
 ## Notas

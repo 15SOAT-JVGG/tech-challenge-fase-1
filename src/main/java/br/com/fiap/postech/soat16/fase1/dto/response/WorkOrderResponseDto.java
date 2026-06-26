@@ -22,5 +22,6 @@ public record WorkOrderResponseDto(
     LocalDateTime openedAt,
     LocalDateTime closedAt,
     BigDecimal estimatedValue,
-    BigDecimal finalValue
+    BigDecimal finalValue,
+    UUID assignedWorkerId
 ) { }

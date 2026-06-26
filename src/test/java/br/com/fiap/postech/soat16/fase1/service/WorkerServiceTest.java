@@ -10,7 +10,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +32,8 @@ import br.com.fiap.postech.soat16.fase1.mapper.WorkerMapper;
 import br.com.fiap.postech.soat16.fase1.model.Worker;
 import br.com.fiap.postech.soat16.fase1.model.enums.WorkerProfile;
 import br.com.fiap.postech.soat16.fase1.repository.WorkerRepository;
+
+import io.smallrye.mutiny.Uni;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("WorkerService - Unit Tests")
@@ -68,11 +69,11 @@ class WorkerServiceTest {
         @Test
         @DisplayName("should return paginated response")
         void shouldReturnPaginatedResponse() {
-            when(repository.findPage(0, 10)).thenReturn(List.of(entity));
-            when(repository.count()).thenReturn(1L);
+            when(repository.findPage(0, 10)).thenReturn(Uni.createFrom().item(List.of(entity)));
+            when(repository.count()).thenReturn(Uni.createFrom().item(1L));
             when(mapper.toResponse(entity)).thenReturn(response);
 
-            var result = service.findAll(null, 0, 10);
+            var result = service.findAll(null, 0, 10).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
@@ -87,10 +88,10 @@ class WorkerServiceTest {
         @Test
         @DisplayName("should return worker response when found")
         void shouldReturnWorkerWhenFound() {
-            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Optional.of(entity));
+            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResponse(entity)).thenReturn(response);
 
-            WorkerResponseDto result = service.findById(FIXED_UUID);
+            WorkerResponseDto result = service.findById(FIXED_UUID).await().indefinitely();
 
             assertEquals(FIXED_UUID, result.workerId());
         }
@@ -98,9 +99,10 @@ class WorkerServiceTest {
         @Test
         @DisplayName("should throw WorkerNotFoundException when not found")
         void shouldThrowNotFoundWhenMissing() {
-            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Optional.empty());
+            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Uni.createFrom().nullItem());
 
-            assertThrows(WorkerNotFoundException.class, () -> service.findById(FIXED_UUID));
+            assertThrows(WorkerNotFoundException.class,
+                    () -> service.findById(FIXED_UUID).await().indefinitely());
         }
     }
 
@@ -114,11 +116,12 @@ class WorkerServiceTest {
             WorkerRequestDto request = new WorkerRequestDto(
                     "Ana", "Silva", "ana@example.com", "5511999999999", "password123", WorkerProfile.MECHANIC);
 
-            when(repository.existsByEmail("ana@example.com")).thenReturn(false);
+            when(repository.existsByEmail("ana@example.com")).thenReturn(Uni.createFrom().item(false));
             when(passwordService.hash("password123")).thenReturn("hash");
             when(mapper.toEntity(request, "hash")).thenReturn(entity);
+            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
 
-            assertDoesNotThrow(() -> service.create(request));
+            assertDoesNotThrow(() -> service.create(request).await().indefinitely());
 
             verify(repository).persist(entity);
         }
@@ -129,9 +132,10 @@ class WorkerServiceTest {
             WorkerRequestDto request = new WorkerRequestDto(
                     "Ana", "Silva", "ana@example.com", "5511999999999", "password123", WorkerProfile.MECHANIC);
 
-            when(repository.existsByEmail("ana@example.com")).thenReturn(true);
+            when(repository.existsByEmail("ana@example.com")).thenReturn(Uni.createFrom().item(true));
 
-            assertThrows(DuplicateWorkerEmailException.class, () -> service.create(request));
+            assertThrows(DuplicateWorkerEmailException.class,
+                    () -> service.create(request).await().indefinitely());
             verify(repository, never()).persist(any(Worker.class));
         }
     }
@@ -146,11 +150,13 @@ class WorkerServiceTest {
             WorkerRequestDto request = new WorkerRequestDto(
                     "Maria", "Souza", "maria@example.com", "5511888888888", "1234", WorkerProfile.MECHANIC);
 
-            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Optional.of(entity));
-            when(repository.existsByEmailAndDifferentId("maria@example.com", FIXED_UUID)).thenReturn(false);
+            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.existsByEmailAndDifferentId("maria@example.com", FIXED_UUID))
+                    .thenReturn(Uni.createFrom().item(false));
+            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResponse(entity)).thenReturn(response);
 
-            WorkerResponseDto result = service.update(FIXED_UUID, request);
+            WorkerResponseDto result = service.update(FIXED_UUID, request).await().indefinitely();
 
             assertNotNull(result);
             verify(mapper).updateEntity(entity, request);
@@ -163,10 +169,12 @@ class WorkerServiceTest {
             WorkerRequestDto request = new WorkerRequestDto(
                     "Maria", "Souza", "maria@example.com", "5511888888888", "1234", WorkerProfile.MECHANIC);
 
-            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Optional.of(entity));
-            when(repository.existsByEmailAndDifferentId("maria@example.com", FIXED_UUID)).thenReturn(true);
+            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.existsByEmailAndDifferentId("maria@example.com", FIXED_UUID))
+                    .thenReturn(Uni.createFrom().item(true));
 
-            assertThrows(DuplicateWorkerEmailException.class, () -> service.update(FIXED_UUID, request));
+            assertThrows(DuplicateWorkerEmailException.class,
+                    () -> service.update(FIXED_UUID, request).await().indefinitely());
         }
 
         @Test
@@ -175,9 +183,10 @@ class WorkerServiceTest {
             WorkerRequestDto request = new WorkerRequestDto(
                     "Maria", "Souza", "maria@example.com", "5511888888888", "1234", WorkerProfile.MECHANIC);
 
-            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Optional.empty());
+            when(repository.findByWorkerId(FIXED_UUID)).thenReturn(Uni.createFrom().nullItem());
 
-            assertThrows(WorkerNotFoundException.class, () -> service.update(FIXED_UUID, request));
+            assertThrows(WorkerNotFoundException.class,
+                    () -> service.update(FIXED_UUID, request).await().indefinitely());
             verify(repository, never()).persist(any(Worker.class));
         }
     }
@@ -189,17 +198,18 @@ class WorkerServiceTest {
         @Test
         @DisplayName("should delete worker when found")
         void shouldDeleteWhenFound() {
-            when(repository.deleteByWorkerId(FIXED_UUID)).thenReturn(1L);
+            when(repository.deleteByWorkerId(FIXED_UUID)).thenReturn(Uni.createFrom().item(1L));
 
-            assertDoesNotThrow(() -> service.delete(FIXED_UUID));
+            assertDoesNotThrow(() -> service.delete(FIXED_UUID).await().indefinitely());
         }
 
         @Test
         @DisplayName("should throw WorkerNotFoundException when no record deleted")
         void shouldThrowWhenNoRecordDeleted() {
-            when(repository.deleteByWorkerId(FIXED_UUID)).thenReturn(0L);
+            when(repository.deleteByWorkerId(FIXED_UUID)).thenReturn(Uni.createFrom().item(0L));
 
-            assertThrows(WorkerNotFoundException.class, () -> service.delete(FIXED_UUID));
+            assertThrows(WorkerNotFoundException.class,
+                    () -> service.delete(FIXED_UUID).await().indefinitely());
         }
     }
 
@@ -213,11 +223,11 @@ class WorkerServiceTest {
             WorkerLoginRequestDto request = new WorkerLoginRequestDto("ana@example.com", "password123");
             WorkerLoginResponseDto loginResponse = new WorkerLoginResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", true);
 
-            when(repository.findByEmail("ana@example.com")).thenReturn(Optional.of(entity));
+            when(repository.findByEmail("ana@example.com")).thenReturn(Uni.createFrom().item(entity));
             when(passwordService.matches("password123", "hash")).thenReturn(true);
             when(mapper.toLoginResponse(entity)).thenReturn(loginResponse);
 
-            WorkerLoginResponseDto result = service.login(request);
+            WorkerLoginResponseDto result = service.login(request).await().indefinitely();
 
             assertEquals(FIXED_UUID, result.workerId());
         }
@@ -227,9 +237,10 @@ class WorkerServiceTest {
         void shouldThrowInvalidCredentialsWhenEmailIsMissing() {
             WorkerLoginRequestDto request = new WorkerLoginRequestDto("ana@example.com", "password123");
 
-            when(repository.findByEmail("ana@example.com")).thenReturn(Optional.empty());
+            when(repository.findByEmail("ana@example.com")).thenReturn(Uni.createFrom().nullItem());
 
-            assertThrows(InvalidWorkerCredentialsException.class, () -> service.login(request));
+            assertThrows(InvalidWorkerCredentialsException.class,
+                    () -> service.login(request).await().indefinitely());
         }
 
         @Test
@@ -238,9 +249,10 @@ class WorkerServiceTest {
             WorkerLoginRequestDto request = new WorkerLoginRequestDto("ana@example.com", "password123");
             entity.setActive(false);
 
-            when(repository.findByEmail("ana@example.com")).thenReturn(Optional.of(entity));
+            when(repository.findByEmail("ana@example.com")).thenReturn(Uni.createFrom().item(entity));
 
-            assertThrows(InactiveWorkerException.class, () -> service.login(request));
+            assertThrows(InactiveWorkerException.class,
+                    () -> service.login(request).await().indefinitely());
         }
 
         @Test
@@ -248,10 +260,11 @@ class WorkerServiceTest {
         void shouldThrowInvalidCredentialsWhenPasswordIsInvalid() {
             WorkerLoginRequestDto request = new WorkerLoginRequestDto("ana@example.com", "password123");
 
-            when(repository.findByEmail("ana@example.com")).thenReturn(Optional.of(entity));
+            when(repository.findByEmail("ana@example.com")).thenReturn(Uni.createFrom().item(entity));
             when(passwordService.matches("password123", "hash")).thenReturn(false);
 
-            assertThrows(InvalidWorkerCredentialsException.class, () -> service.login(request));
+            assertThrows(InvalidWorkerCredentialsException.class,
+                    () -> service.login(request).await().indefinitely());
         }
     }
 }

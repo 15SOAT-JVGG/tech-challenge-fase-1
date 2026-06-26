@@ -7,11 +7,11 @@
 #
 # Then, build the image with:
 #
-# docker build -f src/main/docker/Dockerfile.native -t quarkus/fiap-srv-oficina-mecanica .
+# docker build -f src/main/docker/Dockerfile.native -t quarkus/tech-challenge-fase-1 .
 #
 # Then run the container using:
 #
-# docker run -i --rm -p 8080:8080 quarkus/fiap-srv-oficina-mecanica
+# docker run -i --rm -p 8080:8080 quarkus/tech-challenge-fase-1
 #
 # The ` registry.access.redhat.com/ubi9/ubi-minimal:9.7` base image is based on UBI 9.
 # To use UBI 8, switch to `quay.io/ubi8/ubi-minimal:8.10`.

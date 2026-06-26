@@ -61,7 +61,7 @@ class WorkOrderControllerTest {
     void setUp() {
         controller = new WorkOrderController(service);
         response = new WorkOrderResponseDto(FIXED_UUID, UUID.randomUUID(), UUID.randomUUID(), "desc",
-                WorkOrderPriority.MEDIUM, WorkOrderStatus.RECEIVED, null, null, null, null);
+                WorkOrderPriority.MEDIUM, WorkOrderStatus.RECEIVED, null, null, null, null, null);
     }
 
     @Nested
@@ -137,7 +137,7 @@ class WorkOrderControllerTest {
         @Test
         @DisplayName("should return HTTP 201 when create succeeds")
         void shouldReturn201WhenCreateSucceeds() {
-            WorkOrderRequestDto dto = new WorkOrderRequestDto(UUID.randomUUID(), UUID.randomUUID(), "desc", null);
+            WorkOrderRequestDto dto = new WorkOrderRequestDto(UUID.randomUUID(), UUID.randomUUID(), "desc", null, null);
             when(service.create(dto)).thenReturn(Uni.createFrom().voidItem());
 
             Response result = controller.create(dto).await().indefinitely();
@@ -258,9 +258,9 @@ class WorkOrderControllerTest {
         @Test
         @DisplayName("should return HTTP 201 with the created service line")
         void shouldReturn201WithCreatedService() {
-            WorkOrderServiceRequestDto dto = new WorkOrderServiceRequestDto("Troca de oleo", BigDecimal.TEN);
+            WorkOrderServiceRequestDto dto = new WorkOrderServiceRequestDto("Troca de oleo", BigDecimal.TEN, null);
             WorkOrderServiceResponseDto serviceResponse = new WorkOrderServiceResponseDto(
-                    UUID.randomUUID(), FIXED_UUID, "Troca de oleo", BigDecimal.TEN, null);
+                    UUID.randomUUID(), FIXED_UUID, "Troca de oleo", BigDecimal.TEN, null, null);
 
             when(service.addService(FIXED_UUID, dto)).thenReturn(Uni.createFrom().item(serviceResponse));
 
