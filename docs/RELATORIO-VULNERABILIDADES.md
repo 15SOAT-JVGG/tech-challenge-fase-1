@@ -1,7 +1,7 @@
 # Relatório de Análise de Vulnerabilidades
 
-**Projeto:** fiap-srv-oficina-mecanica (15SOAT — Tech Challenge Fase 1)
-**Repositório:** `15SOAT-JVGG/tech-challenge`
+**Projeto:** fiap-srv-oficina-mecanica (16SOAT — Tech Challenge Fase 1)
+**Repositório:** `16SOAT-JVGG/tech-challenge`
 **Escopo:** back-end monolítico (Quarkus 3.x), pipeline CI e dependências de terceiros.
 
 Este documento consolida o resultado dos scans de segurança executados sobre o código e

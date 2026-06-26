@@ -34,7 +34,7 @@ jobs:
   # ── 1. Detecção de secrets no histórico do repositório ──────────────────────
   secrets_gitleaks:
     name: Secrets Scan (Gitleaks)
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-gitleaks.yml@main
+    uses: 16SOAT-JVGG/reusable-workflows/.github/workflows/security-gitleaks.yml@main
     with:
       gitleaks_version: "8.24.3"
       fetch_depth: 0
@@ -44,7 +44,7 @@ jobs:
   # ── 2. SAST — análise estática de segurança ──────────────────────────────────
   sast_semgrep:
     name: SAST (Semgrep)
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-semgrep.yml@main
+    uses: 16SOAT-JVGG/reusable-workflows/.github/workflows/security-semgrep.yml@main
     secrets: inherit
     with:
       config: p/ci
@@ -55,7 +55,7 @@ jobs:
   build:
     name: Build & Tests (Quarkus JVM)
     needs: [secrets_gitleaks, sast_semgrep]
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/build-java-quarkus-jvm.yml@main
+    uses: 16SOAT-JVGG/reusable-workflows/.github/workflows/build-java-quarkus-jvm.yml@main
     with:
       java_version: "21"
       use_tailscale: false
@@ -67,7 +67,7 @@ jobs:
   sca_dependency_check:
     name: SCA (OWASP Dependency-Check)
     needs: [build]
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-sca-dependency-check.yml@main
+    uses: 16SOAT-JVGG/reusable-workflows/.github/workflows/security-sca-dependency-check.yml@main
     with:
       project_name: ${{ github.event.repository.name }}
       scan_path: .
@@ -80,7 +80,7 @@ jobs:
     name: SonarQube Scan
     needs: [sca_dependency_check]
     if: ${{ inputs.skip_tests != true }}
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/quality-sonarqube-scan.yml@main
+    uses: 16SOAT-JVGG/reusable-workflows/.github/workflows/quality-sonarqube-scan.yml@main
     with:
       environment_name: homelab
       fetch_depth: 0

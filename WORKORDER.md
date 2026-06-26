@@ -10,10 +10,10 @@ veículo. Para detalhes de autenticação, portas e como rodar o projeto, veja o
 
 | Entidade | O que representa |
 |---|---|
-| `WorkOrder` | A ordem de serviço em si: cliente, veículo, descrição, prioridade, status e valores. |
+| `WorkOrder` | A ordem de serviço em si: cliente, veículo, mecânico responsável, descrição, prioridade, status e valores. |
 | `Estimate` | Um orçamento de peças vinculado à ordem de serviço. Pode ser aprovado. |
 | `EstimateItem` | Um item do orçamento: uma peça do catálogo (`Part`), quantidade e preço unitário. |
-| `WorkOrderService` | Uma linha de mão de obra executada na ordem (ex.: "Troca de óleo"), com descrição e preço. |
+| `WorkOrderService` | Uma linha de mão de obra executada na ordem (ex.: "Troca de óleo"), com descrição, preço e item do catálogo de serviços de origem. |
 | `WorkOrderHistory` | Registro interno de toda mudança de status da ordem (não exposto via API). |
 
 ---
@@ -90,12 +90,13 @@ curl -s -X POST http://localhost:8080/v1/work-orders \
         "customerId": "<customer-uuid>",
         "vehicleId": "<vehicle-uuid>",
         "description": "Revisão dos 10.000km",
-        "priority": "HIGH"
+        "priority": "HIGH",
+        "assignedWorkerId": "<worker-uuid>"
       }'
 ```
 
 A ordem é criada com `status = RECEIVED`, `openedAt` preenchido automaticamente. `priority` é opcional —
-se omitido, assume `MEDIUM`.
+se omitido, assume `MEDIUM`. `assignedWorkerId` — identifica o mecânico responsável pela OS.
 
 ### 2. Avançar para diagnóstico
 
@@ -108,9 +109,6 @@ curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
 ### 3. Criar o orçamento
 
 ```shell
-curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
-  -H "Content-Type: application/json" -d '{"status": "WAITING_APPROVAL"}'
-
 curl -s -X POST http://localhost:8080/v1/work-orders/<work-order-id>/estimate \
   -H "Content-Type: application/json" \
   -d '{
@@ -122,6 +120,7 @@ curl -s -X POST http://localhost:8080/v1/work-orders/<work-order-id>/estimate \
 ```
 
 A resposta traz o `estimateId`, o `totalAmount` calculado e cada item com seu `totalPrice`.
+A criação do orçamento move a ordem automaticamente de `DIAGNOSIS` para `WAITING_APPROVAL`.
 
 ### 4. Aprovar o orçamento
 
@@ -146,10 +145,11 @@ Falharia com `422 ESTIMATE_NOT_APPROVED` se não houvesse orçamento aprovado.
 ```shell
 curl -s -X POST http://localhost:8080/v1/work-orders/<work-order-id>/services \
   -H "Content-Type: application/json" \
-  -d '{"description": "Troca de óleo e filtros", "price": 120.00}'
+  -d '{"description": "Troca de óleo e filtros", "price": 120.00, "serviceItemId": "<service-item-uuid>"}'
 ```
 
 Pode ser chamado várias vezes — cada chamada cria uma linha de `WorkOrderService` independente.
+`serviceItemId` — vincula a linha ao item do catálogo de serviços que a originou.
 
 ### 7. Fechar a ordem
 
