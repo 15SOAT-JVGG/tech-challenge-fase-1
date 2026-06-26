@@ -14,5 +14,6 @@ public record WorkOrderRequestDto(
     UUID vehicleId,
     @NotBlank(message = "description cannot be blank")
     String description,
-    WorkOrderPriority priority
+    WorkOrderPriority priority,
+    UUID assignedWorkerId
 ) { }

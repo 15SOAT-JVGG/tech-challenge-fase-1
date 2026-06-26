@@ -48,6 +48,10 @@ public class WorkOrder extends AuditableEntity {
     @JoinColumn(name = "vehicle_id", nullable = false)
     private Vehicle vehicle;
 
+    @ManyToOne
+    @JoinColumn(name = "assigned_worker_id")
+    private Worker assignedWorker;
+
     @Column(nullable = false, length = 1000)
     private String description;
 

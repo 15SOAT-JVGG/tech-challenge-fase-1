@@ -47,7 +47,7 @@ class PublicWorkOrderControllerTest {
     void setUp() {
         controller = new PublicWorkOrderController(service);
         workOrderResponse = new WorkOrderResponseDto(WORK_ORDER_ID, UUID.randomUUID(), UUID.randomUUID(), "desc",
-            WorkOrderPriority.MEDIUM, WorkOrderStatus.WAITING_APPROVAL, null, null, null, null);
+            WorkOrderPriority.MEDIUM, WorkOrderStatus.WAITING_APPROVAL, null, null, null, null, null);
         estimateResponse = new EstimateResponseDto(ESTIMATE_ID, WORK_ORDER_ID, EstimateStatus.PENDING,
             new BigDecimal("50.00"), new BigDecimal("0.00"), new BigDecimal("50.00"), null, null, null);
     }

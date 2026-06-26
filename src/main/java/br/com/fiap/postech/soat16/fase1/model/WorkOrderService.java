@@ -42,6 +42,10 @@ public class WorkOrderService {
     @JoinColumn(name = "work_order_id", nullable = false)
     private WorkOrder workOrder;
 
+    @ManyToOne
+    @JoinColumn(name = "service_item_id")
+    private ServiceItem serviceItem;
+
     @Column(nullable = false, length = 500)
     private String description;
 

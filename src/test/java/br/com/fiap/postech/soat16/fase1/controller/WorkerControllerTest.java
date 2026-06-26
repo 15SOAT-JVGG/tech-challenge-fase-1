@@ -29,6 +29,8 @@ import br.com.fiap.postech.soat16.fase1.dto.response.WorkerResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.enums.WorkerProfile;
 import br.com.fiap.postech.soat16.fase1.service.WorkerService;
 
+import io.smallrye.mutiny.Uni;
+
 @ExtendWith(MockitoExtension.class)
 @DisplayName("WorkerController - Unit Tests")
 class WorkerControllerTest {
@@ -62,9 +64,9 @@ class WorkerControllerTest {
             when(pageable.getQ()).thenReturn(null);
             when(pageable.getPage()).thenReturn(0);
             when(pageable.getSize()).thenReturn(10);
-            when(service.findAll(null, 0, 10)).thenReturn(page);
+            when(service.findAll(null, 0, 10)).thenReturn(Uni.createFrom().item(page));
 
-            var result = controller.findAll(pageable);
+            var result = controller.findAll(pageable).await().indefinitely();
 
             assertEquals(1, result.content().size());
             verify(service).findAll(null, 0, 10);
@@ -74,9 +76,9 @@ class WorkerControllerTest {
     @Test
     @DisplayName("should return worker by id")
     void shouldReturnWorkerById() {
-        when(service.findById(FIXED_UUID)).thenReturn(response);
+        when(service.findById(FIXED_UUID)).thenReturn(Uni.createFrom().item(response));
 
-        WorkerResponseDto result = controller.findById(FIXED_UUID);
+        WorkerResponseDto result = controller.findById(FIXED_UUID).await().indefinitely();
 
         assertEquals(FIXED_UUID, result.workerId());
         verify(service).findById(FIXED_UUID);
@@ -88,7 +90,9 @@ class WorkerControllerTest {
         WorkerRequestDto request = new WorkerRequestDto(
                 "Ana", "Silva", "ana@example.com", "5511999999999", "password123", WorkerProfile.MECHANIC);
 
-        Response result = controller.create(request);
+        when(service.create(request)).thenReturn(Uni.createFrom().voidItem());
+
+        Response result = controller.create(request).await().indefinitely();
 
         assertEquals(201, result.getStatus());
         verify(service).create(request);
@@ -100,9 +104,9 @@ class WorkerControllerTest {
         WorkerLoginRequestDto request = new WorkerLoginRequestDto("ana@example.com", "password123");
         WorkerLoginResponseDto loginResponse = new WorkerLoginResponseDto(FIXED_UUID, "Ana", "Silva", "ana@example.com", true);
 
-        when(service.login(request)).thenReturn(loginResponse);
+        when(service.login(request)).thenReturn(Uni.createFrom().item(loginResponse));
 
-        WorkerLoginResponseDto result = controller.login(request);
+        WorkerLoginResponseDto result = controller.login(request).await().indefinitely();
 
         assertNotNull(result);
         assertEquals(FIXED_UUID, result.workerId());
@@ -114,9 +118,9 @@ class WorkerControllerTest {
         WorkerRequestDto request = new WorkerRequestDto(
                 "Maria", "Souza", "maria@example.com", "5511888888888", "1234", WorkerProfile.MECHANIC);
 
-        when(service.update(FIXED_UUID, request)).thenReturn(response);
+        when(service.update(FIXED_UUID, request)).thenReturn(Uni.createFrom().item(response));
 
-        Response result = controller.update(FIXED_UUID, request);
+        Response result = controller.update(FIXED_UUID, request).await().indefinitely();
 
         assertEquals(200, result.getStatus());
         verify(service).update(FIXED_UUID, request);
@@ -125,7 +129,9 @@ class WorkerControllerTest {
     @Test
     @DisplayName("should return HTTP 204 when delete succeeds")
     void shouldReturn204WhenDeleteSucceeds() {
-        Response result = controller.delete(FIXED_UUID);
+        when(service.delete(FIXED_UUID)).thenReturn(Uni.createFrom().voidItem());
+
+        Response result = controller.delete(FIXED_UUID).await().indefinitely();
 
         assertEquals(204, result.getStatus());
         verify(service).delete(FIXED_UUID);

@@ -26,26 +26,32 @@ import br.com.fiap.postech.soat16.fase1.exception.EstimateNotApprovedException;
 import br.com.fiap.postech.soat16.fase1.exception.EstimateNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.EstimatePartNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.InvalidWorkOrderStatusTransitionException;
+import br.com.fiap.postech.soat16.fase1.exception.ServiceItemNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.VehicleNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.WorkOrderLockedException;
 import br.com.fiap.postech.soat16.fase1.exception.WorkOrderNotFoundException;
+import br.com.fiap.postech.soat16.fase1.exception.WorkerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.mapper.EstimateMapper;
 import br.com.fiap.postech.soat16.fase1.mapper.WorkOrderMapper;
 import br.com.fiap.postech.soat16.fase1.mapper.WorkOrderServiceMapper;
 import br.com.fiap.postech.soat16.fase1.model.Estimate;
 import br.com.fiap.postech.soat16.fase1.model.EstimateItem;
 import br.com.fiap.postech.soat16.fase1.model.Part;
+import br.com.fiap.postech.soat16.fase1.model.ServiceItem;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrderHistory;
+import br.com.fiap.postech.soat16.fase1.model.Worker;
 import br.com.fiap.postech.soat16.fase1.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
 import br.com.fiap.postech.soat16.fase1.repository.EstimateRepository;
 import br.com.fiap.postech.soat16.fase1.repository.PartRepository;
+import br.com.fiap.postech.soat16.fase1.repository.ServiceItemRepository;
 import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
 import br.com.fiap.postech.soat16.fase1.repository.WorkOrderHistoryRepository;
 import br.com.fiap.postech.soat16.fase1.repository.WorkOrderRepository;
 import br.com.fiap.postech.soat16.fase1.repository.WorkOrderServiceRepository;
+import br.com.fiap.postech.soat16.fase1.repository.WorkerRepository;
 
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
@@ -71,6 +77,8 @@ public class WorkOrderService {
     private final CustomerRepository customerRepository;
     private final VehicleRepository vehicleRepository;
     private final PartRepository partRepository;
+    private final WorkerRepository workerRepository;
+    private final ServiceItemRepository serviceItemRepository;
     private final WorkOrderMapper mapper;
     private final EstimateMapper estimateMapper;
     private final WorkOrderServiceMapper serviceMapper;
@@ -108,8 +116,17 @@ public class WorkOrderService {
                 .onItem().ifNull().failWith(CustomerNotFoundException::new)
                 .flatMap(customer -> vehicleRepository.findByVehicleId(request.vehicleId())
                         .onItem().ifNull().failWith(VehicleNotFoundException::new)
-                        .flatMap(vehicle -> repository.persist(mapper.toEntity(request, customer, vehicle))
-                                .replaceWithVoid()));
+                        .flatMap(vehicle -> resolveAssignedWorker(request.assignedWorkerId())
+                                .flatMap(worker -> repository.persist(mapper.toEntity(request, customer, vehicle, worker))
+                                        .replaceWithVoid())));
+    }
+
+    private Uni<Worker> resolveAssignedWorker(UUID assignedWorkerId) {
+        if (assignedWorkerId == null) {
+            return Uni.createFrom().nullItem();
+        }
+        return workerRepository.findByWorkerId(assignedWorkerId)
+                .onItem().ifNull().failWith(() -> new WorkerNotFoundException(assignedWorkerId));
     }
 
     @WithTransaction
@@ -173,8 +190,18 @@ public class WorkOrderService {
         return repository.findByWorkOrderId(workOrderId)
                 .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
                 .flatMap(order -> assertNotLocked(order)
-                        .flatMap(v -> serviceRepository.persist(serviceMapper.toEntity(request, order))))
+                        .flatMap(v -> resolveServiceItem(request.serviceItemId()))
+                        .flatMap(serviceItem -> serviceRepository.persist(
+                                serviceMapper.toEntity(request, order, serviceItem))))
                 .map(serviceMapper::toResponse);
+    }
+
+    private Uni<ServiceItem> resolveServiceItem(UUID serviceItemId) {
+        if (serviceItemId == null) {
+            return Uni.createFrom().nullItem();
+        }
+        return serviceItemRepository.findById(serviceItemId)
+                .onItem().ifNull().failWith(() -> new ServiceItemNotFoundException(serviceItemId));
     }
 
     @WithTransaction

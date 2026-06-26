@@ -31,6 +31,8 @@ import br.com.fiap.postech.soat16.fase1.dto.request.WorkerRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkerLoginResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkerResponseDto;
 
+import io.smallrye.mutiny.Uni;
+
 @Path("/v1/worker")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -43,7 +45,7 @@ public interface WorkerControllerDocs {
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = PageableResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid query parameters")
-    PageableResponseDto<WorkerResponseDto> findAll(@BeanParam @Valid PageableRequestDto pageable);
+    Uni<PageableResponseDto<WorkerResponseDto>> findAll(@BeanParam @Valid PageableRequestDto pageable);
 
     @GET
     @Path("/{id}")
@@ -52,7 +54,7 @@ public interface WorkerControllerDocs {
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = WorkerResponseDto.class)))
     @APIResponse(responseCode = "404", description = "Worker not found")
-    WorkerResponseDto findById(
+    Uni<WorkerResponseDto> findById(
             @Parameter(name = "id", description = "Worker identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id);
 
@@ -61,7 +63,7 @@ public interface WorkerControllerDocs {
     @APIResponse(responseCode = "201", description = "Worker created successfully")
     @APIResponse(responseCode = "400", description = "Invalid request body")
     @APIResponse(responseCode = "409", description = "Worker email already exists")
-    Response create(
+    Uni<Response> create(
             @RequestBody(description = "Worker data for registration")
             @Valid WorkerRequestDto body);
 
@@ -72,7 +74,7 @@ public interface WorkerControllerDocs {
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = WorkerLoginResponseDto.class)))
     @APIResponse(responseCode = "401", description = "Invalid credentials or inactive worker")
-    WorkerLoginResponseDto login(
+    Uni<WorkerLoginResponseDto> login(
             @RequestBody(description = "Worker credentials")
             @Valid WorkerLoginRequestDto body);
 
@@ -84,7 +86,7 @@ public interface WorkerControllerDocs {
                     schema = @Schema(implementation = WorkerResponseDto.class)))
     @APIResponse(responseCode = "404", description = "Worker not found")
     @APIResponse(responseCode = "409", description = "Worker email already exists")
-    Response update(
+    Uni<Response> update(
             @Parameter(name = "id", description = "Worker identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,
             @RequestBody(description = "Updated worker data")
@@ -95,7 +97,7 @@ public interface WorkerControllerDocs {
     @Operation(summary = "Delete worker", description = "Permanently removes an worker by identifier.")
     @APIResponse(responseCode = "204", description = "Worker deleted successfully")
     @APIResponse(responseCode = "404", description = "Worker not found")
-    Response delete(
+    Uni<Response> delete(
             @Parameter(name = "id", description = "Worker identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id);
 }

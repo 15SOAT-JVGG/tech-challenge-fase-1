@@ -9,6 +9,7 @@ import br.com.fiap.postech.soat16.fase1.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.model.WorkOrder;
+import br.com.fiap.postech.soat16.fase1.model.Worker;
 import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderPriority;
 import br.com.fiap.postech.soat16.fase1.model.enums.WorkOrderStatus;
 
@@ -29,11 +30,12 @@ public interface WorkOrderMapper {
                 entity.getOpenedAt(),
                 entity.getClosedAt(),
                 entity.getEstimatedValue(),
-                entity.getFinalValue()
+                entity.getFinalValue(),
+                entity.getAssignedWorker() != null ? entity.getAssignedWorker().getId() : null
         );
     }
 
-    default WorkOrder toEntity(WorkOrderRequestDto request, Customer customer, Vehicle vehicle) {
+    default WorkOrder toEntity(WorkOrderRequestDto request, Customer customer, Vehicle vehicle, Worker assignedWorker) {
         var entity = new WorkOrder();
         entity.setCustomer(customer);
         entity.setVehicle(vehicle);
@@ -41,6 +43,7 @@ public interface WorkOrderMapper {
         entity.setPriority(request.priority() != null ? request.priority() : WorkOrderPriority.MEDIUM);
         entity.setStatus(WorkOrderStatus.RECEIVED);
         entity.setOpenedAt(LocalDateTime.now());
+        entity.setAssignedWorker(assignedWorker);
         return entity;
     }
 }

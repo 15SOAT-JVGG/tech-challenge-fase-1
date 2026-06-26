@@ -14,5 +14,6 @@ public record WorkOrderServiceResponseDto(
     UUID workOrderId,
     String description,
     BigDecimal price,
-    LocalDateTime performedAt
+    LocalDateTime performedAt,
+    UUID serviceItemId
 ) { }

@@ -65,11 +65,11 @@ class WorkOrderMapperTest {
         @DisplayName("should apply default priority, RECEIVED status and openedAt when priority is missing")
         void shouldApplyDefaultsWhenPriorityMissing() {
             WorkOrderRequestDto request = new WorkOrderRequestDto(
-                    UUID.randomUUID(), UUID.randomUUID(), "Revisao geral", null);
+                    UUID.randomUUID(), UUID.randomUUID(), "Revisao geral", null, null);
             Customer customer = new Customer();
             Vehicle vehicle = new Vehicle();
 
-            WorkOrder result = mapper.toEntity(request, customer, vehicle);
+            WorkOrder result = mapper.toEntity(request, customer, vehicle, null);
 
             assertNotNull(result);
             assertEquals("Revisao geral", result.getDescription());
@@ -84,9 +84,9 @@ class WorkOrderMapperTest {
         @DisplayName("should keep requested priority when provided")
         void shouldKeepRequestedPriority() {
             WorkOrderRequestDto request = new WorkOrderRequestDto(
-                    UUID.randomUUID(), UUID.randomUUID(), "Revisao geral", WorkOrderPriority.URGENT);
+                    UUID.randomUUID(), UUID.randomUUID(), "Revisao geral", WorkOrderPriority.URGENT, null);
 
-            WorkOrder result = mapper.toEntity(request, new Customer(), new Vehicle());
+            WorkOrder result = mapper.toEntity(request, new Customer(), new Vehicle(), null);
 
             assertEquals(WorkOrderPriority.URGENT, result.getPriority());
         }

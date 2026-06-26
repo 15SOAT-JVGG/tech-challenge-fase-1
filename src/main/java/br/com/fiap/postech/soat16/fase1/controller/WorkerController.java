@@ -29,6 +29,7 @@ import br.com.fiap.postech.soat16.fase1.dto.response.WorkerLoginResponseDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.WorkerResponseDto;
 import br.com.fiap.postech.soat16.fase1.service.WorkerService;
 
+import io.smallrye.mutiny.Uni;
 import lombok.RequiredArgsConstructor;
 
 @ApplicationScoped
@@ -43,44 +44,45 @@ public class WorkerController implements WorkerControllerDocs {
 
     @GET
     @Override
-    public PageableResponseDto<WorkerResponseDto> findAll(@BeanParam @Valid PageableRequestDto pageable) {
+    public Uni<PageableResponseDto<WorkerResponseDto>> findAll(@BeanParam @Valid PageableRequestDto pageable) {
         return service.findAll(pageable.getQ(), pageable.getPage(), pageable.getSize());
     }
 
     @GET
     @Path("/{id}")
     @Override
-    public WorkerResponseDto findById(@PathParam("id") UUID id) {
+    public Uni<WorkerResponseDto> findById(@PathParam("id") UUID id) {
         return service.findById(id);
     }
 
     @POST
     @Override
-    public Response create(@RequestBody @Valid WorkerRequestDto dto) {
-        service.create(dto);
-        return Response.status(Response.Status.CREATED).build();
+    public Uni<Response> create(@RequestBody @Valid WorkerRequestDto dto) {
+        return service.create(dto)
+                .replaceWith(Response.status(Response.Status.CREATED).build());
     }
 
     @POST
     @Path("/login")
     @PermitAll
     @Override
-    public WorkerLoginResponseDto login(@RequestBody @Valid WorkerLoginRequestDto dto) {
+    public Uni<WorkerLoginResponseDto> login(@RequestBody @Valid WorkerLoginRequestDto dto) {
         return service.login(dto);
     }
 
     @PUT
     @Path("/{id}")
     @Override
-    public Response update(@PathParam("id") UUID id, @RequestBody @Valid WorkerRequestDto dto) {
-        return Response.ok(service.update(id, dto)).build();
+    public Uni<Response> update(@PathParam("id") UUID id, @RequestBody @Valid WorkerRequestDto dto) {
+        return service.update(id, dto)
+                .map(updated -> Response.ok(updated).build());
     }
 
     @DELETE
     @Path("/{id}")
     @Override
-    public Response delete(@PathParam("id") UUID id) {
-        service.delete(id);
-        return Response.noContent().build();
+    public Uni<Response> delete(@PathParam("id") UUID id) {
+        return service.delete(id)
+                .replaceWith(Response.noContent().build());
     }
 }
