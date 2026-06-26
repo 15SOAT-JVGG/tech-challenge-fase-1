@@ -151,5 +151,3 @@ Nenhuma — todas as entidades possuem ao menos um relacionamento.
 - Estimate (1) → (N) EstimateItem
 - Part (1) → (N) EstimateItem
 
-## Pontos de atenção (irregularidades no código atual)
-- `Vehicle.type` e `Worker.profile` são enums sem `@Enumerated` explícito — por padrão JPA persiste como ORDINAL (int), apesar do dimensionamento de coluna `varchar` sugerir string. Vale revisar/padronizar com `@Enumerated(EnumType.STRING)`.

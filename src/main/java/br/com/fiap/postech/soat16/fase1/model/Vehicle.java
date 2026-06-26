@@ -4,6 +4,8 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -60,6 +62,7 @@ public class Vehicle extends AuditableEntity {
     @Column(name = "km_driven", nullable = false)
     private Long kmDriven;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private VehicleType type;
 }
