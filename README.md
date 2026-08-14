@@ -21,6 +21,7 @@ orçamentos**, além de um **canal público** para o cliente acompanhar e autori
 - [Testes automatizados e cobertura](#testes-automatizados-e-cobertura)
 - [Análise estática e segurança](#análise-estática-e-segurança)
 - [Build](#build)
+- [Pipeline CI/CD](#pipeline-cicd)
 - [Documentação DDD e relatórios](#documentação-ddd-e-relatórios)
 
 ---
@@ -284,20 +285,25 @@ docker run --rm --network=tech-challenge_oficina_mecanica_net `
 ```shell
 ./mvnw test            # unitários (*Test.java), sem dependências externas
 ./mvnw test -Pitest    # + integração (*IT.java) com Testcontainers — requer Docker
-./mvnw verify          # testes + cobertura (JaCoCo) + análise estática
+./mvnw verify          # unitários + cobertura (JaCoCo) + análise estática
+./mvnw verify -Pitest  # quality gate completo usado antes do deploy
 ```
 
-Cobertura medida pelo gate JaCoCo; relatório em `target/jacoco-report/index.html`.
+Cobertura medida pelo gate JaCoCo, com mínimo de 80%; relatório em
+`target/jacoco-report/index.html`.
 
 ---
 
 ## Análise estática e segurança
 
-`./mvnw verify` executa Spotless, Checkstyle, PMD, SpotBugs e JaCoCo.
+`./mvnw verify` executa Spotless, Checkstyle, PMD/CPD, SpotBugs e JaCoCo. A
+pipeline de deploy executa também o perfil `itest`, publica o resumo de cobertura
+e dos testes no GitHub e guarda os relatórios por 14 dias.
 
-A esteira de CI (`.github/workflows/ci.yml`) adiciona varreduras de segurança: **Gitleaks**
-(secrets), **Semgrep** (SAST), **OWASP Dependency-Check** (SCA) e **SonarQube**. O resultado
-consolidado está em [docs/RELATORIO-VULNERABILIDADES.md](docs/RELATORIO-VULNERABILIDADES.md) e o
+A esteira de CI (`.github/workflows/ci.yml`) usa o mesmo perfil `itest` nos pull
+requests e adiciona varreduras de segurança: **Gitleaks** (secrets), **Semgrep**
+(SAST) e **OWASP Dependency-Check** (SCA). O resultado consolidado está em
+[docs/RELATORIO-VULNERABILIDADES.md](docs/RELATORIO-VULNERABILIDADES.md) e o
 relatório de dependências em `dependency-check-report.zip`.
 
 > **Chaves JWT:** o par RSA em `src/main/resources/jwt` é **somente para desenvolvimento**. Em
@@ -317,6 +323,34 @@ java -jar target/quarkus-app/quarkus-run.jar
 ./mvnw package -Dnative
 ./mvnw package -Dnative -Dquarkus.native.container-build=true
 ```
+
+---
+
+## Pipeline CI/CD
+
+O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) roda em
+pushes na `main` ou por acionamento manual. A execução manual aceita a versão
+opcional `vX.Y.Z`; sem ela, a pipeline usa `v1.0.<run_number>`.
+
+O fluxo completo executa:
+
+1. quality gate com lint, análise estática, testes unitários/integrados e cobertura mínima de 80%;
+2. build e publicação da imagem Docker no GHCR com tags de versão, SHA e `latest`;
+3. deploy da VPC e do cluster EKS com Terraform;
+4. criação de ConfigMap e Secret no cluster;
+5. deploy do PostgreSQL StatefulSet no EKS;
+6. aplicação dos manifests da API e verificação dos rollouts;
+7. criação da Git tag e GitHub Release após o smoke test;
+8. retenção das três imagens mais recentes no GHCR.
+
+A AWS é acessada preferencialmente com GitHub OIDC e, no Vocareum, pode usar as
+credenciais temporárias do laboratório. Os valores sensíveis ficam no GitHub
+Environment `aws`; consulte
+[`k8s/README.md`](k8s/README.md) para a lista de Secrets e Variables necessárias.
+
+O workflow manual [`.github/workflows/terraform.yml`](.github/workflows/terraform.yml)
+executa `plan`, `apply` ou `destroy`. A destruição exige a confirmação `DESTROY`
+e remove o Service `LoadBalancer` antes do cluster.
 
 ---
 

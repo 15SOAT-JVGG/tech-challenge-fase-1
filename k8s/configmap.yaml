@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oficina-mecanica-config
+  namespace: oficina-mecanica
+  labels:
+    app.kubernetes.io/name: oficina-mecanica-api
+    app.kubernetes.io/part-of: oficina-mecanica
+data:
+  POSTGRES_DB: oficina
+  INFRA_HOST_POSTGRES: postgres.oficina-mecanica.svc.cluster.local
+  APP_SEED_ENABLED: "false"
+  APP_SEED_ADMIN_USERNAME: admin
+  APP_SEED_MECHANIC_USERNAME: mecanico
+  JWT_EXPIRATION_HOURS: "8"
+  JWT_ISSUER: oficina-api
+  JWT_PRIVATE_KEY_LOCATION: file:/etc/jwt/privateKey.pem
+  JWT_PUBLIC_KEY_LOCATION: file:/etc/jwt/publicKey.pem
+  SWAGGER_UI_ENABLED: "true"
+  QUARKUS_OTEL_SDK_DISABLED: "true"
+  INFRA_HOST_OTEL: otel-collector:4317

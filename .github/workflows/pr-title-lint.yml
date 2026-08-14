@@ -1,6 +1,12 @@
 name: PR Title Lint (Conventional Commits)
 
 on:
+  workflow_dispatch:
+    inputs:
+      title:
+        description: PR title to validate
+        required: true
+        type: string
   pull_request:
     types: [opened, edited, synchronize, reopened]
 
@@ -14,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate PR title
+        if: github.event_name == 'pull_request'
         uses: amannn/action-semantic-pull-request@v5
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -35,3 +42,25 @@ jobs:
           requireScope: false
           # permite "feat!: ..." e outros breaking
           validateSingleCommit: false
+
+      - name: Validate provided title
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v8
+        env:
+          PR_TITLE: ${{ inputs.title }}
+        with:
+          script: |
+            const title = process.env.PR_TITLE.trim();
+            const allowed = [
+              'feature', 'feat', 'fix', 'chore', 'docs', 'refactor', 'test',
+              'perf', 'ci', 'build', 'style',
+            ];
+            const pattern = new RegExp(
+              `^(?:${allowed.join('|')})(?:\\([^)]+\\))?!?:\\s+\\S.*$`,
+            );
+
+            if (!pattern.test(title)) {
+              core.setFailed(
+                `Invalid title '${title}'. Expected type(scope): description.`,
+              );
+            }

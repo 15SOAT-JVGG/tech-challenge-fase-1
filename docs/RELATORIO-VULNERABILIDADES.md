@@ -18,9 +18,8 @@ executadas automaticamente na esteira de CI a cada Pull Request para a `main`
 | Secrets | **Gitleaks** 8.24.3 | Credenciais/segredos no histórico do Git | Achados reportados |
 | SAST | **Semgrep** (`p/ci`) | Padrões inseguros no código-fonte (injeção, criptografia fraca, etc.) | `fail_on_findings: true` |
 | SCA | **OWASP Dependency-Check** | CVEs conhecidas em dependências (NVD) | `fail_cvss: 8` (falha em CVSS ≥ 8) |
-| Qualidade/Segurança | **SonarQube** | Vulnerabilities, Security Hotspots, code smells, cobertura | Quality Gate |
 
-> Defesa em profundidade: secrets → código (SAST) → dependências (SCA) → qualidade contínua (Sonar).
+> Defesa em profundidade: secrets → código (SAST) → dependências (SCA).
 
 ---
 
@@ -40,10 +39,6 @@ executadas automaticamente na esteira de CI a cada Pull Request para a `main`
 
 ### 2.3 SAST — Semgrep
 - Regras `p/ci` com `fail_on_findings: true` — o merge na `main` só ocorre sem achados bloqueantes.
-
-### 2.4 SonarQube
-- Quality Gate aguardado no pipeline (`wait_quality_gate: true`), incluindo Security Hotspots
-  e cobertura (relatório JaCoCo XML publicado).
 
 ---
 
@@ -91,7 +86,7 @@ Além dos scans automatizados, a revisão arquitetural identificou os riscos aba
 
 ## 5. Conclusão
 
-As varreduras automatizadas (SCA, SAST, secrets e Sonar) **não acusaram vulnerabilidades
+As varreduras automatizadas (SCA, SAST e secrets) **não acusaram vulnerabilidades
 bloqueantes**, e o relatório do OWASP Dependency-Check anexo confirma **ausência de CVEs** nas
 dependências. O principal ponto de atenção é o **R-01** (controle de acesso do canal público da OS),
 recomendado para tratamento em evolução do MVP. Os artefatos de scan são publicados como

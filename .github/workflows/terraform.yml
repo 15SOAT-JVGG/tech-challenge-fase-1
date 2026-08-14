@@ -1,0 +1,157 @@
+name: Terraform AWS infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Terraform operation
+        required: true
+        default: plan
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      confirm_destroy:
+        description: Type DESTROY to confirm infrastructure destruction
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-aws-dev
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    name: Terraform ${{ inputs.operation }}
+    runs-on: ubuntu-latest
+    environment: aws
+    defaults:
+      run:
+        shell: bash
+        working-directory: infra/terraform
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      TF_VAR_eks_cluster_role_arn: ${{ vars.EKS_CLUSTER_ROLE_ARN }}
+      TF_VAR_eks_node_role_arn: ${{ vars.EKS_NODE_ROLE_ARN }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_STATE_KEY: ${{ vars.TF_STATE_KEY || 'tech-challenge-fase-1/dev/terraform.tfstate' }}
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials with OIDC
+        if: vars.AWS_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-terraform-${{ github.run_id }}
+
+      - name: Configure temporary AWS lab credentials
+        if: vars.AWS_ROLE_ARN == ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.5
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      - name: Initialize remote state
+        run: |
+          : "${TF_STATE_BUCKET:?GitHub variable TF_STATE_BUCKET is required}"
+          terraform init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${AWS_REGION}"
+
+      - name: Validate configuration
+        run: terraform validate
+
+      - name: Confirm infrastructure destruction
+        if: inputs.operation == 'destroy'
+        env:
+          CONFIRM_DESTROY: ${{ inputs.confirm_destroy }}
+        run: |
+          if [[ "${CONFIRM_DESTROY}" != "DESTROY" ]]; then
+            echo "Set confirm_destroy to DESTROY to run this operation." >&2
+            exit 1
+          fi
+
+      - name: Install kubectl for Kubernetes cleanup
+        if: inputs.operation == 'destroy'
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Remove Kubernetes-managed Load Balancer
+        if: inputs.operation == 'destroy'
+        run: |
+          cluster_name="$(terraform output -raw eks_cluster_name 2>/dev/null || true)"
+
+          if [[ -z "${cluster_name}" ]]; then
+            echo "EKS cluster is not present in Terraform state; skipping Kubernetes cleanup."
+            exit 0
+          fi
+
+          set +e
+          cluster_lookup="$(aws eks describe-cluster \
+            --region "${AWS_REGION}" \
+            --name "${cluster_name}" 2>&1)"
+          lookup_status=$?
+          set -e
+
+          if (( lookup_status != 0 )); then
+            if [[ "${cluster_lookup}" == *"ResourceNotFoundException"* ]]; then
+              echo "EKS cluster no longer exists; skipping Kubernetes cleanup."
+              exit 0
+            fi
+
+            echo "Could not verify the EKS cluster; refusing to destroy before Load Balancer cleanup." >&2
+            echo "${cluster_lookup}" >&2
+            exit "${lookup_status}"
+          fi
+
+          aws eks update-kubeconfig \
+            --region "${AWS_REGION}" \
+            --name "${cluster_name}" \
+            --kubeconfig "${RUNNER_TEMP}/kubeconfig"
+          export KUBECONFIG="${RUNNER_TEMP}/kubeconfig"
+
+          kubectl delete service oficina-mecanica-api \
+            --namespace oficina-mecanica \
+            --ignore-not-found=true \
+            --wait=true \
+            --timeout=10m
+
+      - name: Create execution plan
+        if: inputs.operation != 'destroy'
+        run: terraform plan -lock-timeout=5m -out="${RUNNER_TEMP}/terraform.tfplan"
+
+      - name: Create destruction plan
+        if: inputs.operation == 'destroy'
+        run: terraform plan -destroy -lock-timeout=5m -out="${RUNNER_TEMP}/terraform.tfplan"
+
+      - name: Apply execution plan
+        if: inputs.operation == 'apply' || inputs.operation == 'destroy'
+        run: terraform apply -auto-approve "${RUNNER_TEMP}/terraform.tfplan"
+
+      - name: Publish infrastructure outputs
+        if: inputs.operation == 'apply'
+        run: terraform output >> "${GITHUB_STEP_SUMMARY}"

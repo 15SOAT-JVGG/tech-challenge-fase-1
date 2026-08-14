@@ -1,0 +1,14 @@
+aws_region = "us-east-1"
+
+project_name = "oficina-mecanica"
+environment  = "dev"
+
+kubernetes_version = "1.36"
+
+eks_cluster_role_arn = "arn:aws:iam::123456789012:role/LabEksClusterRole"
+eks_node_role_arn    = "arn:aws:iam::123456789012:role/LabEksNodeRole"
+
+node_instance_types = ["t3.medium", "t3a.medium"]
+node_min_size       = 1
+node_max_size       = 2
+node_desired_size   = 1

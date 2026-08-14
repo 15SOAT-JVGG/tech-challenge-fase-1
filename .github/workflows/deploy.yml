@@ -1,0 +1,420 @@
+name: CI/CD - Build, infrastructure and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Optional release version (vX.Y.Z); defaults to v1.0.<run_number>
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/15soat-jvgg/tech-challenge-fase-1
+
+jobs:
+  prepare_version:
+    name: Define release version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Validate version and existing Git tag
+        id: version
+        uses: actions/github-script@v8
+        env:
+          REQUESTED_VERSION: ${{ inputs.version || '' }}
+          AUTOMATIC_VERSION: v1.0.${{ github.run_number }}
+        with:
+          script: |
+            const requested = process.env.REQUESTED_VERSION.trim();
+            const version = requested || process.env.AUTOMATIC_VERSION;
+            const semver = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
+
+            if (!semver.test(version)) {
+              core.setFailed(`Invalid version '${version}'. Use vX.Y.Z.`);
+              return;
+            }
+
+            try {
+              const { data: ref } = await github.rest.git.getRef({
+                ...context.repo,
+                ref: `tags/${version}`,
+              });
+
+              let tagCommit = ref.object.sha;
+              if (ref.object.type === 'tag') {
+                const { data: tag } = await github.rest.git.getTag({
+                  ...context.repo,
+                  tag_sha: ref.object.sha,
+                });
+                tagCommit = tag.object.sha;
+              }
+
+              if (tagCommit !== context.sha) {
+                core.setFailed(
+                  `Version ${version} already points to ${tagCommit}; refusing to retag ${context.sha}.`,
+                );
+                return;
+              }
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            core.setOutput('version', version);
+
+  quality_gate:
+    name: Lint, static analysis, tests and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run Maven quality gate
+        run: ./mvnw --batch-mode verify -Pitest
+
+      - name: Publish JaCoCo coverage summary
+        if: ${{ !cancelled() && hashFiles('target/jacoco-report/jacoco.xml') != '' }}
+        uses: madrapps/jacoco-report@v1.8.0
+        with:
+          paths: ${{ github.workspace }}/target/jacoco-report/jacoco.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          comment-type: summary
+          title: Coverage (JaCoCo)
+          coverage-counter-type: LINE
+          min-coverage-overall: 80
+          min-coverage-changed-lines: 0
+          show-all-modules: true
+          continue-on-error: false
+
+      - name: Publish automated test results
+        if: ${{ !cancelled() && hashFiles('target/surefire-reports/TEST-*.xml') != '' }}
+        uses: dorny/test-reporter@v3
+        with:
+          name: Unit and integration tests
+          path: |
+            target/surefire-reports/TEST-*.xml
+            target/failsafe-reports/TEST-*.xml
+          reporter: java-junit
+          fail-on-error: true
+
+      - name: Upload quality reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: quality-reports-${{ github.sha }}
+          path: |
+            target/jacoco-report/
+            target/surefire-reports/
+            target/failsafe-reports/
+            target/checkstyle-result.xml
+            target/pmd.xml
+            target/cpd.xml
+            target/spotbugsXml.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+  publish_image:
+    name: Build and publish Docker image
+    needs: [prepare_version, quality_gate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.reference }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Docker tags and labels
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ needs.prepare_version.outputs.version }},priority=900
+            type=sha,format=long,prefix=,priority=800
+            type=raw,value=latest,priority=200
+
+      - name: Define immutable image reference
+        id: image
+        run: echo "reference=${IMAGE_NAME}:${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: infra/docker/Dockerfile
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy EKS, PostgreSQL and Kubernetes manifests
+    needs: publish_image
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: aws
+    concurrency:
+      group: terraform-aws-dev
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      TF_VAR_eks_cluster_role_arn: ${{ vars.EKS_CLUSTER_ROLE_ARN }}
+      TF_VAR_eks_node_role_arn: ${{ vars.EKS_NODE_ROLE_ARN }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_STATE_KEY: ${{ vars.TF_STATE_KEY || 'tech-challenge-fase-1/dev/terraform.tfstate' }}
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials with OIDC
+        if: vars.AWS_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-ci-cd-${{ github.run_id }}
+
+      - name: Configure temporary AWS lab credentials
+        if: vars.AWS_ROLE_ARN == ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.5
+
+      - name: Check Terraform formatting
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive
+
+      - name: Initialize Terraform remote state
+        working-directory: infra/terraform
+        run: |
+          : "${TF_STATE_BUCKET:?GitHub variable TF_STATE_BUCKET is required}"
+          terraform init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${AWS_REGION}"
+
+      - name: Validate Terraform configuration
+        working-directory: infra/terraform
+        run: terraform validate
+
+      - name: Plan EKS infrastructure
+        working-directory: infra/terraform
+        run: terraform plan -lock-timeout=5m -out="${RUNNER_TEMP}/terraform.tfplan"
+
+      - name: Deploy EKS infrastructure
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve "${RUNNER_TEMP}/terraform.tfplan"
+
+      - name: Load Terraform deployment outputs
+        working-directory: infra/terraform
+        run: |
+          echo "EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name)" >> "${GITHUB_ENV}"
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Configure and verify EKS access
+        run: |
+          aws sts get-caller-identity
+          aws eks update-kubeconfig \
+            --region "${AWS_REGION}" \
+            --name "${EKS_CLUSTER_NAME}" \
+            --kubeconfig "${RUNNER_TEMP}/kubeconfig"
+          echo "KUBECONFIG=${RUNNER_TEMP}/kubeconfig" >> "${GITHUB_ENV}"
+          export KUBECONFIG="${RUNNER_TEMP}/kubeconfig"
+          kubectl cluster-info
+
+      - name: Apply namespace and ConfigMap
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+
+      - name: Create Kubernetes Secret from GitHub Secrets
+        env:
+          GHCR_USERNAME: ${{ vars.GHCR_USERNAME || github.repository_owner }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          POSTGRES_USERNAME: ${{ secrets.POSTGRES_USERNAME }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY }}
+          JWT_PUBLIC_KEY: ${{ secrets.JWT_PUBLIC_KEY }}
+        run: |
+          : "${POSTGRES_USERNAME:?GitHub secret POSTGRES_USERNAME is required}"
+          : "${POSTGRES_PASSWORD:?GitHub secret POSTGRES_PASSWORD is required}"
+          : "${JWT_PRIVATE_KEY:?GitHub secret JWT_PRIVATE_KEY is required}"
+          : "${JWT_PUBLIC_KEY:?GitHub secret JWT_PUBLIC_KEY is required}"
+          : "${GHCR_USERNAME:?GitHub variable GHCR_USERNAME is required}"
+          : "${GHCR_PULL_TOKEN:?GitHub secret GHCR_PULL_TOKEN is required}"
+
+          umask 077
+          secret_dir="${RUNNER_TEMP}/oficina-mecanica-secrets"
+          mkdir -p "${secret_dir}"
+          printf '%s' "${JWT_PRIVATE_KEY}" > "${secret_dir}/privateKey.pem"
+          printf '%s' "${JWT_PUBLIC_KEY}" > "${secret_dir}/publicKey.pem"
+
+          kubectl create secret generic oficina-mecanica-secrets \
+            --namespace oficina-mecanica \
+            --from-literal=POSTGRES_USERNAME="${POSTGRES_USERNAME}" \
+            --from-literal=POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+            --from-file=JWT_PRIVATE_KEY="${secret_dir}/privateKey.pem" \
+            --from-file=JWT_PUBLIC_KEY="${secret_dir}/publicKey.pem" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --namespace oficina-mecanica \
+            --docker-server=ghcr.io \
+            --docker-username="${GHCR_USERNAME}" \
+            --docker-password="${GHCR_PULL_TOKEN}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy PostgreSQL StatefulSet
+        run: |
+          kubectl apply -f k8s/postgres.yaml
+          kubectl rollout status statefulset/postgres \
+            --namespace oficina-mecanica \
+            --timeout=5m
+
+      - name: Apply Kubernetes YAML manifests
+        env:
+          IMAGE: ${{ needs.publish_image.outputs.image }}
+        run: |
+          kubectl set image --local -f k8s/deployment.yaml \
+            api="${IMAGE}" -o yaml | kubectl apply -f -
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/hpa.yaml
+          kubectl rollout status deployment/oficina-mecanica-api \
+            --namespace oficina-mecanica \
+            --timeout=5m
+
+      - name: Show deployed resources
+        run: |
+          kubectl get statefulset,deployment,pod,service,hpa,pvc \
+            --namespace oficina-mecanica \
+            --selector=app.kubernetes.io/part-of=oficina-mecanica
+          kubectl get persistentvolume oficina-mecanica-postgres
+
+          public_hostname=""
+          for attempt in {1..60}; do
+            public_hostname="$(kubectl get service oficina-mecanica-api \
+              --namespace oficina-mecanica \
+              --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+            [[ -n "${public_hostname}" ]] && break
+            echo "Waiting for public Load Balancer hostname (${attempt}/60)..."
+            sleep 10
+          done
+          : "${public_hostname:?Load Balancer hostname was not provisioned within 10 minutes}"
+
+          openapi_ready=false
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error \
+              --connect-timeout 10 \
+              --max-time 30 \
+              "http://${public_hostname}:8090/q/openapi?format=json" >/dev/null; then
+              openapi_ready=true
+              break
+            fi
+            echo "Waiting for public OpenAPI endpoint (${attempt}/30)..."
+            sleep 10
+          done
+          [[ "${openapi_ready}" == "true" ]]
+
+          echo "### Public endpoints" >> "${GITHUB_STEP_SUMMARY}"
+          echo "- API: http://${public_hostname}:8080" >> "${GITHUB_STEP_SUMMARY}"
+          echo "- OpenAPI: http://${public_hostname}:8090/q/openapi" >> "${GITHUB_STEP_SUMMARY}"
+          echo "- Swagger UI: http://${public_hostname}:8090/q/swagger-ui" >> "${GITHUB_STEP_SUMMARY}"
+
+  release:
+    name: Create Git tag and GitHub Release
+    needs: [prepare_version, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Create or update GitHub Release
+        id: release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.prepare_version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Release ${{ needs.prepare_version.outputs.version }}
+          generate_release_notes: true
+
+      - name: Publish release summary
+        env:
+          RELEASE_URL: ${{ steps.release.outputs.url }}
+          VERSION: ${{ needs.prepare_version.outputs.version }}
+        run: |
+          echo "### Release" >> "${GITHUB_STEP_SUMMARY}"
+          echo "- Version: ${VERSION}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "- URL: ${RELEASE_URL}" >> "${GITHUB_STEP_SUMMARY}"
+
+  cleanup_images:
+    name: Keep the latest three GHCR images
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Delete old container versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: tech-challenge-fase-1
+          package-type: container
+          min-versions-to-keep: 3
+          token: ${{ secrets.GITHUB_TOKEN }}

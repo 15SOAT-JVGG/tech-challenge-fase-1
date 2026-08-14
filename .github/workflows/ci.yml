@@ -61,7 +61,7 @@ jobs:
       use_tailscale: false
       upload_coverage: ${{ inputs.skip_tests != true }}
       maven_goals: "verify"
-      maven_args: ${{ inputs.skip_tests == true && '-DskipTests -Dstyle.color=always' || '-Dstyle.color=always' }}
+      maven_args: ${{ inputs.skip_tests == true && '-DskipTests -Dstyle.color=always' || '-Pitest -Dstyle.color=always' }}
 
   # ── 4. SCA — varredura de dependências com OWASP Dependency-Check ────────────
   sca_dependency_check:
@@ -74,24 +74,3 @@ jobs:
       fail_cvss: "8"
       format: "HTML"
       upload_artifact: true
-
-  # ── 5. Qualidade de código — SonarQube (via Tailscale) ───────────────────────
-  sonar:
-    name: SonarQube Scan
-    needs: [sca_dependency_check]
-    if: ${{ inputs.skip_tests != true }}
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/quality-sonarqube-scan.yml@main
-    with:
-      environment_name: homelab
-      fetch_depth: 0
-      coverage_artifact: ${{ inputs.skip_tests == true && '' || 'coverage-xml' }}
-      coverage_path: target/jacoco-report
-      sonar_enabled: false
-      sonar_project_key: ${{ github.event.repository.name }}
-      wait_quality_gate: true
-      tailscale_tags: tag:github-actions-homelab
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      TS_OAUTH_CLIENT_SECRET: ${{ secrets.TS_OAUTH_CLIENT_SECRET }}
