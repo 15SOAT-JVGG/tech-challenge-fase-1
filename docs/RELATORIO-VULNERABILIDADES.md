@@ -15,11 +15,12 @@ executadas automaticamente na esteira de CI a cada Pull Request para a `main`
 
 | Categoria | Ferramenta | O que cobre | Gate (falha o build) |
 |---|---|---|---|
-| Secrets | **Gitleaks** 8.24.3 | Credenciais/segredos no histórico do Git | Achados reportados |
+| Secrets | **Gitleaks** 8.24.3 | Credenciais/segredos no histórico do Git | Qualquer achado (`exit-code=1`) |
 | SAST | **Semgrep** (`p/ci`) | Padrões inseguros no código-fonte (injeção, criptografia fraca, etc.) | `fail_on_findings: true` |
 | SCA | **OWASP Dependency-Check** | CVEs conhecidas em dependências (NVD) | `fail_cvss: 8` (falha em CVSS ≥ 8) |
+| Imagem | **Trivy** | CVEs em pacotes de SO/bibliotecas e secrets empacotados | `HIGH`/`CRITICAL` corrigíveis |
 
-> Defesa em profundidade: secrets → código (SAST) → dependências (SCA).
+> Defesa em profundidade: secrets → código (SAST) → dependências (SCA) → imagem.
 
 ---
 
@@ -39,6 +40,17 @@ executadas automaticamente na esteira de CI a cada Pull Request para a `main`
 
 ### 2.3 SAST — Semgrep
 - Regras `p/ci` com `fail_on_findings: true` — o merge na `main` só ocorre sem achados bloqueantes.
+
+### 2.4 Imagem — Trivy
+- A imagem imutável identificada pelo SHA é escaneada depois do push no GHCR e
+  antes do Terraform. Vulnerabilidades `HIGH`/`CRITICAL` com correção disponível
+  e secrets empacotados bloqueiam o deploy.
+- Nenhuma chave JWT é incluída na imagem. O Docker Compose monta o par exclusivo
+  de desenvolvimento, enquanto o Kubernetes monta as chaves do GitHub Secret.
+- O resultado fica no resumo da execução e no artefato `trivy-<sha>` por 14 dias.
+- A validação local da imagem produzida com Quarkus `3.33.3.1` passou com zero
+  vulnerabilidades `HIGH`/`CRITICAL` corrigíveis e nenhum secret. A primeira
+  execução pelo GitHub Actions sobre a imagem do GHCR ainda permanece pendente.
 
 ---
 

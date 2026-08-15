@@ -184,9 +184,59 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  image_scan:
+    name: Scan Docker image with Trivy
+    needs: publish_image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan immutable image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ needs.publish_image.outputs.image }}
+          scanners: vuln,secret
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          output: trivy-results.txt
+          exit-code: "1"
+
+      - name: Publish Trivy summary
+        if: ${{ always() && hashFiles('trivy-results.txt') != '' }}
+        shell: bash
+        run: |
+          {
+            echo "### Trivy image scan"
+            echo '```text'
+            cat trivy-results.txt
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload Trivy report
+        if: ${{ always() && hashFiles('trivy-results.txt') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-${{ github.sha }}
+          path: trivy-results.txt
+          retention-days: 14
+
   deploy:
     name: Deploy EKS, PostgreSQL and Kubernetes manifests
-    needs: publish_image
+    needs: [publish_image, image_scan]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: aws
@@ -371,10 +421,12 @@ jobs:
           done
           [[ "${openapi_ready}" == "true" ]]
 
-          echo "### Public endpoints" >> "${GITHUB_STEP_SUMMARY}"
-          echo "- API: http://${public_hostname}:8080" >> "${GITHUB_STEP_SUMMARY}"
-          echo "- OpenAPI: http://${public_hostname}:8090/q/openapi" >> "${GITHUB_STEP_SUMMARY}"
-          echo "- Swagger UI: http://${public_hostname}:8090/q/swagger-ui" >> "${GITHUB_STEP_SUMMARY}"
+          {
+            echo "### Public endpoints"
+            echo "- API: http://${public_hostname}:8080"
+            echo "- OpenAPI: http://${public_hostname}:8090/q/openapi"
+            echo "- Swagger UI: http://${public_hostname}:8090/q/swagger-ui"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
   release:
     name: Create Git tag and GitHub Release
@@ -398,9 +450,11 @@ jobs:
           RELEASE_URL: ${{ steps.release.outputs.url }}
           VERSION: ${{ needs.prepare_version.outputs.version }}
         run: |
-          echo "### Release" >> "${GITHUB_STEP_SUMMARY}"
-          echo "- Version: ${VERSION}" >> "${GITHUB_STEP_SUMMARY}"
-          echo "- URL: ${RELEASE_URL}" >> "${GITHUB_STEP_SUMMARY}"
+          {
+            echo "### Release"
+            echo "- Version: ${VERSION}"
+            echo "- URL: ${RELEASE_URL}"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
   cleanup_images:
     name: Keep the latest three GHCR images

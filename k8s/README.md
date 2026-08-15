@@ -82,17 +82,19 @@ O workflow `CI/CD - Build, infrastructure and deploy` executa:
 
 1. quality gate Maven com Spotless, Checkstyle, PMD/CPD, SpotBugs, testes unitários/integrados e JaCoCo mínimo de 80%;
 2. geração da versão e publicação da imagem no GHCR com versão, SHA e `latest`;
-3. aplicação do Terraform da VPC e EKS;
-4. criação do ConfigMap e do Secret Kubernetes;
-5. aplicação e espera do rollout do PostgreSQL StatefulSet;
-6. aplicação da API, Service e HPA e espera do rollout da API;
-7. smoke test do endpoint público;
-8. criação da Git tag e GitHub Release;
-9. retenção das três imagens mais recentes no GHCR.
+3. scan bloqueante da imagem com Trivy para vulnerabilidades altas/críticas e secrets;
+4. aplicação do Terraform da VPC e EKS;
+5. criação do ConfigMap e do Secret Kubernetes;
+6. aplicação e espera do rollout do PostgreSQL StatefulSet;
+7. aplicação da API, Service e HPA e espera do rollout da API;
+8. smoke test do endpoint público;
+9. criação da Git tag e GitHub Release;
+10. retenção das três imagens mais recentes no GHCR.
 
 Os resultados JUnit e o resumo JaCoCo aparecem na execução da Action. Os
 relatórios completos de cobertura e análise estática ficam disponíveis como o
-artefato `quality-reports-<sha>` por 14 dias.
+artefato `quality-reports-<sha>` por 14 dias; o resultado do scan da imagem fica
+no artefato `trivy-<sha>` pelo mesmo período.
 
 Em execução manual, informe `version` como `vX.Y.Z` ou deixe em branco para usar
 `v1.0.<run_number>`. A mesma versão só pode ser repetida para o mesmo commit.

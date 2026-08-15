@@ -301,8 +301,10 @@ pipeline de deploy executa também o perfil `itest`, publica o resumo de cobertu
 e dos testes no GitHub e guarda os relatórios por 14 dias.
 
 A esteira de CI (`.github/workflows/ci.yml`) usa o mesmo perfil `itest` nos pull
-requests e adiciona varreduras de segurança: **Gitleaks** (secrets), **Semgrep**
-(SAST) e **OWASP Dependency-Check** (SCA). O resultado consolidado está em
+requests e adiciona varreduras bloqueantes de segurança: **Gitleaks** (secrets),
+**Semgrep** (SAST) e **OWASP Dependency-Check** (SCA). Depois do build da imagem,
+o **Trivy** bloqueia o deploy quando encontra vulnerabilidades corrigíveis de
+severidade alta ou crítica, ou secrets dentro da imagem. O resultado consolidado está em
 [docs/RELATORIO-VULNERABILIDADES.md](docs/RELATORIO-VULNERABILIDADES.md) e o
 relatório de dependências em `dependency-check-report.zip`.
 
@@ -336,12 +338,13 @@ O fluxo completo executa:
 
 1. quality gate com lint, análise estática, testes unitários/integrados e cobertura mínima de 80%;
 2. build e publicação da imagem Docker no GHCR com tags de versão, SHA e `latest`;
-3. deploy da VPC e do cluster EKS com Terraform;
-4. criação de ConfigMap e Secret no cluster;
-5. deploy do PostgreSQL StatefulSet no EKS;
-6. aplicação dos manifests da API e verificação dos rollouts;
-7. criação da Git tag e GitHub Release após o smoke test;
-8. retenção das três imagens mais recentes no GHCR.
+3. scan da imagem imutável com Trivy antes de qualquer criação de infraestrutura;
+4. deploy da VPC e do cluster EKS com Terraform;
+5. criação de ConfigMap e Secret no cluster;
+6. deploy do PostgreSQL StatefulSet no EKS;
+7. aplicação dos manifests da API e verificação dos rollouts;
+8. criação da Git tag e GitHub Release após o smoke test;
+9. retenção das três imagens mais recentes no GHCR.
 
 A AWS é acessada preferencialmente com GitHub OIDC e, no Vocareum, pode usar as
 credenciais temporárias do laboratório. Os valores sensíveis ficam no GitHub

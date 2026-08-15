@@ -92,7 +92,8 @@ O workflow **CI/CD - Build, infrastructure and deploy** roda em todo push na
 `main` e também pode ser iniciado manualmente com uma versão `vX.Y.Z` opcional.
 Antes de criar recursos AWS, ele exige Spotless, Checkstyle, PMD/CPD, SpotBugs,
 testes unitários/integrados e cobertura JaCoCo mínima de 80%. Depois desse gate
-e da publicação da imagem, ele:
+e da publicação da imagem, ele exige também o scan Trivy de vulnerabilidades
+altas/críticas corrigíveis e secrets. Somente depois desses gates ele:
 
 1. gera e aplica o plano Terraform;
 2. cria ou atualiza a VPC e o EKS;

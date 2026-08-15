@@ -23,6 +23,32 @@ References: `pom.xml`, `.github/workflows/ci.yml`,
 Last verified locally with 393 passing tests, zero static-analysis violations,
 and 88.49% line coverage on 2026-08-14.
 
+## 2026-08-15 — Security gates are local or revision-pinned
+
+Status: accepted
+
+- Gitleaks runs directly in the PR/manual CI with complete history and blocks on
+  findings; the shared implementation was not used because it temporarily
+  ignored scan failures.
+- Semgrep, the Quarkus build, and OWASP Dependency-Check remain reusable but are
+  pinned to reviewed commit `ecbbbeba3ef6e46082a374d5d918ad40140c144e` instead
+  of the mutable `main` branch.
+- The immutable GHCR image is scanned by Trivy for high/critical fixable CVEs and
+  embedded secrets before Terraform can create AWS resources. The report is
+  retained for 14 days.
+- JWT private keys are never baked into the runtime image: Docker Compose mounts
+  the development pair and Kubernetes mounts the GitHub-provided Secret.
+
+Rationale: security checks must block delivery and shared workflow changes must
+not silently change this repository's pipeline.
+
+References: `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`,
+`docs/RELATORIO-VULNERABILIDADES.md`.
+
+Last verified locally with workflow static validation, 393 passing tests,
+88.49% line coverage, and a clean Trivy scan of the resulting image on
+2026-08-15. The first GitHub Actions scan of the GHCR image remains pending.
+
 ## 2026-08-04 — AWS is the primary deployment target
 
 Status: accepted

@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Development-only JWT key replaced by a Kubernetes Secret in deployments"
+paths = ['''^src/main/resources/jwt/privateKey\.pem$''']

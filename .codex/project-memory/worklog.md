@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-08-15 — Blocking Gitleaks and pre-deploy Trivy scan
+
+- Replaced the non-blocking shared Gitleaks call with a cached, pinned binary
+  scan of the complete Git history; findings now fail PR and manual CI runs.
+- Pinned the remaining reusable Semgrep, build, and OWASP workflows to the
+  reviewed upstream commit instead of `main`.
+- Added an official Trivy image scan between GHCR publication and Terraform,
+  blocking fixable high/critical CVEs and embedded secrets and retaining the
+  report for 14 days.
+- A scan of the previous image exposed a baked-in demo private key and vulnerable
+  framework dependencies. Removed the key from the image, changed Compose to a
+  development-only bind mount, and upgraded the Quarkus LTS platform to
+  `3.33.3.1`.
+- Verified 393 tests, 88.49% line coverage, every Maven static-analysis gate,
+  the production Docker build, and a clean Trivy scan with the same blocking
+  policy used by CI. The first GitHub Actions scan of the GHCR image remains
+  pending.
+
 ## 2026-08-14 — CI/CD quality gate and reports
 
 - Inspected the project's Maven build plugins and confirmed that Spotless,

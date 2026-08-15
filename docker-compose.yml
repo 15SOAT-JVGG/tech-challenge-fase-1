@@ -60,9 +60,12 @@ services:
       APP_SEED_ADMIN_PASSWORD: ${APP_SEED_ADMIN_PASSWORD:-admin123}
       APP_SEED_MECHANIC_USERNAME: ${APP_SEED_MECHANIC_USERNAME:-mecanico}
       APP_SEED_MECHANIC_PASSWORD: ${APP_SEED_MECHANIC_PASSWORD:-mecanico123}
-      # Chaves JWT efêmeras geradas no build da imagem (uso local/demo).
-      JWT_PRIVATE_KEY_LOCATION: ${JWT_PRIVATE_KEY_LOCATION:-file:/deployments/jwt-local/privateKey.pem}
-      JWT_PUBLIC_KEY_LOCATION: ${JWT_PUBLIC_KEY_LOCATION:-file:/deployments/jwt-local/publicKey.pem}
+      # Chaves versionadas somente para desenvolvimento, montadas fora da imagem.
+      JWT_PRIVATE_KEY_LOCATION: ${JWT_PRIVATE_KEY_LOCATION:-file:/run/secrets/jwt/privateKey.pem}
+      JWT_PUBLIC_KEY_LOCATION: ${JWT_PUBLIC_KEY_LOCATION:-file:/run/secrets/jwt/publicKey.pem}
+    volumes:
+      - ./src/main/resources/jwt/privateKey.pem:/run/secrets/jwt/privateKey.pem:ro
+      - ./src/main/resources/jwt/publicKey.pem:/run/secrets/jwt/publicKey.pem:ro
     networks:
       - oficina_mecanica_net
 

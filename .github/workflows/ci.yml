@@ -34,17 +34,64 @@ jobs:
   # ── 1. Detecção de secrets no histórico do repositório ──────────────────────
   secrets_gitleaks:
     name: Secrets Scan (Gitleaks)
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-gitleaks.yml@main
-    with:
-      gitleaks_version: "8.24.3"
-      fetch_depth: 0
-      block_on_manual: false
-      upload_sarif: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: "8.24.3"
+    steps:
+      - name: Checkout complete Git history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache Gitleaks binary
+        id: gitleaks-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.local/bin/gitleaks
+          key: gitleaks-${{ runner.os }}-${{ runner.arch }}-${{ env.GITLEAKS_VERSION }}
+
+      - name: Install Gitleaks
+        if: steps.gitleaks-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "$(uname -m)" in
+            x86_64) package_arch="x64" ;;
+            aarch64|arm64) package_arch="arm64" ;;
+            *) echo "Unsupported runner architecture"; exit 1 ;;
+          esac
+
+          archive="${RUNNER_TEMP}/gitleaks.tar.gz"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${package_arch}.tar.gz"
+          mkdir -p "${HOME}/.local/bin"
+          curl --fail --silent --show-error --location "${url}" --output "${archive}"
+          tar -xzf "${archive}" -C "${HOME}/.local/bin" gitleaks
+          chmod +x "${HOME}/.local/bin/gitleaks"
+
+      - name: Scan complete history for secrets
+        run: |
+          "${HOME}/.local/bin/gitleaks" detect \
+            --config=.gitleaks/gitleaks.toml \
+            --redact \
+            --exit-code=1 \
+            --report-format=sarif \
+            --report-path=gitleaks.sarif
+
+      - name: Upload Gitleaks report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: gitleaks-${{ github.sha }}
+          path: gitleaks.sarif
+          if-no-files-found: warn
+          retention-days: 14
 
   # ── 2. SAST — análise estática de segurança ──────────────────────────────────
   sast_semgrep:
     name: SAST (Semgrep)
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-semgrep.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-semgrep.yml@ecbbbeba3ef6e46082a374d5d918ad40140c144e
     secrets: inherit
     with:
       config: p/ci
@@ -55,7 +102,7 @@ jobs:
   build:
     name: Build & Tests (Quarkus JVM)
     needs: [secrets_gitleaks, sast_semgrep]
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/build-java-quarkus-jvm.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/build-java-quarkus-jvm.yml@ecbbbeba3ef6e46082a374d5d918ad40140c144e
     with:
       java_version: "21"
       use_tailscale: false
@@ -67,7 +114,7 @@ jobs:
   sca_dependency_check:
     name: SCA (OWASP Dependency-Check)
     needs: [build]
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-sca-dependency-check.yml@main
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-sca-dependency-check.yml@ecbbbeba3ef6e46082a374d5d918ad40140c144e
     with:
       project_name: ${{ github.event.repository.name }}
       scan_path: .
