@@ -89,22 +89,24 @@ quarkus:
 
 
 # ── JWT ─────────────────────────────────────────────────────────────────────--
-# Keys externalized via env. The defaults point to an RSA pair for DEVELOPMENT ONLY
-# (src/main/resources/jwt). In production, override
-# JWT_PRIVATE_KEY_LOCATION / JWT_PUBLIC_KEY_LOCATION for mounted secrets
-# (e.g.: file:/etc/jwt/privateKey.pem) and NEVER use the versioned keys.
+# The RS256 pair is never versioned nor baked into the image: it is generated once,
+# outside the build (infra/scripts/generate-jwt-pair.sh), and provided by
+# JWT_PRIVATE_KEY_LOCATION / JWT_PUBLIC_KEY_LOCATION — a mounted secret in production
+# (e.g.: file:/etc/jwt/privateKey.pem), a Docker volume under docker compose.
+# The defaults below point to the local development pair, which is not tracked by Git;
+# JwtKeyStartupGuard refuses to start in production while they are in use.
 smallrye:
   jwt:
     sign:
       key:
-        location: ${JWT_PRIVATE_KEY_LOCATION:jwt/privateKey.pem}
+        location: ${JWT_PRIVATE_KEY_LOCATION:.local-jwt/privateKey.pem}
 
 mp:
   jwt:
     verify:
       issuer: ${JWT_ISSUER:oficina-api}
       publickey:
-        location: ${JWT_PUBLIC_KEY_LOCATION:jwt/publicKey.pem}
+        location: ${JWT_PUBLIC_KEY_LOCATION:.local-jwt/publicKey.pem}
 
 app:
   seed:

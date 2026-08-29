@@ -14,6 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
+import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.JwtKeyPairTestResource;
 import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.PostgresTestResource;
 
 import io.quarkus.hibernate.reactive.panache.Panache;
@@ -24,6 +25,7 @@ import io.smallrye.mutiny.Uni;
 
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
+@QuarkusTestResource(JwtKeyPairTestResource.class)
 @DisplayName("PartRepository — Integration Tests")
 class PartRepositoryIT {
 

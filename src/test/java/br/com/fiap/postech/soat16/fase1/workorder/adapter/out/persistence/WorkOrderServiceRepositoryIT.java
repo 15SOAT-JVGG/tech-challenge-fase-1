@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import br.com.fiap.postech.soat16.fase1.customer.adapter.out.persistence.CustomerRepository;
 import br.com.fiap.postech.soat16.fase1.customer.domain.model.Customer;
 import br.com.fiap.postech.soat16.fase1.customer.domain.model.enums.DocumentType;
+import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.JwtKeyPairTestResource;
 import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.PostgresTestResource;
 import br.com.fiap.postech.soat16.fase1.vehicle.adapter.out.persistence.VehicleRepository;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
@@ -35,6 +36,7 @@ import io.smallrye.mutiny.Uni;
 
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
+@QuarkusTestResource(JwtKeyPairTestResource.class)
 @DisplayName("WorkOrderServiceRepository — Integration Tests")
 class WorkOrderServiceRepositoryIT {
 

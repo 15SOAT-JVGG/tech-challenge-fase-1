@@ -34,9 +34,11 @@ executadas automaticamente na esteira de CI a cada Pull Request para a `main`
 
 ### 2.2 Secrets — Gitleaks
 - Varredura de todo o histórico (`fetch_depth: 0`). Sem segredos commitados.
-- O par de chaves RSA versionado em `src/main/resources/jwt` é **exclusivo para desenvolvimento**
-  e está documentado como tal; em produção é sobrescrito por secrets montados
-  (`JWT_PRIVATE_KEY_LOCATION` / `JWT_PUBLIC_KEY_LOCATION`). Não é um segredo real de produção.
+- O par de chaves RS256 **não é versionado nem embutido na imagem**: é gerado uma única vez fora do
+  build e informado por `JWT_PRIVATE_KEY_LOCATION` / `JWT_PUBLIC_KEY_LOCATION` — Secret montado em
+  produção, volume do Docker no Compose, par efêmero nos testes de integração. O par de
+  desenvolvimento que antes vivia em `src/main/resources/jwt` foi removido; como ele permanece no
+  histórico do Git, deve ser considerado comprometido e nunca reutilizado.
 
 ### 2.3 SAST — Semgrep
 - Regras `p/ci` com `fail_on_findings: true` — o merge na `main` só ocorre sem achados bloqueantes.
@@ -77,7 +79,9 @@ Além dos scans automatizados, a revisão arquitetural identificou os riscos aba
 
 ## 4. Controles de segurança já implementados
 
-- **Autenticação JWT (RS256)** com chaves assimétricas externalizáveis; emissor validado.
+- **Autenticação JWT (RS256)** com chaves assimétricas sempre externas ao artefato — a imagem não
+  contém chave privada e o `JwtKeyStartupGuard` impede a subida em produção com a chave local;
+  emissor validado.
 - **Autorização RBAC** por endpoint (`@RolesAllowed("ADMIN" | "MECHANIC")`).
 - **Negação por padrão:** `quarkus.security.jaxrs.deny-unannotated-endpoints: true` —
   endpoint sem anotação de segurança é negado.

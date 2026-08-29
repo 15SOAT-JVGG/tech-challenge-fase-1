@@ -28,14 +28,6 @@ COPY src/ src/
 RUN mvn package -B -DskipTests \
       -Dnexus.url=${NEXUS_URL:-https://repo.maven.apache.org/maven2}
 
-# Gera um par RSA efêmero (único por build) para uso LOCAL/DEMO via docker-compose.
-# Evita reutilizar as chaves de desenvolvimento versionadas e satisfaz o
-# JwtKeyStartupGuard. Em produção, sobrescreva JWT_PRIVATE_KEY_LOCATION /
-# JWT_PUBLIC_KEY_LOCATION apontando para secrets montados (nunca estas chaves).
-RUN mkdir -p /build/jwt-local && \
-    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /build/jwt-local/privateKey.pem && \
-    openssl rsa -pubout -in /build/jwt-local/privateKey.pem -out /build/jwt-local/publicKey.pem
-
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM registry.access.redhat.com/ubi9/openjdk-21-runtime:1.24
 
@@ -46,10 +38,10 @@ COPY --from=builder --chown=185 /build/target/quarkus-app/*.jar /deployments/
 COPY --from=builder --chown=185 /build/target/quarkus-app/app/ /deployments/app/
 COPY --from=builder --chown=185 /build/target/quarkus-app/quarkus/ /deployments/quarkus/
 
-# Chaves JWT efêmeras para uso local/demo. NÃO definimos JWT_*_LOCATION aqui de
-# propósito: sem override, a aplicação usa a chave de dev e o JwtKeyStartupGuard
-# bloqueia o start em produção. O docker-compose aponta as variáveis para estas.
-COPY --from=builder --chown=185 /build/jwt-local/ /deployments/jwt-local/
+# A imagem não carrega chave alguma: o par RS256 é gerado uma única vez fora do
+# build e montado em tempo de execução (Secret no Kubernetes, volume no Compose).
+# Sem JWT_PRIVATE_KEY_LOCATION / JWT_PUBLIC_KEY_LOCATION, o JwtKeyStartupGuard
+# bloqueia a inicialização em produção.
 
 EXPOSE 8080
 USER 185

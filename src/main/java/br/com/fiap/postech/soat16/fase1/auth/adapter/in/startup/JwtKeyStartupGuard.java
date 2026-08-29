@@ -18,7 +18,7 @@ public class JwtKeyStartupGuard {
 
     private static final Logger LOG = Logger.getLogger(JwtKeyStartupGuard.class);
 
-    static final String DEV_KEY_LOCATION = "jwt/privateKey.pem";
+    static final String DEV_KEY_LOCATION = ".local-jwt/privateKey.pem";
 
     @ConfigProperty(name = "smallrye.jwt.sign.key.location")
     String signKeyLocation;

@@ -14,6 +14,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.JwtKeyPairTestResource;
 import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.PostgresTestResource;
 import br.com.fiap.postech.soat16.fase1.worker.domain.model.Worker;
 import br.com.fiap.postech.soat16.fase1.worker.domain.model.enums.WorkerProfile;
@@ -26,6 +27,7 @@ import io.smallrye.mutiny.Uni;
 
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
+@QuarkusTestResource(JwtKeyPairTestResource.class)
 @DisplayName("WorkerRepository — Integration Tests")
 class WorkerRepositoryIT {
 

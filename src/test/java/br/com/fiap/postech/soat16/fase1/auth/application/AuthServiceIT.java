@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import br.com.fiap.postech.soat16.fase1.auth.adapter.out.persistence.AppUserRepository;
 import br.com.fiap.postech.soat16.fase1.auth.application.command.LoginCommand;
 import br.com.fiap.postech.soat16.fase1.auth.domain.exception.InvalidCredentialsException;
+import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.JwtKeyPairTestResource;
 import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.PostgresTestResource;
 
 import io.quarkus.elytron.security.common.BcryptUtil;
@@ -32,6 +33,7 @@ import io.quarkus.test.vertx.UniAsserter;
 
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
+@QuarkusTestResource(JwtKeyPairTestResource.class)
 @DisplayName("AuthService — Integration Tests")
 class AuthServiceIT {
 

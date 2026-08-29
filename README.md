@@ -70,6 +70,8 @@ orçamentos**, além de um **canal público** para o cliente acompanhar e autori
 | `APP_SEED_ADMIN_USERNAME` / `APP_SEED_ADMIN_PASSWORD` | Admin inicial | `admin` / `admin123` |
 | `APP_SEED_MECHANIC_USERNAME` / `APP_SEED_MECHANIC_PASSWORD` | Mecânico inicial | `mecanico` / `mecanico123` |
 | `JWT_EXPIRATION_HOURS` | Validade do token (horas) | `8` |
+| `JWT_PRIVATE_KEY_LOCATION` | Chave privada de assinatura RS256 | `.local-jwt/privateKey.pem` |
+| `JWT_PUBLIC_KEY_LOCATION` | Chave pública de validação RS256 | `.local-jwt/publicKey.pem` |
 
 > **Banco x Schema:** o **banco** chama-se `oficina` e a aplicação cria/usa o **schema**
 > `oficina_mecanica` automaticamente na inicialização (Flyway + Hibernate). Não confunda os dois.
@@ -109,11 +111,15 @@ leva alguns minutos; nas próximas é quase instantâneo (cache).
 > O `.env` é **opcional**: todos os valores já vêm preenchidos no `docker-compose.yml`. Crie um `.env`
 > (a partir de `.env.example`) **somente** se quiser sobrescrever portas, senhas ou nomes padrão.
 
+O par de chaves RS256 é gerado na primeira subida pelo serviço `jwt-keys` e guardado num volume do
+Docker — a imagem não carrega chave alguma (ver [Chaves JWT (RS256)](#chaves-jwt-rs256)).
+
 ### Alternativa — Dev mode (live reload)
 
 Requer Java 21 + Maven. Sobe só o banco em container e a aplicação localmente com hot reload:
 
 ```shell
+infra/scripts/generate-jwt-pair.sh    # uma única vez: cria .local-jwt/
 docker compose up -d postgres
 ./mvnw quarkus:dev
 ```
@@ -159,6 +165,36 @@ token** (sem `Bearer`) → as chamadas passam a enviar o header automaticamente.
 
 > Sem senha definida no `.env`? Recupere a gerada no log:
 > `docker compose logs app | grep SEED`
+
+### Chaves JWT (RS256)
+
+O token é assinado com RSA. **A imagem não contém chave privada e o repositório não versiona nenhuma
+chave:** o par é gerado uma única vez, fora do build, e informado à aplicação por
+`JWT_PRIVATE_KEY_LOCATION` / `JWT_PUBLIC_KEY_LOCATION`. Assim a mesma imagem serve para qualquer
+ambiente e um rebuild não invalida os tokens em circulação.
+
+| Ambiente | Origem do par |
+|---|---|
+| `docker compose` | Serviço `jwt-keys` gera na primeira subida e guarda no volume `jwt_keys`, montado em `/etc/jwt` |
+| Dev mode e uso local | `infra/scripts/generate-jwt-pair.sh` cria `.local-jwt/` (fora do controle de versão) |
+| Testes de integração | Par efêmero gerado por `JwtKeyPairTestResource` em `target/jwt-test/` |
+| Produção | Arquivo montado a partir de um secret, com as variáveis apontando para ele |
+
+Qualquer ambiente fora do Compose recebe o par por essas duas variáveis; no cluster, o par vem de um
+`Secret` do Kubernetes criado a partir dos secrets do repositório pelo caminho de entrega.
+
+Para gerar o par de um ambiente real e guardá-lo nos secrets do repositório:
+
+```shell
+infra/scripts/generate-jwt-pair.sh /caminho/seguro/jwt
+gh secret set JWT_PRIVATE_KEY_B64 --body "$(base64 < /caminho/seguro/jwt/privateKey.pem | tr -d '\n')"
+gh secret set JWT_PUBLIC_KEY_B64  --body "$(base64 < /caminho/seguro/jwt/publicKey.pem  | tr -d '\n')"
+```
+
+Guarde a chave privada apenas no gerenciador de secrets — nunca no repositório, no `.env` versionado
+ou na imagem. Regerar o par invalida todos os tokens já emitidos, então trate-o como rotação
+planejada. Sem `JWT_PRIVATE_KEY_LOCATION` definido, o `JwtKeyStartupGuard` **bloqueia a inicialização
+em produção**, para que nenhum ambiente produtivo suba com a chave de desenvolvimento.
 
 ---
 
@@ -300,9 +336,9 @@ A esteira de CI (`.github/workflows/ci.yml`) adiciona varreduras de segurança: 
 consolidado está em [docs/RELATORIO-VULNERABILIDADES.md](docs/RELATORIO-VULNERABILIDADES.md) e o
 relatório de dependências em `dependency-check-report.zip`.
 
-> **Chaves JWT:** o par RSA em `src/main/resources/jwt` é **somente para desenvolvimento**. Em
-> produção, aponte `JWT_PRIVATE_KEY_LOCATION` / `JWT_PUBLIC_KEY_LOCATION` para secrets montados e
-> **nunca** use as chaves versionadas. Em produção, defina também `SWAGGER_UI_ENABLED=false`.
+> **Chaves JWT:** nenhuma chave é versionada ou embutida na imagem — aponte
+> `JWT_PRIVATE_KEY_LOCATION` / `JWT_PUBLIC_KEY_LOCATION` para o secret montado, conforme
+> [Chaves JWT (RS256)](#chaves-jwt-rs256). Em produção, defina também `SWAGGER_UI_ENABLED=false`.
 
 ---
 

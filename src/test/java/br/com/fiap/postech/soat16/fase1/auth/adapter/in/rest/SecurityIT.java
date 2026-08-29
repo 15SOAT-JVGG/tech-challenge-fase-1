@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.JwtKeyPairTestResource;
 import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.PostgresTestResource;
 
 import io.quarkus.test.common.QuarkusTestResource;
@@ -14,6 +15,7 @@ import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
+@QuarkusTestResource(JwtKeyPairTestResource.class)
 @DisplayName("Security — proteção das APIs administrativas")
 class SecurityIT {
 

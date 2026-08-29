@@ -36,6 +36,27 @@ services:
     networks:
       - oficina_mecanica_net
 
+  # Gera o par RS256 fora do build da imagem, na primeira subida, e o guarda num
+  # volume. A imagem nunca contém chave privada e o par sobrevive a `docker compose
+  # up` seguintes, então os tokens emitidos continuam válidos. Mesma geração do
+  # infra/scripts/generate-jwt-pair.sh, aqui em sh puro por causa da imagem.
+  # A chave privada fica 640 e pertence ao grupo 0, o único que o usuário 185 da
+  # imagem da aplicação tem — ninguém além dele consegue ler.
+  jwt-keys:
+    image: alpine/openssl:3.5.1
+    container_name: oficina-mecanica-jwt-keys
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        (test -s /jwt/privateKey.pem && test -s /jwt/publicKey.pem) ||
+        (openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /jwt/privateKey.pem &&
+         openssl rsa -pubout -in /jwt/privateKey.pem -out /jwt/publicKey.pem &&
+         chown 185:0 /jwt/privateKey.pem /jwt/publicKey.pem &&
+         chmod 640 /jwt/privateKey.pem &&
+         chmod 644 /jwt/publicKey.pem)
+    volumes:
+      - jwt_keys:/jwt
+
   app:
     build:
       context: .
@@ -46,6 +67,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      jwt-keys:
+        condition: service_completed_successfully
+    volumes:
+      - jwt_keys:/etc/jwt:ro
     ports:
       - "8080:8080"
     environment:
@@ -59,9 +84,9 @@ services:
       APP_SEED_ADMIN_PASSWORD: ${APP_SEED_ADMIN_PASSWORD:-admin123}
       APP_SEED_MECHANIC_USERNAME: ${APP_SEED_MECHANIC_USERNAME:-mecanico}
       APP_SEED_MECHANIC_PASSWORD: ${APP_SEED_MECHANIC_PASSWORD:-mecanico123}
-      # Chaves JWT efêmeras geradas no build da imagem (uso local/demo).
-      JWT_PRIVATE_KEY_LOCATION: ${JWT_PRIVATE_KEY_LOCATION:-file:/deployments/jwt-local/privateKey.pem}
-      JWT_PUBLIC_KEY_LOCATION: ${JWT_PUBLIC_KEY_LOCATION:-file:/deployments/jwt-local/publicKey.pem}
+      # Par RS256 gerado pelo serviço jwt-keys e montado em /etc/jwt (uso local/demo).
+      JWT_PRIVATE_KEY_LOCATION: ${JWT_PRIVATE_KEY_LOCATION:-file:/etc/jwt/privateKey.pem}
+      JWT_PUBLIC_KEY_LOCATION: ${JWT_PUBLIC_KEY_LOCATION:-file:/etc/jwt/publicKey.pem}
     networks:
       - oficina_mecanica_net
 
@@ -71,3 +96,4 @@ networks:
 
 volumes:
   postgres_data:
+  jwt_keys:

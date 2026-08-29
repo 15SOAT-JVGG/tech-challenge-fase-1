@@ -29,6 +29,7 @@ import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
 import br.com.fiap.postech.soat16.fase1.shared.adapter.in.rest.dto.ApiErrorResponseDto;
 import br.com.fiap.postech.soat16.fase1.shared.adapter.in.rest.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.shared.domain.exception.ErrorType;
+import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.JwtKeyPairTestResource;
 import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.PostgresTestResource;
 import br.com.fiap.postech.soat16.fase1.vehicle.adapter.out.persistence.VehicleRepository;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
@@ -52,6 +53,7 @@ import io.smallrye.mutiny.Uni;
 
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
+@QuarkusTestResource(JwtKeyPairTestResource.class)
 @DisplayName("WorkOrderController — Integration Tests (HTTP)")
 class WorkOrderControllerIT {
 

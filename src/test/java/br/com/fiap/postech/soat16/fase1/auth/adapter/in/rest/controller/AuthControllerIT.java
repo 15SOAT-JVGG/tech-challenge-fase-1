@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import br.com.fiap.postech.soat16.fase1.auth.application.AuthService;
+import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.JwtKeyPairTestResource;
 import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.PostgresTestResource;
 
 import io.quarkus.test.common.QuarkusTestResource;
@@ -22,6 +23,7 @@ import io.quarkus.vertx.VertxContextSupport;
 
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
+@QuarkusTestResource(JwtKeyPairTestResource.class)
 @DisplayName("AuthController — Integration Tests (HTTP)")
 class AuthControllerIT {
 

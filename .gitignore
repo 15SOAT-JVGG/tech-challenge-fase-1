@@ -46,7 +46,7 @@ nb-configuration.xml
 .env
 .scratch/
 
-# Local-only JWT keys for docker compose (never use in production)
+# Par RS256 do ambiente local, gerado por infra/scripts/generate-jwt-pair.sh
 .local-jwt/
 
 # Relatório gerado pelo infra/scripts/verify-lab.sh: vale apenas para a sessão do lab em
