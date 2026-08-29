@@ -1,9 +1,9 @@
 package br.com.fiap.postech.soat16.fase1.workorder.domain.exception;
 
-import static br.com.fiap.postech.soat16.fase1.exception.ErrorType.BUSINESS;
+import static br.com.fiap.postech.soat16.fase1.shared.domain.exception.ErrorType.BUSINESS;
 import static br.com.fiap.postech.soat16.fase1.workorder.domain.exception.WorkOrderErrorCode.INVALID_STATUS_TRANSITION;
 
-import br.com.fiap.postech.soat16.fase1.exception.AppException;
+import br.com.fiap.postech.soat16.fase1.shared.domain.exception.AppException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderStatus;
 
 public class InvalidWorkOrderStatusTransitionException extends AppException {

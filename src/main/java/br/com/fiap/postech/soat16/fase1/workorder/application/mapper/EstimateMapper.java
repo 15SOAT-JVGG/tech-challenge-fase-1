@@ -1,15 +1,15 @@
 package br.com.fiap.postech.soat16.fase1.workorder.application.mapper;
 
-import org.mapstruct.Mapper;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.Estimate;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.EstimateItem;
 
-@Mapper(componentModel = "cdi")
-public interface EstimateMapper {
+@ApplicationScoped
+public class EstimateMapper {
 
-    default EstimateResult toResult(Estimate entity) {
+    public EstimateResult toResult(Estimate entity) {
         if (entity == null) {
             return null;
         }
@@ -26,7 +26,7 @@ public interface EstimateMapper {
         );
     }
 
-    default EstimateResult.Item toItemResult(EstimateItem item) {
+    public EstimateResult.Item toItemResult(EstimateItem item) {
         return new EstimateResult.Item(
                 item.getId(),
                 item.getPart().getId(),

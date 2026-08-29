@@ -17,10 +17,10 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
-import br.com.fiap.postech.soat16.fase1.model.Customer;
-import br.com.fiap.postech.soat16.fase1.model.Vehicle;
-import br.com.fiap.postech.soat16.fase1.model.Worker;
-import br.com.fiap.postech.soat16.fase1.model.audit.AuditableEntity;
+import br.com.fiap.postech.soat16.fase1.customer.domain.model.Customer;
+import br.com.fiap.postech.soat16.fase1.shared.domain.model.audit.AuditableEntity;
+import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
+import br.com.fiap.postech.soat16.fase1.worker.domain.model.Worker;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateNotApprovedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidWorkOrderStatusTransitionException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.WorkOrderLockedException;

@@ -4,16 +4,16 @@ import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import br.com.fiap.postech.soat16.fase1.model.Customer;
-import br.com.fiap.postech.soat16.fase1.model.Part;
-import br.com.fiap.postech.soat16.fase1.model.ServiceItem;
-import br.com.fiap.postech.soat16.fase1.model.Vehicle;
-import br.com.fiap.postech.soat16.fase1.model.Worker;
-import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
-import br.com.fiap.postech.soat16.fase1.repository.PartRepository;
-import br.com.fiap.postech.soat16.fase1.repository.ServiceItemRepository;
-import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
-import br.com.fiap.postech.soat16.fase1.repository.WorkerRepository;
+import br.com.fiap.postech.soat16.fase1.customer.application.port.out.CustomerPersistencePort;
+import br.com.fiap.postech.soat16.fase1.customer.domain.model.Customer;
+import br.com.fiap.postech.soat16.fase1.part.application.port.out.PartPersistencePort;
+import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.application.port.out.ServiceCatalogPersistencePort;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.model.ServiceItem;
+import br.com.fiap.postech.soat16.fase1.vehicle.application.port.out.VehiclePersistencePort;
+import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
+import br.com.fiap.postech.soat16.fase1.worker.application.port.out.WorkerPersistencePort;
+import br.com.fiap.postech.soat16.fase1.worker.domain.model.Worker;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkshopCatalogPort;
 
 import io.smallrye.mutiny.Uni;
@@ -23,11 +23,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class LegacyWorkshopCatalogAdapter implements WorkshopCatalogPort {
 
-    private final CustomerRepository customerRepository;
-    private final VehicleRepository vehicleRepository;
-    private final PartRepository partRepository;
-    private final WorkerRepository workerRepository;
-    private final ServiceItemRepository serviceItemRepository;
+    private final CustomerPersistencePort customerRepository;
+    private final VehiclePersistencePort vehicleRepository;
+    private final PartPersistencePort partRepository;
+    private final WorkerPersistencePort workerRepository;
+    private final ServiceCatalogPersistencePort serviceItemRepository;
 
     @Override
     public Uni<Customer> findCustomerById(UUID id) {
@@ -41,7 +41,7 @@ public class LegacyWorkshopCatalogAdapter implements WorkshopCatalogPort {
 
     @Override
     public Uni<Part> findPartById(UUID id) {
-        return partRepository.findById(id);
+        return partRepository.findPartById(id);
     }
 
     @Override
@@ -51,6 +51,6 @@ public class LegacyWorkshopCatalogAdapter implements WorkshopCatalogPort {
 
     @Override
     public Uni<ServiceItem> findServiceItemById(UUID id) {
-        return serviceItemRepository.findById(id);
+        return serviceItemRepository.findServiceItemById(id);
     }
 }

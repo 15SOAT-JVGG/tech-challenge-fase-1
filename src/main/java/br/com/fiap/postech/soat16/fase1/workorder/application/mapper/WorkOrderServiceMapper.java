@@ -3,18 +3,18 @@ package br.com.fiap.postech.soat16.fase1.workorder.application.mapper;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
-import org.mapstruct.Mapper;
+import jakarta.enterprise.context.ApplicationScoped;
 
-import br.com.fiap.postech.soat16.fase1.model.ServiceItem;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.model.ServiceItem;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.AddWorkOrderServiceCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService;
 
-@Mapper(componentModel = "cdi")
-public interface WorkOrderServiceMapper {
+@ApplicationScoped
+public class WorkOrderServiceMapper {
 
-    default WorkOrderServiceResult toResult(WorkOrderService entity) {
+    public WorkOrderServiceResult toResult(WorkOrderService entity) {
         if (entity == null) {
             return null;
         }
@@ -28,7 +28,7 @@ public interface WorkOrderServiceMapper {
         );
     }
 
-    default WorkOrderService toEntity(AddWorkOrderServiceCommand request,
+    public WorkOrderService toEntity(AddWorkOrderServiceCommand request,
             WorkOrder workOrder, ServiceItem serviceItem) {
         var entity = new WorkOrderService();
         entity.setWorkOrder(workOrder);

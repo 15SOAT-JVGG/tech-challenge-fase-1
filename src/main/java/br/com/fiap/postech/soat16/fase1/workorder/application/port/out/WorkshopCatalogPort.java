@@ -2,11 +2,11 @@ package br.com.fiap.postech.soat16.fase1.workorder.application.port.out;
 
 import java.util.UUID;
 
-import br.com.fiap.postech.soat16.fase1.model.Customer;
-import br.com.fiap.postech.soat16.fase1.model.Part;
-import br.com.fiap.postech.soat16.fase1.model.ServiceItem;
-import br.com.fiap.postech.soat16.fase1.model.Vehicle;
-import br.com.fiap.postech.soat16.fase1.model.Worker;
+import br.com.fiap.postech.soat16.fase1.customer.domain.model.Customer;
+import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.model.ServiceItem;
+import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
+import br.com.fiap.postech.soat16.fase1.worker.domain.model.Worker;
 
 import io.smallrye.mutiny.Uni;
 

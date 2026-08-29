@@ -26,12 +26,15 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
-import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
-import br.com.fiap.postech.soat16.fase1.exception.VehicleNotFoundException;
-import br.com.fiap.postech.soat16.fase1.model.Customer;
-import br.com.fiap.postech.soat16.fase1.model.Part;
-import br.com.fiap.postech.soat16.fase1.model.Vehicle;
+import br.com.fiap.postech.soat16.fase1.customer.domain.exception.CustomerNotFoundException;
+import br.com.fiap.postech.soat16.fase1.customer.domain.model.Customer;
+import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.exception.ServiceItemNotFoundException;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.model.ServiceItem;
+import br.com.fiap.postech.soat16.fase1.shared.application.result.PagedResult;
+import br.com.fiap.postech.soat16.fase1.shared.domain.exception.BusinessException;
+import br.com.fiap.postech.soat16.fase1.vehicle.domain.exception.VehicleNotFoundException;
+import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.AddWorkOrderServiceCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.ChangeWorkOrderStatusCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.CloseWorkOrderCommand;
@@ -47,7 +50,6 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrder
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderServicePersistencePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkshopCatalogPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
-import br.com.fiap.postech.soat16.fase1.workorder.application.result.PagedResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateAlreadyDecidedException;
@@ -702,8 +704,7 @@ class WorkOrderServiceTest {
         @DisplayName("should resolve and persist the referenced service item when serviceItemId is provided")
         void shouldResolveServiceItem() {
             UUID serviceItemId = UUID.randomUUID();
-            br.com.fiap.postech.soat16.fase1.model.ServiceItem serviceItem =
-                    new br.com.fiap.postech.soat16.fase1.model.ServiceItem();
+            ServiceItem serviceItem = new ServiceItem();
             serviceItem.setId(serviceItemId);
             AddWorkOrderServiceCommand request =
                     new AddWorkOrderServiceCommand("Troca de oleo", BigDecimal.TEN, serviceItemId);
@@ -733,7 +734,7 @@ class WorkOrderServiceTest {
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(catalog.findServiceItemById(serviceItemId)).thenReturn(Uni.createFrom().nullItem());
 
-            assertThrows(br.com.fiap.postech.soat16.fase1.exception.ServiceItemNotFoundException.class,
+            assertThrows(ServiceItemNotFoundException.class,
                     () -> service.addService(WORK_ORDER_ID, request).await().indefinitely());
         }
 

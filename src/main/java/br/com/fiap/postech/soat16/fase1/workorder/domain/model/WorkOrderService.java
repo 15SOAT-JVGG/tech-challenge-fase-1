@@ -13,7 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
-import br.com.fiap.postech.soat16.fase1.model.ServiceItem;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.model.ServiceItem;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;

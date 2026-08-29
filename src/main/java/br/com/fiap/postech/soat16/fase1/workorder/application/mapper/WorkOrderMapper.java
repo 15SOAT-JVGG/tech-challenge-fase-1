@@ -1,14 +1,14 @@
 package br.com.fiap.postech.soat16.fase1.workorder.application.mapper;
 
-import org.mapstruct.Mapper;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrder;
 
-@Mapper(componentModel = "cdi")
-public interface WorkOrderMapper {
+@ApplicationScoped
+public class WorkOrderMapper {
 
-    default WorkOrderResult toResult(WorkOrder entity) {
+    public WorkOrderResult toResult(WorkOrder entity) {
         if (entity == null) {
             return null;
         }

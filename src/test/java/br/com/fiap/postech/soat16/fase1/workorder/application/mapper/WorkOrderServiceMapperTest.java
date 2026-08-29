@@ -10,7 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import br.com.fiap.postech.soat16.fase1.model.ServiceItem;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.model.ServiceItem;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.AddWorkOrderServiceCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrder;

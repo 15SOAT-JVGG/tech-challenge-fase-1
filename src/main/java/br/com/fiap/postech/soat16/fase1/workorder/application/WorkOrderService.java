@@ -9,13 +9,14 @@ import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
-import br.com.fiap.postech.soat16.fase1.exception.ServiceItemNotFoundException;
-import br.com.fiap.postech.soat16.fase1.exception.VehicleNotFoundException;
-import br.com.fiap.postech.soat16.fase1.exception.WorkerNotFoundException;
-import br.com.fiap.postech.soat16.fase1.model.Part;
-import br.com.fiap.postech.soat16.fase1.model.ServiceItem;
-import br.com.fiap.postech.soat16.fase1.model.Worker;
+import br.com.fiap.postech.soat16.fase1.customer.domain.exception.CustomerNotFoundException;
+import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.exception.ServiceItemNotFoundException;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.model.ServiceItem;
+import br.com.fiap.postech.soat16.fase1.shared.application.result.PagedResult;
+import br.com.fiap.postech.soat16.fase1.vehicle.domain.exception.VehicleNotFoundException;
+import br.com.fiap.postech.soat16.fase1.worker.domain.exception.WorkerNotFoundException;
+import br.com.fiap.postech.soat16.fase1.worker.domain.model.Worker;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.AddWorkOrderServiceCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.ChangeWorkOrderStatusCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.CloseWorkOrderCommand;
@@ -30,7 +31,6 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrder
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderServicePersistencePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkshopCatalogPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
-import br.com.fiap.postech.soat16.fase1.workorder.application.result.PagedResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderMetricsResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
