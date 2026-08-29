@@ -48,3 +48,6 @@ nb-configuration.xml
 
 # Local-only JWT keys for docker compose (never use in production)
 .local-jwt/
+
+# Relatório do infra/scripts/verify-lab.sh: contém ID de conta, ARNs e IDs de subnet
+lab-capabilities.md
