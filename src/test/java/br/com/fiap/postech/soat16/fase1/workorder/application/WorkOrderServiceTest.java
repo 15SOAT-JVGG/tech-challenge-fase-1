@@ -26,23 +26,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.exception.BusinessException;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.VehicleNotFoundException;
 import br.com.fiap.postech.soat16.fase1.model.Customer;
 import br.com.fiap.postech.soat16.fase1.model.Part;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
-import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
-import br.com.fiap.postech.soat16.fase1.repository.PartRepository;
-import br.com.fiap.postech.soat16.fase1.repository.ServiceItemRepository;
-import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
-import br.com.fiap.postech.soat16.fase1.repository.WorkerRepository;
-import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.notification.LoggingNotificationAdapter;
-import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.EstimateRepository;
-import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.WorkOrderHistoryRepository;
-import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.WorkOrderRepository;
-import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.WorkOrderServiceRepository;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.AddWorkOrderServiceCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.ChangeWorkOrderStatusCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.CloseWorkOrderCommand;
@@ -52,7 +41,13 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.command.OpenWorkOr
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.EstimateMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.WorkOrderMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.WorkOrderServiceMapper;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimatePersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderNotificationPort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderPersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderServicePersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkshopCatalogPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.PagedResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateAlreadyDecidedException;
@@ -69,7 +64,6 @@ import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderHistory;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderStatus;
 
-import io.quarkus.hibernate.reactive.panache.PanacheQuery;
 import io.smallrye.mutiny.Uni;
 
 @ExtendWith(MockitoExtension.class)
@@ -77,31 +71,16 @@ import io.smallrye.mutiny.Uni;
 class WorkOrderServiceTest {
 
     @Mock
-    private WorkOrderRepository repository;
+    private WorkOrderPersistencePort repository;
 
     @Mock
-    private WorkOrderHistoryRepository historyRepository;
+    private EstimatePersistencePort estimateRepository;
 
     @Mock
-    private EstimateRepository estimateRepository;
+    private WorkOrderServicePersistencePort serviceRepository;
 
     @Mock
-    private WorkOrderServiceRepository serviceRepository;
-
-    @Mock
-    private CustomerRepository customerRepository;
-
-    @Mock
-    private VehicleRepository vehicleRepository;
-
-    @Mock
-    private PartRepository partRepository;
-
-    @Mock
-    private WorkerRepository workerRepository;
-
-    @Mock
-    private ServiceItemRepository serviceItemRepository;
+    private WorkshopCatalogPort catalog;
 
     @Mock
     private WorkOrderMapper mapper;
@@ -113,10 +92,7 @@ class WorkOrderServiceTest {
     private WorkOrderServiceMapper serviceMapper;
 
     @Mock
-    private LoggingNotificationAdapter notificationService;
-
-    @Mock
-    private PanacheQuery<Part> partQuery;
+    private WorkOrderNotificationPort notificationService;
 
     private WorkOrderService service;
 
@@ -129,8 +105,7 @@ class WorkOrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new WorkOrderService(repository, historyRepository, estimateRepository, serviceRepository,
-                customerRepository, vehicleRepository, partRepository, workerRepository, serviceItemRepository,
+        service = new WorkOrderService(repository, estimateRepository, serviceRepository, catalog,
                 mapper, estimateMapper, serviceMapper, notificationService);
 
         lenient().when(notificationService.notifyEstimateReady(any(), any()))
@@ -154,14 +129,14 @@ class WorkOrderServiceTest {
         @DisplayName("should return paginated response")
         void shouldReturnPaginatedResponse() {
             when(repository.findPage(0, 10)).thenReturn(Uni.createFrom().item(List.of(entity)));
-            when(repository.count()).thenReturn(Uni.createFrom().item(1L));
+            when(repository.countWorkOrders()).thenReturn(Uni.createFrom().item(1L));
             when(mapper.toResult(entity)).thenReturn(response);
 
-            PageableResponseDto<WorkOrderResult> result = service.findAll(null, 0, 10).await().indefinitely();
+            PagedResult<WorkOrderResult> result = service.findAll(null, 0, 10).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
-            assertEquals(1L, result.pagination().totalElements());
+            assertEquals(1L, result.totalElements());
         }
     }
 
@@ -201,15 +176,15 @@ class WorkOrderServiceTest {
             Vehicle vehicle = new Vehicle();
             OpenWorkOrderCommand request = new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
 
-            when(customerRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
-            when(vehicleRepository.findByVehicleId(VEHICLE_ID)).thenReturn(Uni.createFrom().item(vehicle));
-            when(repository.persist(any(WorkOrder.class)))
+            when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
+            when(catalog.findVehicleById(VEHICLE_ID)).thenReturn(Uni.createFrom().item(vehicle));
+            when(repository.save(any(WorkOrder.class)))
                     .thenAnswer(invocation -> Uni.createFrom().item(
                             (WorkOrder) invocation.getArgument(0)));
 
             assertDoesNotThrow(() -> service.create(request).await().indefinitely());
             ArgumentCaptor<WorkOrder> orderCaptor = ArgumentCaptor.forClass(WorkOrder.class);
-            verify(repository).persist(orderCaptor.capture());
+            verify(repository).save(orderCaptor.capture());
             assertEquals(WorkOrderStatus.RECEIVED, orderCaptor.getValue().getStatus());
             assertEquals(customer, orderCaptor.getValue().getCustomer());
             assertEquals(vehicle, orderCaptor.getValue().getVehicle());
@@ -219,11 +194,11 @@ class WorkOrderServiceTest {
         @DisplayName("should throw CustomerNotFoundException when customer does not exist")
         void shouldThrowWhenCustomerMissing() {
             OpenWorkOrderCommand request = new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
-            when(customerRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Uni.createFrom().nullItem());
+            when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().nullItem());
 
             assertThrows(CustomerNotFoundException.class,
                     () -> service.create(request).await().indefinitely());
-            verify(repository, never()).persist(any(WorkOrder.class));
+            verify(repository, never()).save(any(WorkOrder.class));
         }
 
         @Test
@@ -232,12 +207,12 @@ class WorkOrderServiceTest {
             Customer customer = new Customer();
             OpenWorkOrderCommand request = new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
 
-            when(customerRepository.findByCustomerId(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
-            when(vehicleRepository.findByVehicleId(VEHICLE_ID)).thenReturn(Uni.createFrom().nullItem());
+            when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
+            when(catalog.findVehicleById(VEHICLE_ID)).thenReturn(Uni.createFrom().nullItem());
 
             assertThrows(VehicleNotFoundException.class,
                     () -> service.create(request).await().indefinitely());
-            verify(repository, never()).persist(any(WorkOrder.class));
+            verify(repository, never()).save(any(WorkOrder.class));
         }
     }
 
@@ -252,15 +227,14 @@ class WorkOrderServiceTest {
             ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.DIAGNOSIS);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResult(entity)).thenReturn(response);
 
             service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
 
             assertEquals(WorkOrderStatus.DIAGNOSIS, entity.getStatus());
-            verify(historyRepository).persist(any(WorkOrderHistory.class));
+            verify(repository).saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class));
         }
 
         @Test
@@ -292,9 +266,8 @@ class WorkOrderServiceTest {
             ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.CANCELLED);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResult(entity)).thenReturn(response);
 
             service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
@@ -320,9 +293,8 @@ class WorkOrderServiceTest {
             ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.DELIVERED);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResult(entity)).thenReturn(response);
 
             service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
@@ -375,9 +347,8 @@ class WorkOrderServiceTest {
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(true));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResult(entity)).thenReturn(response);
 
             service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
@@ -408,9 +379,8 @@ class WorkOrderServiceTest {
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(true));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResult(entity)).thenReturn(response);
 
             service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
@@ -446,19 +416,18 @@ class WorkOrderServiceTest {
                     BigDecimal.valueOf(20), null, null, List.of());
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(partRepository.find("id = ?1", partId)).thenReturn(partQuery);
-            when(partQuery.firstResult()).thenReturn(Uni.createFrom().item(part));
+            when(catalog.findPartById(partId)).thenReturn(Uni.createFrom().item(part));
             when(serviceRepository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(List.of()));
-            when(estimateRepository.persist(any(Estimate.class)))
+            when(estimateRepository.save(any(Estimate.class)))
                     .thenAnswer(invocation -> Uni.createFrom().item(
                             (Estimate) invocation.getArgument(0)));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.save(entity)).thenReturn(Uni.createFrom().item(entity));
             when(estimateMapper.toResult(any(Estimate.class))).thenReturn(estimateResponse);
 
             EstimateResult result = service.createEstimate(WORK_ORDER_ID, request).await().indefinitely();
 
             assertEquals(BigDecimal.valueOf(20), result.totalAmount());
-            verify(estimateRepository).persist(any(Estimate.class));
+            verify(estimateRepository).save(any(Estimate.class));
         }
 
         @Test
@@ -469,8 +438,7 @@ class WorkOrderServiceTest {
             CreateEstimateCommand request = new CreateEstimateCommand(List.of(itemDto));
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(partRepository.find("id = ?1", partId)).thenReturn(partQuery);
-            when(partQuery.firstResult()).thenReturn(Uni.createFrom().nullItem());
+            when(catalog.findPartById(partId)).thenReturn(Uni.createFrom().nullItem());
 
             assertThrows(EstimatePartNotFoundException.class,
                     () -> service.createEstimate(WORK_ORDER_ID, request).await().indefinitely());
@@ -507,10 +475,9 @@ class WorkOrderServiceTest {
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(estimate));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.persist(estimate)).thenReturn(Uni.createFrom().item(estimate));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
             when(estimateMapper.toResult(estimate)).thenReturn(new EstimateResult(
                     estimateId, WORK_ORDER_ID, EstimateStatus.APPROVED, BigDecimal.valueOf(100), BigDecimal.ZERO,
                     BigDecimal.valueOf(100), null, null, List.of()));
@@ -536,8 +503,8 @@ class WorkOrderServiceTest {
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(estimate));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.persist(estimate)).thenReturn(Uni.createFrom().item(estimate));
+            when(repository.save(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
             when(estimateMapper.toResult(estimate)).thenReturn(new EstimateResult(
                     estimateId, WORK_ORDER_ID, EstimateStatus.APPROVED, BigDecimal.valueOf(50), BigDecimal.ZERO,
                     BigDecimal.valueOf(50), null, null, List.of()));
@@ -545,7 +512,7 @@ class WorkOrderServiceTest {
             service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
 
             assertEquals(WorkOrderStatus.IN_PROGRESS, entity.getStatus());
-            verify(historyRepository, never()).persist(any(WorkOrderHistory.class));
+            verify(repository, never()).saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class));
         }
 
         @Test
@@ -594,10 +561,9 @@ class WorkOrderServiceTest {
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(estimate));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.persist(estimate)).thenReturn(Uni.createFrom().item(estimate));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
             when(estimateMapper.toResult(estimate)).thenReturn(new EstimateResult(
                     estimateId, WORK_ORDER_ID, EstimateStatus.REJECTED, BigDecimal.valueOf(100), BigDecimal.ZERO,
                     BigDecimal.valueOf(100), null, null, List.of()));
@@ -654,10 +620,9 @@ class WorkOrderServiceTest {
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(estimate));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.persist(estimate)).thenReturn(Uni.createFrom().item(estimate));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
             when(estimateMapper.toResult(estimate)).thenReturn(new EstimateResult(
                     estimateId, WORK_ORDER_ID, EstimateStatus.APPROVED, BigDecimal.valueOf(20), BigDecimal.ZERO,
                     BigDecimal.valueOf(20), null, null, List.of()));
@@ -698,9 +663,8 @@ class WorkOrderServiceTest {
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.findApprovedByWorkOrderId(WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(approvedEstimate));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResult(entity)).thenReturn(response);
 
             service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
@@ -725,13 +689,13 @@ class WorkOrderServiceTest {
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(serviceMapper.toEntity(request, entity, null)).thenReturn(lineEntity);
-            when(serviceRepository.persist(lineEntity)).thenReturn(Uni.createFrom().item(lineEntity));
+            when(serviceRepository.save(lineEntity)).thenReturn(Uni.createFrom().item(lineEntity));
             when(serviceMapper.toResult(lineEntity)).thenReturn(lineResponse);
 
             WorkOrderServiceResult result = service.addService(WORK_ORDER_ID, request).await().indefinitely();
 
             assertEquals("Troca de oleo", result.description());
-            verify(serviceRepository, times(1)).persist(lineEntity);
+            verify(serviceRepository, times(1)).save(lineEntity);
         }
 
         @Test
@@ -749,9 +713,9 @@ class WorkOrderServiceTest {
                     UUID.randomUUID(), WORK_ORDER_ID, "Troca de oleo", BigDecimal.TEN, null, serviceItemId);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(serviceItemRepository.findById(serviceItemId)).thenReturn(Uni.createFrom().item(serviceItem));
+            when(catalog.findServiceItemById(serviceItemId)).thenReturn(Uni.createFrom().item(serviceItem));
             when(serviceMapper.toEntity(request, entity, serviceItem)).thenReturn(lineEntity);
-            when(serviceRepository.persist(lineEntity)).thenReturn(Uni.createFrom().item(lineEntity));
+            when(serviceRepository.save(lineEntity)).thenReturn(Uni.createFrom().item(lineEntity));
             when(serviceMapper.toResult(lineEntity)).thenReturn(lineResponse);
 
             WorkOrderServiceResult result = service.addService(WORK_ORDER_ID, request).await().indefinitely();
@@ -767,7 +731,7 @@ class WorkOrderServiceTest {
                     new AddWorkOrderServiceCommand("Troca de oleo", BigDecimal.TEN, serviceItemId);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(serviceItemRepository.findById(serviceItemId)).thenReturn(Uni.createFrom().nullItem());
+            when(catalog.findServiceItemById(serviceItemId)).thenReturn(Uni.createFrom().nullItem());
 
             assertThrows(br.com.fiap.postech.soat16.fase1.exception.ServiceItemNotFoundException.class,
                     () -> service.addService(WORK_ORDER_ID, request).await().indefinitely());
@@ -799,9 +763,8 @@ class WorkOrderServiceTest {
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(true));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResult(entity)).thenReturn(response);
 
             service.close(WORK_ORDER_ID, request).await().indefinitely();
@@ -821,9 +784,8 @@ class WorkOrderServiceTest {
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(true));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResult(entity)).thenReturn(response);
 
             service.close(WORK_ORDER_ID, request).await().indefinitely();
@@ -841,15 +803,14 @@ class WorkOrderServiceTest {
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(true));
-            when(historyRepository.persist(any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(new WorkOrderHistory()));
-            when(repository.persist(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
             when(mapper.toResult(entity)).thenReturn(response);
 
             service.close(WORK_ORDER_ID, request).await().indefinitely();
 
             ArgumentCaptor<WorkOrderHistory> historyCaptor = ArgumentCaptor.forClass(WorkOrderHistory.class);
-            verify(historyRepository).persist(historyCaptor.capture());
+            verify(repository).saveWithHistory(any(WorkOrder.class), historyCaptor.capture());
             WorkOrderHistory history = historyCaptor.getValue();
             assertEquals(WorkOrderStatus.IN_PROGRESS, history.getPreviousStatus());
             assertEquals(WorkOrderStatus.COMPLETED, history.getNewStatus());

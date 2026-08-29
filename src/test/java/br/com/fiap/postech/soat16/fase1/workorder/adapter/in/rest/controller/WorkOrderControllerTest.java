@@ -23,7 +23,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PaginationDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.WorkOrderRestMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.EstimateItemRequestDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.EstimateRequestDto;
@@ -36,6 +35,7 @@ import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.W
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.application.WorkOrderService;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.PagedResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderMetricsResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
@@ -80,8 +80,7 @@ class WorkOrderControllerTest {
             when(pageable.getPage()).thenReturn(0);
             when(pageable.getSize()).thenReturn(10);
 
-            PaginationDto paginationDto = new PaginationDto(0, 10, 1L, 1, false, false);
-            PageableResponseDto<WorkOrderResult> page = new PageableResponseDto<>(List.of(response), paginationDto);
+            PagedResult<WorkOrderResult> page = PagedResult.of(List.of(response), 0, 10, 1L);
             when(service.findAll(null, 0, 10)).thenReturn(Uni.createFrom().item(page));
 
             PageableResponseDto<WorkOrderResponseDto> result = controller.findAll(pageable).await().indefinitely();

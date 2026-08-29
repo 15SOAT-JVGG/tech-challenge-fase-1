@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimatePersistencePort;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.Estimate;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
 
@@ -12,8 +13,9 @@ import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
 
 @ApplicationScoped
-public class EstimateRepository implements PanacheRepository<Estimate> {
+public class EstimateRepository implements PanacheRepository<Estimate>, EstimatePersistencePort {
 
+    @Override
     public Uni<Estimate> findByEstimateIdAndWorkOrderId(UUID estimateId, UUID workOrderId) {
         return find("FROM Estimate e LEFT JOIN FETCH e.items i LEFT JOIN FETCH i.part "
                         + "WHERE e.id = ?1 AND e.workOrder.id = ?2", estimateId, workOrderId)
@@ -22,14 +24,21 @@ public class EstimateRepository implements PanacheRepository<Estimate> {
                         estimateId, workOrderId, found != null));
     }
 
+    @Override
     public Uni<Estimate> findApprovedByWorkOrderId(UUID workOrderId) {
         return find("FROM Estimate e LEFT JOIN FETCH e.items i LEFT JOIN FETCH i.part "
                         + "WHERE e.workOrder.id = ?1 AND e.status = ?2", workOrderId, EstimateStatus.APPROVED)
                 .firstResult();
     }
 
+    @Override
     public Uni<Boolean> existsApprovedByWorkOrderId(UUID workOrderId) {
         return count("workOrder.id = ?1 and status = ?2", workOrderId, EstimateStatus.APPROVED)
                 .map(total -> total > 0);
+    }
+
+    @Override
+    public Uni<Estimate> save(Estimate estimate) {
+        return persist(estimate);
     }
 }

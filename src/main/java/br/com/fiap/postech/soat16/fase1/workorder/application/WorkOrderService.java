@@ -9,8 +9,6 @@ import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableResponseDto;
-import br.com.fiap.postech.soat16.fase1.dto.pagination.ReactivePage;
 import br.com.fiap.postech.soat16.fase1.exception.CustomerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.ServiceItemNotFoundException;
 import br.com.fiap.postech.soat16.fase1.exception.VehicleNotFoundException;
@@ -18,16 +16,6 @@ import br.com.fiap.postech.soat16.fase1.exception.WorkerNotFoundException;
 import br.com.fiap.postech.soat16.fase1.model.Part;
 import br.com.fiap.postech.soat16.fase1.model.ServiceItem;
 import br.com.fiap.postech.soat16.fase1.model.Worker;
-import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
-import br.com.fiap.postech.soat16.fase1.repository.PartRepository;
-import br.com.fiap.postech.soat16.fase1.repository.ServiceItemRepository;
-import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
-import br.com.fiap.postech.soat16.fase1.repository.WorkerRepository;
-import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.notification.LoggingNotificationAdapter;
-import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.EstimateRepository;
-import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.WorkOrderHistoryRepository;
-import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.WorkOrderRepository;
-import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.WorkOrderServiceRepository;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.AddWorkOrderServiceCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.ChangeWorkOrderStatusCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.CloseWorkOrderCommand;
@@ -36,7 +24,13 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.command.OpenWorkOr
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.EstimateMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.WorkOrderMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.WorkOrderServiceMapper;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimatePersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderNotificationPort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderPersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderServicePersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkshopCatalogPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.PagedResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderMetricsResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
@@ -59,23 +53,23 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class WorkOrderService {
 
-    private final WorkOrderRepository repository;
-    private final WorkOrderHistoryRepository historyRepository;
-    private final EstimateRepository estimateRepository;
-    private final WorkOrderServiceRepository serviceRepository;
-    private final CustomerRepository customerRepository;
-    private final VehicleRepository vehicleRepository;
-    private final PartRepository partRepository;
-    private final WorkerRepository workerRepository;
-    private final ServiceItemRepository serviceItemRepository;
+    private final WorkOrderPersistencePort repository;
+    private final EstimatePersistencePort estimateRepository;
+    private final WorkOrderServicePersistencePort serviceRepository;
+    private final WorkshopCatalogPort catalog;
     private final WorkOrderMapper mapper;
     private final EstimateMapper estimateMapper;
     private final WorkOrderServiceMapper serviceMapper;
-    private final LoggingNotificationAdapter notificationService;
+    private final WorkOrderNotificationPort notificationService;
 
     @WithSession
-    public Uni<PageableResponseDto<WorkOrderResult>> findAll(String q, int page, int size) {
-        return ReactivePage.of(repository.findPage(page, size), repository.count(), mapper::toResult, page, size);
+    public Uni<PagedResult<WorkOrderResult>> findAll(String q, int page, int size) {
+        return Uni.combine().all().unis(repository.findPage(page, size), repository.countWorkOrders()).asTuple()
+                .map(tuple -> PagedResult.of(
+                        tuple.getItem1().stream().map(mapper::toResult).toList(),
+                        page,
+                        size,
+                        tuple.getItem2()));
     }
 
     @WithSession
@@ -101,12 +95,12 @@ public class WorkOrderService {
 
     @WithTransaction
     public Uni<Void> create(OpenWorkOrderCommand request) {
-        return customerRepository.findByCustomerId(request.customerId())
+        return catalog.findCustomerById(request.customerId())
                 .onItem().ifNull().failWith(CustomerNotFoundException::new)
-                .flatMap(customer -> vehicleRepository.findByVehicleId(request.vehicleId())
+                .flatMap(customer -> catalog.findVehicleById(request.vehicleId())
                         .onItem().ifNull().failWith(VehicleNotFoundException::new)
                         .flatMap(vehicle -> resolveAssignedWorker(request.assignedWorkerId())
-                                .flatMap(worker -> repository.persist(WorkOrder.open(
+                                .flatMap(worker -> repository.save(WorkOrder.open(
                                         customer,
                                         vehicle,
                                         worker,
@@ -120,7 +114,7 @@ public class WorkOrderService {
         if (assignedWorkerId == null) {
             return Uni.createFrom().nullItem();
         }
-        return workerRepository.findByWorkerId(assignedWorkerId)
+        return catalog.findWorkerById(assignedWorkerId)
                 .onItem().ifNull().failWith(() -> new WorkerNotFoundException(assignedWorkerId));
     }
 
@@ -196,7 +190,7 @@ public class WorkOrderService {
                 .flatMap(order -> {
                     order.ensureMutable();
                     return resolveServiceItem(request.serviceItemId())
-                            .flatMap(serviceItem -> serviceRepository.persist(
+                            .flatMap(serviceItem -> serviceRepository.save(
                                     serviceMapper.toEntity(request, order, serviceItem)));
                 })
                 .map(serviceMapper::toResult);
@@ -206,7 +200,7 @@ public class WorkOrderService {
         if (serviceItemId == null) {
             return Uni.createFrom().nullItem();
         }
-        return serviceItemRepository.findById(serviceItemId)
+        return catalog.findServiceItemById(serviceItemId)
                 .onItem().ifNull().failWith(() -> new ServiceItemNotFoundException(serviceItemId));
     }
 
@@ -234,14 +228,14 @@ public class WorkOrderService {
         reserveStock(estimate);
         estimate.approve(now);
         return persistOrderWithHistory(order, order.registerEstimateApproval(estimate, now))
-                .flatMap(persisted -> estimateRepository.persist(estimate));
+                .flatMap(persisted -> estimateRepository.save(estimate));
     }
 
     private Uni<Estimate> reject(WorkOrder order, Estimate estimate) {
         LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
         estimate.reject();
         return persistOrderWithHistory(order, order.registerEstimateRejection(now))
-                .flatMap(persisted -> estimateRepository.persist(estimate));
+                .flatMap(persisted -> estimateRepository.save(estimate));
     }
 
     private Uni<Estimate> finalizeEstimateCreation(WorkOrder order, Estimate estimate) {
@@ -254,7 +248,7 @@ public class WorkOrderService {
 
     private Uni<List<EstimateItem>> buildItems(CreateEstimateCommand request) {
         List<Uni<EstimateItem>> itemUnis = request.items().stream()
-                .map(itemDto -> partRepository.find("id = ?1", itemDto.partId()).firstResult()
+                .map(itemDto -> catalog.findPartById(itemDto.partId())
                         .onItem().ifNull().failWith(() -> new EstimatePartNotFoundException(itemDto.partId()))
                         .map(part -> EstimateItem.create(part, itemDto.quantity(), itemDto.unitPrice())))
                 .toList();
@@ -263,7 +257,7 @@ public class WorkOrderService {
 
     private Uni<Estimate> persistEstimate(WorkOrder order, List<EstimateItem> items,
             List<br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService> services) {
-        return estimateRepository.persist(Estimate.create(order, items, services));
+        return estimateRepository.save(Estimate.create(order, items, services));
     }
 
     /**
@@ -299,10 +293,9 @@ public class WorkOrderService {
 
     private Uni<WorkOrder> persistOrderWithHistory(WorkOrder order,
             Optional<WorkOrderHistory> history) {
-        Uni<Void> persistHistory = history
-                .map(value -> historyRepository.persist(value).replaceWithVoid())
-                .orElseGet(() -> Uni.createFrom().voidItem());
-        return persistHistory.flatMap(ignored -> repository.persist(order));
+        return history
+                .map(value -> repository.saveWithHistory(order, value))
+                .orElseGet(() -> repository.save(order));
     }
 
     private Uni<Boolean> hasApprovedEstimate(UUID workOrderId) {

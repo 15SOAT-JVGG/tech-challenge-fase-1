@@ -41,6 +41,9 @@ class WorkOrderRepositoryIT {
     WorkOrderRepository repository;
 
     @Inject
+    WorkOrderHistoryRepository historyRepository;
+
+    @Inject
     CustomerRepository customerRepository;
 
     @Inject
@@ -157,6 +160,28 @@ class WorkOrderRepositoryIT {
 
             assertTrue(result.stream().anyMatch(w -> w.getId().equals(closed.getId())));
             assertTrue(result.stream().allMatch(w -> w.getClosedAt() != null));
+        }
+    }
+
+    @Nested
+    @DisplayName("saveWithHistory")
+    class SaveWithHistory {
+
+        @Test
+        @DisplayName("persists the work order and its status transition together")
+        void persistsOrderAndHistory() {
+            WorkOrder workOrder = seed(WorkOrderPriority.MEDIUM, WorkOrderStatus.RECEIVED, null);
+
+            inTransaction(() -> repository.findByWorkOrderId(workOrder.getId())
+                    .flatMap(managed -> repository.saveWithHistory(
+                            managed,
+                            managed.transitionTo(WorkOrderStatus.DIAGNOSIS, false, LocalDateTime.now()))));
+
+            WorkOrder updated = inTransaction(() -> repository.findByWorkOrderId(workOrder.getId()));
+            long historyCount = inTransaction(() -> historyRepository.count("workOrder.id = ?1", workOrder.getId()));
+
+            assertEquals(WorkOrderStatus.DIAGNOSIS, updated.getStatus());
+            assertEquals(1L, historyCount);
         }
     }
 }

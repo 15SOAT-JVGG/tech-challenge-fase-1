@@ -17,6 +17,7 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.command.CloseWorkO
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.CreateEstimateCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.OpenWorkOrderCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.PagedResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderMetricsResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
@@ -56,10 +57,12 @@ public final class WorkOrderRestMapper {
     }
 
     public static PageableResponseDto<WorkOrderResponseDto> toResponse(
-            PageableResponseDto<WorkOrderResult> page) {
-        return new PageableResponseDto<>(
+            PagedResult<WorkOrderResult> page) {
+        return PageableResponseDto.of(
                 page.content().stream().map(WorkOrderRestMapper::toResponse).toList(),
-                page.pagination());
+                page.page(),
+                page.size(),
+                page.totalElements());
     }
 
     public static WorkOrderResponseDto toResponse(WorkOrderResult result) {
