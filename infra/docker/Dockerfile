@@ -52,7 +52,6 @@ COPY --from=builder --chown=185 /build/target/quarkus-app/quarkus/ /deployments/
 COPY --from=builder --chown=185 /build/jwt-local/ /deployments/jwt-local/
 
 EXPOSE 8080
-EXPOSE 8090
 USER 185
 
 ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"

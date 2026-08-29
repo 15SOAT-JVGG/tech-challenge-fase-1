@@ -96,7 +96,7 @@ rodar `mvnw package` antes, nem criar `.env`. Na primeira execução o build bai
 leva alguns minutos; nas próximas é quase instantâneo (cache).
 
 - API: `http://localhost:8080`
-- Swagger UI: `http://localhost:8090/q/swagger-ui`
+- Swagger UI: `http://localhost:8080/q/swagger-ui`
 - Login: **`admin` / `admin123`** (ver [Autenticação JWT](#autenticação-jwt))
 
 | Ação | Comando |
@@ -154,7 +154,7 @@ curl -s http://localhost:8080/v1/customer -H "Authorization: Bearer $TOKEN"
 
 ### 3. Pelo Swagger UI
 
-Abra `http://localhost:8090/q/swagger-ui` → **Authorize** (esquema `bearerAuth`) → cole **apenas o
+Abra `http://localhost:8080/q/swagger-ui` → **Authorize** (esquema `bearerAuth`) → cole **apenas o
 token** (sem `Bearer`) → as chamadas passam a enviar o header automaticamente.
 
 > Sem senha definida no `.env`? Recupere a gerada no log:
