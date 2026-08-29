@@ -160,3 +160,17 @@ Fluxos que exigem teste de integração:
 
 Ao criar um endpoint, cubra no `*IT` o status HTTP de sucesso, o payload de resposta e os erros
 esperados (`400`, `401`, `403`, `404`, `409`), afirmando sobre o `ApiErrorResponseDto`.
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues e specs vivem no GitHub Issues do repositório, operados pela CLI `gh`.
+Ver `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Repositório single-context: `CONTEXT.md` na raiz e ADRs em `docs/adr/`.
+Ver `docs/agents/domain.md`.

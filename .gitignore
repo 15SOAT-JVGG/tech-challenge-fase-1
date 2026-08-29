@@ -44,6 +44,7 @@ nb-configuration.xml
 
 # Environment variables
 .env
+.scratch/
 
 # Local-only JWT keys for docker compose (never use in production)
 .local-jwt/
