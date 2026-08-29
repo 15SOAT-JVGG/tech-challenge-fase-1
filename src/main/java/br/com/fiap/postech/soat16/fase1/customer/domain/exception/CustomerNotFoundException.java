@@ -1,0 +1,17 @@
+package br.com.fiap.postech.soat16.fase1.customer.domain.exception;
+
+import static br.com.fiap.postech.soat16.fase1.customer.domain.exception.CustomerErrorCode.CUSTOMER_NOT_FOUND;
+import static br.com.fiap.postech.soat16.fase1.shared.domain.exception.ErrorType.NOT_FOUND;
+
+import br.com.fiap.postech.soat16.fase1.shared.domain.exception.AppException;
+
+public class CustomerNotFoundException extends AppException {
+
+    public CustomerNotFoundException() {
+        super("Customer not found", CUSTOMER_NOT_FOUND, NOT_FOUND);
+    }
+
+    public CustomerNotFoundException(String document) {
+        super("Customer not found for document: " + document, CUSTOMER_NOT_FOUND, NOT_FOUND);
+    }
+}

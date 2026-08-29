@@ -3,10 +3,6 @@ quarkus:
     name: ${project.artifactId}
     version: ${project.version}
 
-  management:
-    enabled: true
-    port: 8090
-
   banner:
     enabled: true
 

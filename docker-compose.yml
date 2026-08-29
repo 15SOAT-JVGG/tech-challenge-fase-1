@@ -11,7 +11,7 @@
 #
 # Após subir:
 #   - API .............. http://localhost:8080
-#   - Swagger UI ....... http://localhost:8090/q/swagger-ui
+#   - Swagger UI ....... http://localhost:8080/q/swagger-ui
 #   - Login ............ admin / admin123   (POST /v1/auth/login)
 
 services:
@@ -48,7 +48,6 @@ services:
         condition: service_healthy
     ports:
       - "8080:8080"
-      - "8090:8090"
     environment:
       # Conexão com o banco (host = nome do serviço/container na rede do Compose)
       INFRA_HOST_POSTGRES: oficina-mecanica-postgres
