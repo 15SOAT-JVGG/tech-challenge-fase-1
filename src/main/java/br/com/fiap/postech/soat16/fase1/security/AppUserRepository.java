@@ -12,8 +12,7 @@ public class AppUserRepository implements PanacheRepository<AppUser> {
         return find("username = ?1 and active = true", username).firstResult();
     }
 
-    // Checks for duplicates regardless of active status to respect the unique(username) constraint,
-    // which also covers deactivated users.
+    // Considera usuários inativos porque a restrição unique(username) também se aplica a eles.
     public Uni<Boolean> existsByUsername(String username) {
         return count("username = ?1", username).map(total -> total > 0);
     }

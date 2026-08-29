@@ -12,10 +12,6 @@ import br.com.fiap.postech.soat16.fase1.security.PostgresTestResource;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 
-/**
- * Garante que as APIs administrativas exigem JWT (requisito do PDF) e que os endpoints públicos
- * (login e canal do cliente) permanecem acessíveis sem token.
- */
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
 @DisplayName("Security — proteção das APIs administrativas")
@@ -40,7 +36,7 @@ class SecurityIT {
         .when()
             .post("/v1/auth/login")
         .then()
-            .statusCode(400); // passa pela autorização (público); falha só na validação do corpo
+            .statusCode(400);
     }
 
     @Test
@@ -50,6 +46,6 @@ class SecurityIT {
         .when()
             .get("/v1/public/work-orders/" + UUID.randomUUID())
         .then()
-            .statusCode(404); // público: passa pela autorização; OS inexistente → 404
+            .statusCode(404);
     }
 }

@@ -37,7 +37,6 @@ public class AppUser {
     private LocalDateTime createdAt;
 
     protected AppUser() {
-        // Required by JPA
     }
 
     public AppUser(String username, String hashedPassword, String role) {

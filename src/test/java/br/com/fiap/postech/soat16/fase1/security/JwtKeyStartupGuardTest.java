@@ -17,7 +17,7 @@ class JwtKeyStartupGuardTest {
 
     @AfterEach
     void resetLaunchMode() {
-        // Avoids leaking launch mode state into other test classes sharing this JVM/fork.
+        // Evita que o modo de execução afete outros testes na mesma JVM.
         LaunchMode.set(LaunchMode.TEST);
     }
 

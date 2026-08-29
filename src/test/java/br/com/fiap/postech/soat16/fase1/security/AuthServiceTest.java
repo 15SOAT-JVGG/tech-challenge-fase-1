@@ -20,8 +20,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.postech.soat16.fase1.dto.request.LoginRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.LoginResponseDto;
+import br.com.fiap.postech.soat16.fase1.service.PasswordService;
 
-import io.quarkus.elytron.security.common.BcryptUtil;
 import io.smallrye.mutiny.Uni;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,16 +36,18 @@ class AuthServiceTest {
     private AppUserRepository repository;
 
     private AuthService authService;
+    private PasswordService passwordService;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(repository);
+        passwordService = new PasswordService();
+        authService = new AuthService(repository, passwordService);
         authService.issuer = "oficina-api-test";
         authService.expirationHours = 8;
     }
 
     private AppUser activeUser() {
-        return new AppUser(USERNAME, BcryptUtil.bcryptHash(RAW_PASSWORD), ROLE);
+        return new AppUser(USERNAME, passwordService.hash(RAW_PASSWORD), ROLE);
     }
 
     @Nested

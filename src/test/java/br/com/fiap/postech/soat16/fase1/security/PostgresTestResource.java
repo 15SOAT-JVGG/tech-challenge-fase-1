@@ -9,11 +9,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
 
 /**
- * Sobe um PostgreSQL real (Testcontainers) e injeta a URL reativa em runtime.
- * Motivo de não usar DevServices: a config base define quarkus.datasource.reactive.url
- * (necessária ao profile de runtime "default"), e uma URL explícita suprime o DevServices.
- * Este resource fornece o container e sobrescreve a URL apenas para o teste, sem tocar
- * na configuração compartilhada.
+ * Sobe um PostgreSQL real (Testcontainers) e injeta a URL reativa durante a execução.
+ * DevServices não é usado porque a configuração base define quarkus.datasource.reactive.url,
+ * e uma URL explícita desativa o recurso. Este recurso fornece o contêiner apenas para o teste,
+ * sem alterar a configuração compartilhada.
  */
 public class PostgresTestResource implements QuarkusTestResourceLifecycleManager {
 
@@ -27,16 +26,15 @@ public class PostgresTestResource implements QuarkusTestResourceLifecycleManager
         postgres.start();
         createSchema();
 
-        // Paridade com produção: mesmo schema e search_path; o Hibernate (%test: drop-and-create) cria as tabelas.
+        // Mantém o mesmo schema e search_path da produção; o Hibernate cria as tabelas nos testes.
         String reactiveUrl = "postgresql://%s:%d/%s?search_path=%s".formatted(
             postgres.getHost(),
             postgres.getMappedPort(PostgreSQLContainer.POSTGRESQL_PORT),
             postgres.getDatabaseName(),
             SCHEMA);
 
-        // O Flyway usa o datasource JDBC (blocking), não o reativo. Sem este override ele
-        // herda quarkus.datasource.jdbc.url da config base (ex.: INFRA_HOST_POSTGRES local),
-        // mas com as credenciais do container — causando "password authentication failed".
+        // O Flyway usa a conexão JDBC bloqueante. Sem esta sobrescrita, herdaria a URL base com
+        // as credenciais do contêiner.
         String jdbcUrl = "jdbc:postgresql://%s:%d/%s?currentSchema=%s".formatted(
             postgres.getHost(),
             postgres.getMappedPort(PostgreSQLContainer.POSTGRESQL_PORT),
@@ -51,8 +49,8 @@ public class PostgresTestResource implements QuarkusTestResourceLifecycleManager
         );
     }
 
-    // Cria o schema via psql no socket local (trust) — evita o withInitScript, cujo layout shaded
-    // diverge entre o módulo postgresql (1.20.x) e o testcontainers-core (gerido pelo quarkus-bom).
+    // Usa o psql porque o empacotamento de withInitScript diverge entre as versões dos módulos do
+    // Testcontainers gerenciadas pelo Quarkus.
     private void createSchema() {
         try {
             Container.ExecResult result = postgres.execInContainer(

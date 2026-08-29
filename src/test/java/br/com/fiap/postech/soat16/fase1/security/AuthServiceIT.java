@@ -23,14 +23,6 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.vertx.RunOnVertxContext;
 import io.quarkus.test.vertx.UniAsserter;
 
-/**
- * Testes de integração contra um PostgreSQL real (DevServices/Testcontainers).
- * Executam toda a stack reativa: AuthService → AppUserRepository → Hibernate Reactive → PostgreSQL.
- * Foco principal: confirmar que o offload do bcrypt para o worker pool
- * (runSubscriptionOn / emitOn) preserva a sessão reativa via context propagation
- * do Quarkus — caso contrário o persist/read falharia com "No current Mutiny.Session".
- * Roda apenas no profile itest (mvn test -Pitest) por exigir Docker.
- */
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
 @DisplayName("AuthService — Integration Tests")
@@ -68,7 +60,6 @@ class AuthServiceIT {
                     assertEquals(username, persisted.getUsername());
                     assertEquals(ROLE, persisted.getRole());
                     assertTrue(persisted.isActive());
-                    // senha nunca persistida em texto plano e validável pelo bcrypt
                     assertNotEquals(RAW_PASSWORD, persisted.getPassword());
                     assertTrue(BcryptUtil.matches(RAW_PASSWORD, persisted.getPassword()),
                         "hash persistido deve corresponder à senha original");

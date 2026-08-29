@@ -10,7 +10,8 @@ import jakarta.enterprise.event.Observes;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
-import io.quarkus.elytron.security.common.BcryptUtil;
+import br.com.fiap.postech.soat16.fase1.service.PasswordService;
+
 import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.vertx.VertxContextSupport;
@@ -22,10 +23,12 @@ public class DataSeeder {
     private static final Logger LOG = Logger.getLogger(DataSeeder.class);
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    AppUserRepository userRepository;
+    private final AppUserRepository userRepository;
+    private final PasswordService passwordService;
 
-    public DataSeeder(AppUserRepository userRepository) {
+    public DataSeeder(AppUserRepository userRepository, PasswordService passwordService) {
         this.userRepository = userRepository;
+        this.passwordService = passwordService;
     }
 
     @ConfigProperty(name = "app.seed.admin-username", defaultValue = "admin")
@@ -50,14 +53,14 @@ public class DataSeeder {
             return;
         }
         try {
-            // Hibernate Reactive requires a Vert.x context and reactive session/transaction;
-            // subscribeAndAwait blocks startup until the seed completes.
+            // O Hibernate Reactive exige contexto Vert.x e transação reativa; a inicialização
+            // aguarda a conclusão da carga.
             VertxContextSupport.subscribeAndAwait(() ->
                 Panache.withTransaction(() ->
                     seedUser(adminUsername, adminPassword, "ADMIN")
                         .chain(() -> seedUser(mechanicUsername, mechanicPassword, "MECHANIC"))));
         } catch (Throwable e) {
-            // subscribeAndAwait declares "throws Throwable", so this catch can't be narrowed
+            // subscribeAndAwait declara Throwable, portanto este catch não pode ser mais específico.
             throw new IllegalStateException("Failed to run initial seed.", e);
         }
     }
@@ -75,7 +78,7 @@ public class DataSeeder {
                     return generated;
                 });
 
-                AppUser user = new AppUser(username, BcryptUtil.bcryptHash(password), role);
+                AppUser user = new AppUser(username, passwordService.hash(password), role);
                 return userRepository.persist(user)
                     .invoke(() -> LOG.infof("Initial user created: %s (%s)", username, role))
                     .replaceWithVoid();

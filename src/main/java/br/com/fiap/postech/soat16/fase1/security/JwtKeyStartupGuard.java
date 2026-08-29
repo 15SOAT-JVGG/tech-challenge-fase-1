@@ -10,17 +10,15 @@ import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.StartupEvent;
 
 /**
- * Fails fast at boot if the application starts in production (LaunchMode.NORMAL) still using
- * the default development JWT key. In dev/test it only logs a warning.
- * Production must override JWT_PRIVATE_KEY_LOCATION / JWT_PUBLIC_KEY_LOCATION pointing
- * to secure keys (e.g. a mounted secret), never the keys versioned in the repository.
+ * Impede a inicialização em produção com a chave JWT de desenvolvimento. Os ambientes produtivos
+ * devem fornecer chaves próprias por JWT_PRIVATE_KEY_LOCATION e JWT_PUBLIC_KEY_LOCATION.
  */
 @ApplicationScoped
 public class JwtKeyStartupGuard {
 
     private static final Logger LOG = Logger.getLogger(JwtKeyStartupGuard.class);
 
-    // Same default defined in application.yaml for smallrye.jwt.sign.key.location
+    // Deve permanecer igual ao valor padrão de smallrye.jwt.sign.key.location no application.yaml.
     static final String DEV_KEY_LOCATION = "jwt/privateKey.pem";
 
     @ConfigProperty(name = "smallrye.jwt.sign.key.location")

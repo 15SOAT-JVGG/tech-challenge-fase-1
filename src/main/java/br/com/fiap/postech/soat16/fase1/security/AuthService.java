@@ -11,8 +11,8 @@ import org.jboss.logging.Logger;
 
 import br.com.fiap.postech.soat16.fase1.dto.request.LoginRequestDto;
 import br.com.fiap.postech.soat16.fase1.dto.response.LoginResponseDto;
+import br.com.fiap.postech.soat16.fase1.service.PasswordService;
 
-import io.quarkus.elytron.security.common.BcryptUtil;
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.jwt.build.Jwt;
@@ -23,14 +23,16 @@ public class AuthService {
 
     private static final Logger LOG = Logger.getLogger(AuthService.class);
     private static final String INVALID_CREDENTIALS = "Invalid credentials";
-    // Dummy hash for constant-time comparison when the user does not exist
+    // Hash usado para manter o tempo de comparação quando o usuário não existe.
     private static final String DUMMY_HASH =
         "$2a$10$7EqJtq98hPqEX7fNZaFWoO9vQKPdN0nW1c6jE8fXE9rH3gYxQ3s2u";
 
-    AppUserRepository userRepository;
+    private final AppUserRepository userRepository;
+    private final PasswordService passwordService;
 
-    public AuthService(AppUserRepository userRepository) {
+    public AuthService(AppUserRepository userRepository, PasswordService passwordService) {
         this.userRepository = userRepository;
+        this.passwordService = passwordService;
     }
 
     @ConfigProperty(name = "app.jwt.expiration-hours", defaultValue = "8")
@@ -46,8 +48,8 @@ public class AuthService {
     }
 
     private LoginResponseDto authenticate(LoginRequestDto request, AppUser user) {
-        // Constant-time comparison avoids timing attacks that leak valid usernames
-        boolean validPassword = BcryptUtil.matches(
+        // A comparação constante evita revelar usuários válidos por diferença de tempo.
+        boolean validPassword = passwordService.matches(
             request.password(),
             user != null ? user.getPassword() : DUMMY_HASH
         );
@@ -72,7 +74,7 @@ public class AuthService {
             .flatMap(exists -> Boolean.TRUE.equals(exists)
                 ? Uni.createFrom().failure(
                     new IllegalArgumentException("User already exists: " + username))
-                : userRepository.persist(new AppUser(username, BcryptUtil.bcryptHash(rawPassword), role))
+                : userRepository.persist(new AppUser(username, passwordService.hash(rawPassword), role))
                     .replaceWithVoid());
     }
 }

@@ -22,12 +22,6 @@ import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.vertx.VertxContextSupport;
 
-/**
- * Testes de integração HTTP do endpoint POST /v1/auth/login contra um PostgreSQL real
- * (Testcontainers via {@link PostgresTestResource}). Exercita toda a stack:
- * RestAssured → AuthController → AuthService → AppUserRepository → Hibernate Reactive → PostgreSQL.
- * Cada teste usa um username único porque o schema é drop-and-create por execução (não por méthodo).
- */
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
 @DisplayName("AuthController — Integration Tests (HTTP)")
@@ -36,7 +30,6 @@ class AuthControllerIT {
     private static final String LOGIN_PATH = "/v1/auth/login";
     private static final String RAW_PASSWORD = "S3nh@-F0rte";
     private static final String ROLE = "ADMIN";
-    // Um JWT possui três segmentos base64url separados por ponto.
     private static final String JWT_PATTERN = "^[\\w-]+\\.[\\w-]+\\.[\\w-]+$";
 
     @Inject
@@ -47,7 +40,7 @@ class AuthControllerIT {
     }
 
     // Persiste o usuário fora do event loop, estabelecendo o contexto Vert.x exigido
-    // pelo Hibernate Reactive (mesma abordagem do DataSeeder no startup).
+    // pelo Hibernate Reactive, como no DataSeeder.
     private void persistUser(String username) {
         try {
             VertxContextSupport.subscribeAndAwait(
