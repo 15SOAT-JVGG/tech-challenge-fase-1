@@ -22,8 +22,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Servico ofertado pela oficina no catalogo (ex.: troca de oleo, alinhamento), com preco base.
- * Diferente de {@link WorkOrderService}, que e a linha de mao de obra efetivamente aplicada a uma OS.
+ * Serviço do catálogo da oficina, diferente de {@link WorkOrderService}, que representa a mão de
+ * obra aplicada a uma OS.
  */
 @Entity
 @Table(name = "service_item", schema = "oficina_mecanica")
@@ -54,7 +54,7 @@ public class ServiceItem extends AuditableEntity {
     @Column(nullable = false)
     private boolean active;
 
-    // CPD-OFF: padrao Hibernate-recomendado de equals/hashCode proxy-safe, repetido por design em todas as entidades.
+    // CPD-OFF: padrão do Hibernate para equals/hashCode compatível com proxies.
     @Override
     public final boolean equals(Object o) {
         if (this == o) {
