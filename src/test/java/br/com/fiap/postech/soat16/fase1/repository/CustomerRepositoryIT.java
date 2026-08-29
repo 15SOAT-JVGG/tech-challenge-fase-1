@@ -25,11 +25,6 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.vertx.VertxContextSupport;
 import io.smallrye.mutiny.Uni;
 
-/**
- * Testes de integração contra um PostgreSQL real (Testcontainers), seguindo o mesmo padrão de
- * {@code AuthServiceIT}/{@code WorkOrderControllerIT}: roda apenas no profile itest
- * (mvn test -Pitest) por exigir Docker.
- */
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
 @DisplayName("CustomerRepository — Integration Tests")

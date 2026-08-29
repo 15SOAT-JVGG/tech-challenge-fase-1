@@ -56,7 +56,7 @@ public class Customer extends AuditableEntity {
     @Column(name = "document_type", nullable = false)
     private DocumentType documentType;
 
-    // CPD-OFF: padrao Hibernate-recomendado de equals/hashCode proxy-safe, repetido por design em todas as entidades.
+    // CPD-OFF: padrão do Hibernate para equals/hashCode compatível com proxies.
     @Override
     public final boolean equals(Object o) {
         if (this == o) {

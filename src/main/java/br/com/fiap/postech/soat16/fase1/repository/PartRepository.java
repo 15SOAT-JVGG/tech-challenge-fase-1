@@ -13,9 +13,6 @@ import io.smallrye.mutiny.Uni;
 @ApplicationScoped
 public class PartRepository implements PanacheRepositoryBase<Part, UUID> {
 
-    /**
-     * Parts whose current stock is at or below the minimum defined for each part.
-     */
     public Uni<List<Part>> findLowStock() {
         return list("stockQuantity <= minimumStock");
     }

@@ -65,7 +65,6 @@ public class Part {
     private Long version;
 
     protected Part() {
-        // Required by JPA
     }
 
     public Part(String name, String description, BigDecimal unitPrice, Integer stockQuantity, String unit) {
@@ -105,9 +104,6 @@ public class Part {
         this.partType = partType != null ? partType : PartType.PART;
     }
 
-    /**
-     * Indicates restocking is needed: current stock at or below the minimum defined for the part.
-     */
     public boolean isLowStock() {
         return minimumStock != null && stockQuantity <= minimumStock;
     }

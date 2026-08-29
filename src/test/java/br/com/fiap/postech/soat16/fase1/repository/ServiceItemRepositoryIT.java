@@ -23,11 +23,6 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.vertx.VertxContextSupport;
 import io.smallrye.mutiny.Uni;
 
-/**
- * {@link ServiceItemRepository} não declara consultas customizadas, então estes testes cobrem o
- * CRUD herdado de {@code PanacheRepositoryBase} (persist/findById/deleteById) sobre um banco real,
- * seguindo o mesmo padrão dos demais *RepositoryIT.
- */
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource.class)
 @DisplayName("ServiceItemRepository — Integration Tests")
