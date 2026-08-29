@@ -163,7 +163,7 @@ class CustomerRepositoryIT {
         customer.setPhoneNumber("+5511999999999");
         customer.setDocument(document);
         customer.setDocumentType(DocumentType.CPF);
-        return inTransaction(() -> repository.persist(customer));
+        return inTransaction(() -> repository.save(customer));
     }
 
     private <T> T inTransaction(Supplier<Uni<T>> action) {

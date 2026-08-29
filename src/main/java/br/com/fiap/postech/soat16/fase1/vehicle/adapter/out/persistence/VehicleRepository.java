@@ -9,6 +9,8 @@ import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import br.com.fiap.postech.soat16.fase1.vehicle.adapter.out.persistence.entity.VehicleJpaEntity;
+import br.com.fiap.postech.soat16.fase1.vehicle.adapter.out.persistence.mapper.VehiclePersistenceMapper;
 import br.com.fiap.postech.soat16.fase1.vehicle.application.port.out.VehiclePersistencePort;
 import br.com.fiap.postech.soat16.fase1.vehicle.application.query.VehicleQuery;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
@@ -20,11 +22,12 @@ import io.smallrye.mutiny.Uni;
 
 @ApplicationScoped
 public class VehicleRepository
-        implements PanacheRepositoryBase<Vehicle, UUID>, VehiclePersistencePort {
+        implements PanacheRepositoryBase<VehicleJpaEntity, UUID>, VehiclePersistencePort {
 
     @Override
     public Uni<Vehicle> findByLicensePlate(String licensePlate) {
-        return find("licensePlate = ?1", licensePlate).firstResult();
+        return find("licensePlate = ?1", licensePlate).firstResult()
+                .map(VehiclePersistenceMapper::toDomain);
     }
 
     @Override
@@ -40,7 +43,8 @@ public class VehicleRepository
     @Override
     public Uni<Vehicle> findByVehicleId(UUID id) {
         return findById(id)
-                .invoke(found -> Log.infof("Vehicle lookup: id=%s found=%b", id, found != null));
+                .invoke(found -> Log.infof("Vehicle lookup: id=%s found=%b", id, found != null))
+                .map(VehiclePersistenceMapper::toDomain);
     }
 
     @Override
@@ -53,14 +57,14 @@ public class VehicleRepository
     public Uni<List<Vehicle>> findPageWithFilter(VehicleQuery query) {
         FilterResult filterResult = buildFilter(query);
         Sort sort = buildSort(query);
-        if (filterResult.query().isEmpty()) {
-            return findAll(sort)
-                    .page(query.page(), query.size())
-                    .list();
-        }
-        return find(filterResult.query(), sort, filterResult.params())
-                .page(query.page(), query.size())
-                .list();
+        Uni<List<VehicleJpaEntity>> entities = filterResult.query().isEmpty()
+                ? findAll(sort).page(query.page(), query.size()).list()
+                : find(filterResult.query(), sort, filterResult.params())
+                        .page(query.page(), query.size())
+                        .list();
+        return entities.map(list -> list.stream()
+                .map(VehiclePersistenceMapper::toDomain)
+                .toList());
     }
 
     @Override
@@ -74,7 +78,17 @@ public class VehicleRepository
 
     @Override
     public Uni<Vehicle> save(Vehicle vehicle) {
-        return persist(vehicle);
+        return upsert(vehicle).replaceWith(vehicle);
+    }
+
+    private Uni<VehicleJpaEntity> upsert(Vehicle vehicle) {
+        if (vehicle.getId() == null) {
+            return persist(VehiclePersistenceMapper.toJpaEntity(vehicle))
+                    .invoke(entity -> VehiclePersistenceMapper.copyGeneratedState(entity, vehicle));
+        }
+        return findById(vehicle.getId())
+                .onItem().ifNotNull()
+                .invoke(entity -> VehiclePersistenceMapper.copyState(vehicle, entity));
     }
 
     private FilterResult buildFilter(VehicleQuery query) {

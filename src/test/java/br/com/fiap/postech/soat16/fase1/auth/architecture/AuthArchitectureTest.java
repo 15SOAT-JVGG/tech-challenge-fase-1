@@ -53,7 +53,7 @@ class AuthArchitectureTest {
         String source = Files.readString(AUTH_ROOT.resolve(
                 "adapter/out/persistence/AppUserRepository.java"));
 
-        assertTrue(source.contains("implements PanacheRepository<AppUser>, "
+        assertTrue(source.contains("implements PanacheRepository<AppUserJpaEntity>, "
                 + "AppUserPersistencePort"));
         assertFalse(source.contains("auth.application.AuthService"));
     }

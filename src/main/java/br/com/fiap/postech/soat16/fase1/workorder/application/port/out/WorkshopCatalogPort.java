@@ -1,5 +1,6 @@
 package br.com.fiap.postech.soat16.fase1.workorder.application.port.out;
 
+import java.util.List;
 import java.util.UUID;
 
 import br.com.fiap.postech.soat16.fase1.customer.domain.model.Customer;
@@ -21,4 +22,9 @@ public interface WorkshopCatalogPort {
     Uni<Worker> findWorkerById(UUID id);
 
     Uni<ServiceItem> findServiceItemById(UUID id);
+
+    /**
+     * Persiste as peças cujo estoque foi alterado pelo fluxo de orçamento.
+     */
+    Uni<Void> saveParts(List<Part> parts);
 }

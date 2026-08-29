@@ -47,7 +47,7 @@ class PartRepositoryIT {
                 "UN",
                 minimumStock,
                 null);
-        return inTransaction(() -> repository.persist(part));
+        return inTransaction(() -> repository.save(part));
     }
 
     @Test

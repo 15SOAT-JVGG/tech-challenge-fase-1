@@ -20,6 +20,7 @@ import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.PostgresTestR
 import br.com.fiap.postech.soat16.fase1.vehicle.adapter.out.persistence.VehicleRepository;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.enums.VehicleType;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.entity.WorkOrderHistoryJpaEntity;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderHistory;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderPriority;
@@ -79,8 +80,8 @@ class WorkOrderHistoryRepositoryIT {
         vehicle.setKmDriven(10_000L);
         vehicle.setType(VehicleType.CAR);
 
-        return inTransaction(() -> customerRepository.persist(customer)
-            .chain(c -> vehicleRepository.persist(vehicle)
+        return inTransaction(() -> customerRepository.save(customer)
+            .chain(c -> vehicleRepository.save(vehicle)
                 .chain(v -> {
                     WorkOrder workOrder = new WorkOrder();
                     workOrder.setCustomer(c);
@@ -89,7 +90,7 @@ class WorkOrderHistoryRepositoryIT {
                     workOrder.setPriority(WorkOrderPriority.MEDIUM);
                     workOrder.setStatus(WorkOrderStatus.DIAGNOSIS);
                     workOrder.setOpenedAt(LocalDateTime.now());
-                    return workOrderRepository.persist(workOrder);
+                    return workOrderRepository.save(workOrder);
                 })));
     }
 
@@ -99,7 +100,7 @@ class WorkOrderHistoryRepositoryIT {
         history.setPreviousStatus(WorkOrderStatus.RECEIVED);
         history.setNewStatus(WorkOrderStatus.DIAGNOSIS);
         history.setChangedAt(LocalDateTime.now());
-        return inTransaction(() -> repository.persist(history));
+        return inTransaction(() -> repository.save(history));
     }
 
     @Nested
@@ -112,7 +113,8 @@ class WorkOrderHistoryRepositoryIT {
             WorkOrder workOrder = seedWorkOrder();
             WorkOrderHistory history = seedHistory(workOrder);
 
-            WorkOrderHistory found = inTransaction(() -> repository.find("id = ?1", history.getId()).firstResult());
+            WorkOrderHistoryJpaEntity found =
+                    inTransaction(() -> repository.find("id = ?1", history.getId()).firstResult());
 
             assertEquals(WorkOrderStatus.RECEIVED, found.getPreviousStatus());
             assertEquals(WorkOrderStatus.DIAGNOSIS, found.getNewStatus());

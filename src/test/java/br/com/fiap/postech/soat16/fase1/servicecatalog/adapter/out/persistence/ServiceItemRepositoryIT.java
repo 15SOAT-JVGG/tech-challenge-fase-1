@@ -46,7 +46,7 @@ class ServiceItemRepositoryIT {
         serviceItem.setBasePrice(new BigDecimal("80.00"));
         serviceItem.setEstimatedDurationMinutes(30);
         serviceItem.setActive(true);
-        return inTransaction(() -> repository.persist(serviceItem));
+        return inTransaction(() -> repository.save(serviceItem));
     }
 
     @Nested
@@ -59,7 +59,7 @@ class ServiceItemRepositoryIT {
             ServiceItem serviceItem = seed("Alinhamento - " + UUID.randomUUID());
 
             ServiceItem found =
-                    inTransaction(() -> repository.findById(serviceItem.getId()));
+                    inTransaction(() -> repository.findServiceItemById(serviceItem.getId()));
 
             assertEquals(serviceItem.getId(), found.getId());
             assertEquals(serviceItem.getName(), found.getName());
@@ -68,7 +68,7 @@ class ServiceItemRepositoryIT {
         @Test
         @DisplayName("returns null when the id does not exist")
         void returnsNullWhenNotFound() {
-            assertNull(inTransaction(() -> repository.findById(UUID.randomUUID())));
+            assertNull(inTransaction(() -> repository.findServiceItemById(UUID.randomUUID())));
         }
     }
 
@@ -82,16 +82,17 @@ class ServiceItemRepositoryIT {
             ServiceItem serviceItem = seed("Balanceamento - " + UUID.randomUUID());
 
             Boolean deleted =
-                    inTransaction(() -> repository.deleteById(serviceItem.getId()));
+                    inTransaction(() -> repository.deleteServiceItemById(serviceItem.getId()));
 
             assertTrue(deleted);
-            assertNull(inTransaction(() -> repository.findById(serviceItem.getId())));
+            assertNull(inTransaction(() -> repository.findServiceItemById(serviceItem.getId())));
         }
 
         @Test
         @DisplayName("deleting a non-existent id returns false")
         void deletingMissingIdReturnsFalse() {
-            Boolean deleted = inTransaction(() -> repository.deleteById(UUID.randomUUID()));
+            Boolean deleted =
+                    inTransaction(() -> repository.deleteServiceItemById(UUID.randomUUID()));
 
             assertEquals(Boolean.FALSE, deleted);
         }

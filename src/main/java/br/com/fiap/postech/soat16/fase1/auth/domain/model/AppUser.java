@@ -2,35 +2,18 @@ package br.com.fiap.postech.soat16.fase1.auth.domain.model;
 
 import java.time.LocalDateTime;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "app_users")
 public class AppUser {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 50)
     private String username;
 
-    @Column(nullable = false)
     private String password;
 
-    @Column(nullable = false, length = 20)
     private String role;
 
-    @Column(nullable = false)
     private Boolean active = true;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     protected AppUser() {
@@ -43,9 +26,16 @@ public class AppUser {
         this.active = true;
     }
 
-    @PrePersist
-    void prePersist() {
-        createdAt = LocalDateTime.now();
+    /**
+     * Reidrata um usuário já persistido, preservando identidade e datas geradas pela infraestrutura.
+     */
+    public static AppUser restore(Long id, String username, String hashedPassword, String role,
+            Boolean active, LocalDateTime createdAt) {
+        var user = new AppUser(username, hashedPassword, role);
+        user.id = id;
+        user.active = active;
+        user.createdAt = createdAt;
+        return user;
     }
 
     public void deactivate() {

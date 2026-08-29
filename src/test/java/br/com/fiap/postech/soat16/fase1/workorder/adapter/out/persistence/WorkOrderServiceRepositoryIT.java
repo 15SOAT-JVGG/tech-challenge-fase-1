@@ -75,8 +75,8 @@ class WorkOrderServiceRepositoryIT {
         vehicle.setKmDriven(10_000L);
         vehicle.setType(VehicleType.CAR);
 
-        return inTransaction(() -> customerRepository.persist(customer)
-            .chain(c -> vehicleRepository.persist(vehicle)
+        return inTransaction(() -> customerRepository.save(customer)
+            .chain(c -> vehicleRepository.save(vehicle)
                 .chain(v -> {
                     WorkOrder workOrder = new WorkOrder();
                     workOrder.setCustomer(c);
@@ -85,7 +85,7 @@ class WorkOrderServiceRepositoryIT {
                     workOrder.setPriority(WorkOrderPriority.MEDIUM);
                     workOrder.setStatus(WorkOrderStatus.IN_PROGRESS);
                     workOrder.setOpenedAt(LocalDateTime.now());
-                    return workOrderRepository.persist(workOrder);
+                    return workOrderRepository.save(workOrder);
                 })));
     }
 
@@ -101,7 +101,7 @@ class WorkOrderServiceRepositoryIT {
         service.setDescription(description);
         service.setPrice(new BigDecimal("120.00"));
         service.setPerformedAt(LocalDateTime.now());
-        return inTransaction(() -> repository.persist(service));
+        return inTransaction(() -> repository.save(service));
     }
 
     @Nested

@@ -107,7 +107,7 @@ class WorkOrderControllerIT {
         customer.setPhoneNumber("+5511999999999");
         customer.setDocument("DOC-" + UUID.randomUUID());
         customer.setDocumentType(DocumentType.CPF);
-        return persistInTransaction(() -> customerRepository.persist(customer)).getId();
+        return persistInTransaction(() -> customerRepository.save(customer)).getId();
     }
 
     private UUID seedVehicle() {
@@ -119,12 +119,12 @@ class WorkOrderControllerIT {
         vehicle.setYear(2020);
         vehicle.setKmDriven(50_000L);
         vehicle.setType(VehicleType.CAR);
-        return persistInTransaction(() -> vehicleRepository.persist(vehicle)).getId();
+        return persistInTransaction(() -> vehicleRepository.save(vehicle)).getId();
     }
 
     private UUID seedPart(BigDecimal unitPrice) {
         Part part = new Part("Filtro de óleo", "Filtro de óleo padrão", unitPrice, 100, "UN");
-        return persistInTransaction(() -> partRepository.persist(part)).getId();
+        return persistInTransaction(() -> partRepository.save(part)).getId();
     }
 
     private UUID createWorkOrder(UUID customerId, UUID vehicleId) {
@@ -804,7 +804,7 @@ class WorkOrderControllerIT {
         @DisplayName("deve retornar 422 ao aprovar com estoque insuficiente")
         void shouldReturn422WhenInsufficientStock() {
             Part part = new Part("Peça rara", "estoque baixo", new BigDecimal("50.00"), 1, "UN");
-            UUID partId = persistInTransaction(() -> partRepository.persist(part)).getId();
+            UUID partId = persistInTransaction(() -> partRepository.save(part)).getId();
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
             updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
             updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);

@@ -1,5 +1,6 @@
 package br.com.fiap.postech.soat16.fase1.workorder.adapter.out.catalog;
 
+import java.util.List;
 import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -16,6 +17,7 @@ import br.com.fiap.postech.soat16.fase1.worker.application.port.out.WorkerPersis
 import br.com.fiap.postech.soat16.fase1.worker.domain.model.Worker;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkshopCatalogPort;
 
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import lombok.RequiredArgsConstructor;
 
@@ -52,5 +54,13 @@ public class LegacyWorkshopCatalogAdapter implements WorkshopCatalogPort {
     @Override
     public Uni<ServiceItem> findServiceItemById(UUID id) {
         return serviceItemRepository.findServiceItemById(id);
+    }
+
+    @Override
+    public Uni<Void> saveParts(List<Part> parts) {
+        return Multi.createFrom().iterable(parts)
+                .onItem().transformToUniAndConcatenate(partRepository::save)
+                .collect().asList()
+                .replaceWithVoid();
     }
 }

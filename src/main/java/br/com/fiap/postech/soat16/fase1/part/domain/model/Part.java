@@ -4,65 +4,34 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
-import jakarta.persistence.Version;
-
 import br.com.fiap.postech.soat16.fase1.part.domain.model.enums.PartType;
 import br.com.fiap.postech.soat16.fase1.shared.domain.exception.BusinessException;
 
 import lombok.EqualsAndHashCode;
 
-@Entity
-@Table(name = "parts", schema = "oficina_mecanica")
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 public class Part {
 
     @EqualsAndHashCode.Include
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "part_id", nullable = false)
     private UUID id;
 
-    @Column(nullable = false, length = 100)
     private String name;
 
-    @Column
     private String description;
 
-    @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPrice;
 
-    @Column(name = "stock_quantity", nullable = false)
     private Integer stockQuantity;
 
-    @Column(nullable = false, length = 10)
     private String unit;
 
-    @Column(name = "minimum_stock", nullable = false)
     private Integer minimumStock = 0;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "part_type", nullable = false, length = 10)
     private PartType partType = PartType.PART;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
-
-    @Version
-    @Column(name = "version")
-    private Long version;
 
     protected Part() {
     }
@@ -93,15 +62,25 @@ public class Part {
         this.partType = partType != null ? partType : PartType.PART;
     }
 
-    @PrePersist
-    void prePersist() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    void preUpdate() {
-        updatedAt = LocalDateTime.now();
+    /**
+     * Reidrata uma peça já persistida, preservando identidade e datas geradas pela infraestrutura.
+     */
+    public static Part restore(
+            UUID id,
+            String name,
+            String description,
+            BigDecimal unitPrice,
+            Integer stockQuantity,
+            String unit,
+            Integer minimumStock,
+            PartType partType,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt) {
+        var part = new Part(name, description, unitPrice, stockQuantity, unit, minimumStock, partType);
+        part.id = id;
+        part.createdAt = createdAt;
+        part.updatedAt = updatedAt;
+        return part;
     }
 
     public void update(

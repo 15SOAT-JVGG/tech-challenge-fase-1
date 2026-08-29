@@ -5,6 +5,8 @@ import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import br.com.fiap.postech.soat16.fase1.customer.adapter.out.persistence.entity.CustomerJpaEntity;
+import br.com.fiap.postech.soat16.fase1.customer.adapter.out.persistence.mapper.CustomerPersistenceMapper;
 import br.com.fiap.postech.soat16.fase1.customer.application.port.out.CustomerPersistencePort;
 import br.com.fiap.postech.soat16.fase1.customer.domain.model.Customer;
 
@@ -14,11 +16,14 @@ import io.smallrye.mutiny.Uni;
 
 @ApplicationScoped
 public class CustomerRepository
-        implements PanacheRepositoryBase<Customer, UUID>, CustomerPersistencePort {
+        implements PanacheRepositoryBase<CustomerJpaEntity, UUID>, CustomerPersistencePort {
 
     @Override
     public Uni<List<Customer>> findPage(int page, int size) {
-        return find("ORDER BY createdAt DESC").page(page, size).list();
+        return find("ORDER BY createdAt DESC").page(page, size).list()
+                .map(entities -> entities.stream()
+                        .map(CustomerPersistenceMapper::toDomain)
+                        .toList());
     }
 
     @Override
@@ -29,7 +34,8 @@ public class CustomerRepository
     @Override
     public Uni<Customer> findByCustomerId(UUID id) {
         return findById(id)
-                .invoke(found -> Log.infof("Customer lookup: id=%s found=%b", id, found != null));
+                .invoke(found -> Log.infof("Customer lookup: id=%s found=%b", id, found != null))
+                .map(CustomerPersistenceMapper::toDomain);
     }
 
     @Override
@@ -40,7 +46,8 @@ public class CustomerRepository
 
     @Override
     public Uni<Customer> findByDocument(String document) {
-        return find("document = ?1", document).firstResult();
+        return find("document = ?1", document).firstResult()
+                .map(CustomerPersistenceMapper::toDomain);
     }
 
     @Override
@@ -50,6 +57,14 @@ public class CustomerRepository
 
     @Override
     public Uni<Customer> save(Customer customer) {
-        return persist(customer);
+        if (customer.getId() == null) {
+            return persist(CustomerPersistenceMapper.toJpaEntity(customer))
+                    .map(CustomerPersistenceMapper::toDomain);
+        }
+        return findById(customer.getId())
+                .onItem().ifNotNull().transform(entity -> {
+                    CustomerPersistenceMapper.copyState(customer, entity);
+                    return CustomerPersistenceMapper.toDomain(entity);
+                });
     }
 }

@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDateTime;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -50,13 +52,17 @@ class AppUserTest {
     class Lifecycle {
 
         @Test
-        @DisplayName("prePersist sets createdAt")
-        void prePersistSetsCreatedAt() {
-            AppUser user = new AppUser(USERNAME, HASHED_PASSWORD, ROLE);
+        @DisplayName("restore rehydrates identity and creation instant")
+        void restoreRehydratesPersistedState() {
+            LocalDateTime createdAt = LocalDateTime.now();
 
-            user.prePersist();
+            AppUser user = AppUser.restore(7L, USERNAME, HASHED_PASSWORD, ROLE, true, createdAt);
 
+            assertEquals(7L, user.getId());
+            assertEquals(USERNAME, user.getUsername());
             assertNotNull(user.getCreatedAt());
+            assertEquals(createdAt, user.getCreatedAt());
+            assertTrue(user.isActive());
         }
 
         @Test

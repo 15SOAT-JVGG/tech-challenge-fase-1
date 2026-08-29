@@ -83,8 +83,8 @@ class EstimateRepositoryIT {
         vehicle.setKmDriven(10_000L);
         vehicle.setType(VehicleType.CAR);
 
-        return inTransaction(() -> customerRepository.persist(customer)
-            .chain(c -> vehicleRepository.persist(vehicle)
+        return inTransaction(() -> customerRepository.save(customer)
+            .chain(c -> vehicleRepository.save(vehicle)
                 .chain(v -> {
                     WorkOrder workOrder = new WorkOrder();
                     workOrder.setCustomer(c);
@@ -93,7 +93,7 @@ class EstimateRepositoryIT {
                     workOrder.setPriority(WorkOrderPriority.MEDIUM);
                     workOrder.setStatus(WorkOrderStatus.WAITING_APPROVAL);
                     workOrder.setOpenedAt(LocalDateTime.now());
-                    return workOrderRepository.persist(workOrder);
+                    return workOrderRepository.save(workOrder);
                 })));
     }
 
@@ -105,7 +105,7 @@ class EstimateRepositoryIT {
 
     private Part seedPart() {
         Part part = new Part("Filtro", "desc", new BigDecimal("50.00"), 100, "UN");
-        return inTransaction(() -> partRepository.persist(part));
+        return inTransaction(() -> partRepository.save(part));
     }
 
     private Estimate seedEstimate(WorkOrder workOrder, Part part, EstimateStatus status) {
@@ -124,7 +124,7 @@ class EstimateRepositoryIT {
         item.setTotalPrice(new BigDecimal("50.00"));
         estimate.setItems(java.util.List.of(item));
 
-        return inTransaction(() -> repository.persist(estimate));
+        return inTransaction(() -> repository.save(estimate));
     }
 
     @Nested

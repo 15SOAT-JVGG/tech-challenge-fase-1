@@ -5,6 +5,8 @@ import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import br.com.fiap.postech.soat16.fase1.servicecatalog.adapter.out.persistence.entity.ServiceItemJpaEntity;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.adapter.out.persistence.mapper.ServiceItemPersistenceMapper;
 import br.com.fiap.postech.soat16.fase1.servicecatalog.application.port.out.ServiceCatalogPersistencePort;
 import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.model.ServiceItem;
 
@@ -13,21 +15,31 @@ import io.smallrye.mutiny.Uni;
 
 @ApplicationScoped
 public class ServiceItemRepository
-        implements PanacheRepositoryBase<ServiceItem, UUID>, ServiceCatalogPersistencePort {
+        implements PanacheRepositoryBase<ServiceItemJpaEntity, UUID>, ServiceCatalogPersistencePort {
 
     @Override
     public Uni<List<ServiceItem>> listAllServiceItems() {
-        return listAll();
+        return listAll().map(entities -> entities.stream()
+                .map(ServiceItemPersistenceMapper::toDomain)
+                .toList());
     }
 
     @Override
     public Uni<ServiceItem> findServiceItemById(UUID id) {
-        return findById(id);
+        return findById(id).map(ServiceItemPersistenceMapper::toDomain);
     }
 
     @Override
     public Uni<ServiceItem> save(ServiceItem serviceItem) {
-        return persist(serviceItem);
+        if (serviceItem.getId() == null) {
+            return persist(ServiceItemPersistenceMapper.toJpaEntity(serviceItem))
+                    .map(ServiceItemPersistenceMapper::toDomain);
+        }
+        return findById(serviceItem.getId())
+                .onItem().ifNotNull().transform(entity -> {
+                    ServiceItemPersistenceMapper.copyState(serviceItem, entity);
+                    return ServiceItemPersistenceMapper.toDomain(entity);
+                });
     }
 
     @Override

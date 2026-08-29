@@ -299,7 +299,7 @@ class VehicleRepositoryIT {
         customer.setPhoneNumber("11999999999");
         customer.setDocument("DOC-" + UUID.randomUUID());
         customer.setDocumentType(DocumentType.CPF);
-        return inTransaction(() -> customerRepository.persist(customer));
+        return inTransaction(() -> customerRepository.save(customer));
     }
 
     private Vehicle seed(String licensePlate, String manufacturer, String model) {

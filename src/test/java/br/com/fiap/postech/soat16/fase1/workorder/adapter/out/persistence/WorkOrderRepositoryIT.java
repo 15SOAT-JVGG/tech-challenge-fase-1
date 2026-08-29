@@ -64,7 +64,7 @@ class WorkOrderRepositoryIT {
         customer.setPhoneNumber("+5511999999999");
         customer.setDocument("DOC-" + UUID.randomUUID());
         customer.setDocumentType(DocumentType.CPF);
-        return inTransaction(() -> customerRepository.persist(customer));
+        return inTransaction(() -> customerRepository.save(customer));
     }
 
     private Vehicle seedVehicle() {
@@ -76,7 +76,7 @@ class WorkOrderRepositoryIT {
         vehicle.setYear(2020);
         vehicle.setKmDriven(10_000L);
         vehicle.setType(VehicleType.CAR);
-        return inTransaction(() -> vehicleRepository.persist(vehicle));
+        return inTransaction(() -> vehicleRepository.save(vehicle));
     }
 
     private static final java.util.concurrent.atomic.AtomicInteger PLATE_COUNTER = new java.util.concurrent.atomic.AtomicInteger();
@@ -94,7 +94,7 @@ class WorkOrderRepositoryIT {
         workOrder.setStatus(status);
         workOrder.setOpenedAt(LocalDateTime.now());
         workOrder.setClosedAt(closedAt);
-        return inTransaction(() -> repository.persist(workOrder));
+        return inTransaction(() -> repository.save(workOrder));
     }
 
     @Nested

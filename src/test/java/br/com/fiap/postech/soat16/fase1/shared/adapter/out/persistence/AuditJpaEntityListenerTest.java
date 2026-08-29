@@ -1,4 +1,4 @@
-package br.com.fiap.postech.soat16.fase1.shared.domain.model.audit;
+package br.com.fiap.postech.soat16.fase1.shared.adapter.out.persistence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -9,17 +9,17 @@ import java.time.OffsetDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import br.com.fiap.postech.soat16.fase1.customer.domain.model.Customer;
+import br.com.fiap.postech.soat16.fase1.customer.adapter.out.persistence.entity.CustomerJpaEntity;
 
-@DisplayName("AuditEntityListener — Unit Tests")
-class AuditEntityListenerTest {
+@DisplayName("AuditJpaEntityListener — Unit Tests")
+class AuditJpaEntityListenerTest {
 
-    private final AuditEntityListener listener = new AuditEntityListener();
+    private final AuditJpaEntityListener listener = new AuditJpaEntityListener();
 
     @Test
     @DisplayName("prePersist stamps creation fields")
     void prePersistStampsCreationFields() {
-        Customer customer = new Customer();
+        CustomerJpaEntity customer = new CustomerJpaEntity();
 
         listener.prePersist(customer);
 
@@ -32,7 +32,7 @@ class AuditEntityListenerTest {
     @Test
     @DisplayName("preUpdate refreshes only update fields")
     void preUpdateRefreshesUpdateFieldsOnly() {
-        Customer customer = new Customer();
+        CustomerJpaEntity customer = new CustomerJpaEntity();
         OffsetDateTime originalCreatedAt = OffsetDateTime.now().minusDays(1);
         customer.setCreatedAt(originalCreatedAt);
         customer.setCreatedBy("original-author");

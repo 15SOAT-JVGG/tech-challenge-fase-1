@@ -225,10 +225,12 @@ public class WorkOrderService {
     private Uni<Estimate> approve(WorkOrder order, Estimate estimate) {
         LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
         estimate.assertPending();
-        reserveStock(estimate);
-        estimate.approve(now);
-        return persistOrderWithHistory(order, order.registerEstimateApproval(estimate, now))
-                .flatMap(persisted -> estimateRepository.save(estimate));
+        return reserveStock(estimate)
+                .flatMap(ignored -> {
+                    estimate.approve(now);
+                    return persistOrderWithHistory(order, order.registerEstimateApproval(estimate, now))
+                            .flatMap(persisted -> estimateRepository.save(estimate));
+                });
     }
 
     private Uni<Estimate> reject(WorkOrder order, Estimate estimate) {
@@ -264,15 +266,19 @@ public class WorkOrderService {
      * Baixa o estoque somente após a aprovação do orçamento. A transação é revertida se alguma peça
      * não tiver estoque suficiente.
      */
-    private void reserveStock(Estimate estimate) {
-        estimate.getItems().forEach(item -> {
-            Part part = item.getPart();
-            part.decreaseStock(item.getQuantity());
-            if (part.isLowStock()) {
-                Log.warnf("Estoque baixo apos reserva: peca=%s restante=%d minimo=%d",
-                        part.getName(), part.getStockQuantity(), part.getMinimumStock());
-            }
-        });
+    private Uni<Void> reserveStock(Estimate estimate) {
+        List<Part> parts = estimate.getItems().stream()
+                .map(item -> {
+                    Part part = item.getPart();
+                    part.decreaseStock(item.getQuantity());
+                    if (part.isLowStock()) {
+                        Log.warnf("Estoque baixo apos reserva: peca=%s restante=%d minimo=%d",
+                                part.getName(), part.getStockQuantity(), part.getMinimumStock());
+                    }
+                    return part;
+                })
+                .toList();
+        return catalog.saveParts(parts);
     }
 
     /**
@@ -284,10 +290,17 @@ public class WorkOrderService {
         }
         return estimateRepository.findApprovedByWorkOrderId(order.getId())
                 .flatMap(estimate -> {
-                    if (estimate != null) {
-                        estimate.getItems().forEach(item -> item.getPart().increaseStock(item.getQuantity()));
+                    if (estimate == null) {
+                        return Uni.createFrom().voidItem();
                     }
-                    return Uni.createFrom().voidItem();
+                    List<Part> parts = estimate.getItems().stream()
+                            .map(item -> {
+                                Part part = item.getPart();
+                                part.increaseStock(item.getQuantity());
+                                return part;
+                            })
+                            .toList();
+                    return catalog.saveParts(parts);
                 });
     }
 
