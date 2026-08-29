@@ -36,6 +36,7 @@ import br.com.fiap.postech.soat16.fase1.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.model.enums.VehicleType;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
 import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
+import br.com.fiap.postech.soat16.fase1.service.query.VehicleQuery;
 
 import io.smallrye.mutiny.Uni;
 
@@ -84,8 +85,8 @@ class VehicleServiceTest {
             VehicleFilterDto filter = mock(VehicleFilterDto.class);
             when(pageable.getPage()).thenReturn(0);
             when(pageable.getSize()).thenReturn(10);
-            when(vehicleRepository.findPageWithFilter(pageable, filter)).thenReturn(Uni.createFrom().item(List.of(entity)));
-            when(vehicleRepository.countWithFilter(filter)).thenReturn(Uni.createFrom().item(1L));
+            when(vehicleRepository.findPageWithFilter(any(VehicleQuery.class))).thenReturn(Uni.createFrom().item(List.of(entity)));
+            when(vehicleRepository.countWithFilter(any(VehicleQuery.class))).thenReturn(Uni.createFrom().item(1L));
             when(vehicleMapper.toResponse(entity)).thenReturn(response);
 
             PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
@@ -103,8 +104,8 @@ class VehicleServiceTest {
             VehicleFilterDto filter = mock(VehicleFilterDto.class);
             when(pageable.getPage()).thenReturn(0);
             when(pageable.getSize()).thenReturn(5);
-            when(vehicleRepository.findPageWithFilter(pageable, filter)).thenReturn(Uni.createFrom().item(List.of(entity)));
-            when(vehicleRepository.countWithFilter(filter)).thenReturn(Uni.createFrom().item(12L));
+            when(vehicleRepository.findPageWithFilter(any(VehicleQuery.class))).thenReturn(Uni.createFrom().item(List.of(entity)));
+            when(vehicleRepository.countWithFilter(any(VehicleQuery.class))).thenReturn(Uni.createFrom().item(12L));
             when(vehicleMapper.toResponse(entity)).thenReturn(response);
 
             PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
@@ -124,8 +125,8 @@ class VehicleServiceTest {
             VehicleFilterDto filter = mock(VehicleFilterDto.class);
             when(pageable.getPage()).thenReturn(0);
             when(pageable.getSize()).thenReturn(10);
-            when(vehicleRepository.findPageWithFilter(pageable, filter)).thenReturn(Uni.createFrom().item(List.of()));
-            when(vehicleRepository.countWithFilter(filter)).thenReturn(Uni.createFrom().item(0L));
+            when(vehicleRepository.findPageWithFilter(any(VehicleQuery.class))).thenReturn(Uni.createFrom().item(List.of()));
+            when(vehicleRepository.countWithFilter(any(VehicleQuery.class))).thenReturn(Uni.createFrom().item(0L));
 
             PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();
 
@@ -140,8 +141,8 @@ class VehicleServiceTest {
             VehicleFilterDto filter = mock(VehicleFilterDto.class);
             when(pageable.getPage()).thenReturn(1);
             when(pageable.getSize()).thenReturn(10);
-            when(vehicleRepository.findPageWithFilter(pageable, filter)).thenReturn(Uni.createFrom().item(List.of(entity)));
-            when(vehicleRepository.countWithFilter(filter)).thenReturn(Uni.createFrom().item(11L));
+            when(vehicleRepository.findPageWithFilter(any(VehicleQuery.class))).thenReturn(Uni.createFrom().item(List.of(entity)));
+            when(vehicleRepository.countWithFilter(any(VehicleQuery.class))).thenReturn(Uni.createFrom().item(11L));
             when(vehicleMapper.toResponse(entity)).thenReturn(response);
 
             PageableResponseDto<VehicleResponseDto> result = service.listAll(pageable, filter).await().indefinitely();

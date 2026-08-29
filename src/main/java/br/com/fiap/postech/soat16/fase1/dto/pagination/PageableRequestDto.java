@@ -33,6 +33,10 @@ public class PageableRequestDto {
     @QueryParam("sort")
     private List<String> sort;
 
+    public List<String> getSortParameters() {
+        return sort == null ? List.of() : List.copyOf(sort);
+    }
+
     public Sort getSort() {
         if (sort == null || sort.isEmpty()) {
             return Sort.by("createdAt", Sort.Direction.Descending);

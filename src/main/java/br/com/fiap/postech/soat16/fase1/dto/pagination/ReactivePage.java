@@ -5,10 +5,6 @@ import java.util.function.Function;
 
 import io.smallrye.mutiny.Uni;
 
-/**
- * Monta uma página reativa combinando a consulta dos itens com a contagem total, aplicando o
- * mapeamento entidade → DTO. Centraliza o padrão de paginação reativo compartilhado pelos serviços.
- */
 public final class ReactivePage {
 
     private ReactivePage() {

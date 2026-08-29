@@ -9,12 +9,12 @@ import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import br.com.fiap.postech.soat16.fase1.dto.pagination.PageableRequestDto;
-import br.com.fiap.postech.soat16.fase1.dto.request.VehicleFilterDto;
 import br.com.fiap.postech.soat16.fase1.model.Vehicle;
+import br.com.fiap.postech.soat16.fase1.service.query.VehicleQuery;
 
 import io.quarkus.hibernate.reactive.panache.PanacheRepository;
 import io.quarkus.logging.Log;
+import io.quarkus.panache.common.Sort;
 import io.smallrye.mutiny.Uni;
 
 @ApplicationScoped
@@ -42,47 +42,62 @@ public class VehicleRepository implements PanacheRepository<Vehicle> {
                 .invoke(deleted -> Log.infof("Vehicle deleted: id=%s deleted=%d", id, deleted));
     }
 
-    public Uni<List<Vehicle>> findPageWithFilter(PageableRequestDto pageable, VehicleFilterDto filter) {
-        var filterResult = buildFilter(filter);
+    public Uni<List<Vehicle>> findPageWithFilter(VehicleQuery query) {
+        var filterResult = buildFilter(query);
+        Sort sort = buildSort(query);
         if (filterResult.query().isEmpty()) {
-            return findAll(pageable.getSort())
-                    .page(pageable.getPage(), pageable.getSize())
+            return findAll(sort)
+                    .page(query.page(), query.size())
                     .list();
         }
-        return find(filterResult.query(), pageable.getSort(), filterResult.params())
-                .page(pageable.getPage(), pageable.getSize())
+        return find(filterResult.query(), sort, filterResult.params())
+                .page(query.page(), query.size())
                 .list();
     }
 
-    public Uni<Long> countWithFilter(VehicleFilterDto filter) {
-        var filterResult = buildFilter(filter);
+    public Uni<Long> countWithFilter(VehicleQuery query) {
+        var filterResult = buildFilter(query);
         if (filterResult.query().isEmpty()) {
             return count();
         }
         return count(filterResult.query(), filterResult.params());
     }
 
-    private FilterResult buildFilter(VehicleFilterDto filter) {
+    private FilterResult buildFilter(VehicleQuery query) {
 
         List<String> conditions = new ArrayList<>();
         Map<String, Object> params = new HashMap<>();
 
-        if (filter.getLicensePlate() != null && !filter.getLicensePlate().isBlank()) {
+        if (query.licensePlate() != null && !query.licensePlate().isBlank()) {
             conditions.add("LOWER(licensePlate) LIKE :licensePlate");
-            params.put("licensePlate", "%" + filter.getLicensePlate().toLowerCase(Locale.ROOT) + "%");
+            params.put("licensePlate", "%" + query.licensePlate().toLowerCase(Locale.ROOT) + "%");
         }
 
-        if (filter.getManufacturer() != null && !filter.getManufacturer().isBlank()) {
+        if (query.manufacturer() != null && !query.manufacturer().isBlank()) {
             conditions.add("LOWER(manufacturer) LIKE :manufacturer");
-            params.put("manufacturer", "%" + filter.getManufacturer().toLowerCase(Locale.ROOT) + "%");
+            params.put("manufacturer", "%" + query.manufacturer().toLowerCase(Locale.ROOT) + "%");
         }
 
-        if (filter.getModel() != null && !filter.getModel().isBlank()) {
+        if (query.model() != null && !query.model().isBlank()) {
             conditions.add("LOWER(model) LIKE :model");
-            params.put("model", "%" + filter.getModel().toLowerCase(Locale.ROOT) + "%");
+            params.put("model", "%" + query.model().toLowerCase(Locale.ROOT) + "%");
         }
 
         return new FilterResult(String.join(" AND ", conditions), params);
+    }
+
+    private Sort buildSort(VehicleQuery query) {
+        List<VehicleQuery.Order> orders = query.orders().isEmpty()
+                ? List.of(new VehicleQuery.Order("createdAt", VehicleQuery.Direction.DESCENDING))
+                : query.orders();
+        Sort result = null;
+        for (VehicleQuery.Order order : orders) {
+            Sort.Direction direction = order.direction() == VehicleQuery.Direction.DESCENDING
+                    ? Sort.Direction.Descending
+                    : Sort.Direction.Ascending;
+            result = result == null ? Sort.by(order.field(), direction) : result.and(order.field(), direction);
+        }
+        return result;
     }
 
     private record FilterResult(String query, Map<String, Object> params) { }

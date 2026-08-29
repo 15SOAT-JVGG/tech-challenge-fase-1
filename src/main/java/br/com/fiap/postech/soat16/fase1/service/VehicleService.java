@@ -18,6 +18,7 @@ import br.com.fiap.postech.soat16.fase1.exception.VehicleNotFoundException;
 import br.com.fiap.postech.soat16.fase1.mapper.VehicleMapper;
 import br.com.fiap.postech.soat16.fase1.repository.CustomerRepository;
 import br.com.fiap.postech.soat16.fase1.repository.VehicleRepository;
+import br.com.fiap.postech.soat16.fase1.service.query.VehicleQuery;
 
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
@@ -34,8 +35,15 @@ public class VehicleService {
 
     @WithSession
     public Uni<PageableResponseDto<VehicleResponseDto>> listAll(PageableRequestDto pageable, VehicleFilterDto filter) {
+        VehicleQuery query = VehicleQuery.of(
+                pageable.getPage(),
+                pageable.getSize(),
+                pageable.getSortParameters(),
+                filter.getLicensePlate(),
+                filter.getManufacturer(),
+                filter.getModel());
         return Uni.combine().all()
-                .unis(vehicleRepository.findPageWithFilter(pageable, filter), vehicleRepository.countWithFilter(filter))
+                .unis(vehicleRepository.findPageWithFilter(query), vehicleRepository.countWithFilter(query))
                 .asTuple().map(tuple -> {
                     var content = tuple.getItem1().stream().map(vehicleMapper::toResponse).toList();
                     var totalElements = tuple.getItem2();
