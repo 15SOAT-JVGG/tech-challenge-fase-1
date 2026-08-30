@@ -56,10 +56,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      # O caminho do arquivo de exceções é explícito para que a lista valha em qualquer
+      # diretório de trabalho, e para que ela seja um lugar óbvio de auditar.
       - name: Varre o histórico
         run: |
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.3 \
-            detect --source=/repo --redact --verbose
+            detect --source=/repo --redact --verbose \
+              --gitleaks-ignore-path=/repo/.gitleaksignore
 
   # ── 2. SAST — análise estática de segurança ──────────────────────────────────
   sast_semgrep:
@@ -71,10 +74,17 @@ jobs:
 
       # `scan` em vez de `ci`: o segundo espera uma conta no Semgrep Cloud para buscar a
       # política do projeto. `--error` é o que transforma achado em reprovação.
+      #
+      # A regra de tag mutável de action fica de fora. Ela pede o SHA da action em vez de
+      # `@v4`, o que protege contra a reescrita de uma tag no repositório da action — risco
+      # real, mas de probabilidade baixa em actions oficiais, e cujo preço é atualizar
+      # quinze SHAs à mão a cada versão. A decisão é consciente e vale para os quatro
+      # workflows; revisá-la é assunto de uma entrega que não esteja em prazo.
       - name: Analisa o código
         run: |
           docker run --rm -v "$PWD:/src" semgrep/semgrep:1.175.0 \
-            semgrep scan --config p/ci --error --metrics=off
+            semgrep scan --config p/ci --error --metrics=off \
+              --exclude-rule yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag
 
   # ── 3. Build & Testes — Quarkus JVM ──────────────────────────────────────────
   #
@@ -96,8 +106,18 @@ jobs:
           java-version: "21"
           cache: maven
 
+      # A escolha entra por variável de ambiente, e não interpolada no comando: expressão
+      # do GitHub dentro de `run` é injeção de shell, porque o valor é colado no script
+      # antes de o shell existir.
       - name: Build, testes e gates de qualidade
-        run: ./mvnw --batch-mode verify ${{ inputs.skip_tests && '-DskipTests' || '' }}
+        env:
+          SKIP_TESTS: ${{ inputs.skip_tests }}
+        run: |
+          if [[ "$SKIP_TESTS" == "true" ]]; then
+            ./mvnw --batch-mode verify -DskipTests
+          else
+            ./mvnw --batch-mode verify
+          fi
 
       # O relatório é o que permite conferir a cobertura de um PR sem rodar nada local.
       - name: Publica o relatório de cobertura

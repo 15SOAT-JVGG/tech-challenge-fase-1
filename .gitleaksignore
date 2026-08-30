@@ -1,0 +1,19 @@
+# Achados conhecidos e já remediados, que o Gitleaks continua encontrando porque varre o
+# histórico — e no histórico eles não deixam de existir. Só entra aqui o que foi
+# verificado; um achado novo tem de reprovar a execução.
+#
+# ── Par RS256 versionado até junho de 2026 ────────────────────────────────────
+# A chave privada de desenvolvimento viveu em src/main/resources/jwt/ e saiu do
+# repositório em 20d91c5 ("fix(security): retira o par RS256 do build e do
+# repositório"), junto com a geração da chave no build da imagem. Hoje nenhum .pem é
+# rastreado: o par é gerado fora do build por infra/scripts/generate-jwt-pair.sh e chega
+# à aplicação por Secret montado em /etc/jwt.
+#
+# Reescrever o histórico para apagá-la foi descartado: o repositório é compartilhado com
+# a banca avaliadora e com o time, e um force-push invalidaria os clones de todos.
+#
+# Remover do código-fonte não desfaz a exposição: a chave segue recuperável por qualquer
+# um que clone o repositório, e por isso tem de ser tratada como comprometida. A mitigação
+# que importa é a rotação do par que a aplicação usa — gerar um novo com
+# infra/scripts/generate-jwt-pair.sh e regravar JWT_PRIVATE_KEY_B64 e JWT_PUBLIC_KEY_B64.
+98515043a518156cc369deb5396eb4a6d9647d3f:src/main/resources/jwt/privateKey.pem:private-key:1
