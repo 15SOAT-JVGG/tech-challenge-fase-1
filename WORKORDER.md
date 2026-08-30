@@ -15,6 +15,7 @@ veículo. Para detalhes de autenticação, portas e como rodar o projeto, veja o
 | `EstimateItem` | Um item do orçamento: uma peça do catálogo (`Part`), quantidade e preço unitário. |
 | `WorkOrderService` | Uma linha de mão de obra executada na ordem (ex.: "Troca de óleo"), com descrição, preço e item do catálogo de serviços de origem. |
 | `WorkOrderHistory` | Registro interno de toda mudança de status da ordem (não exposto via API). |
+| `EstimateDecisionToken` | O direito a uma única decisão do cliente sobre um orçamento. Um token por decisão (aprovar/recusar), assinado, de uso único e válido por sete dias. |
 
 ---
 
@@ -27,6 +28,10 @@ RECEIVED ──► DIAGNOSIS ──► WAITING_APPROVAL ──► IN_PROGRESS �
 ```
 
 - **RECEIVED** é o status inicial — definido automaticamente na criação, junto com `openedAt`.
+- **WAITING_APPROVAL** é o ponto em que a oficina se compromete com o cliente: a mesma transação
+  reserva no estoque todas as peças do orçamento pendente e envia ao cliente um e-mail com os links
+  de aprovação e recusa. Se qualquer peça não tiver saldo, nada é reservado, nenhum e-mail sai e a
+  OS permanece em `DIAGNOSIS` (`INSUFFICIENT_PART_STOCK`, HTTP 422).
 - **COMPLETED** é alcançado pelo endpoint dedicado `PATCH /{id}/close` ou pela recusa do orçamento.
 - **DELIVERED** só pode ser definido a partir de `COMPLETED`, via `PATCH /{id}/status`.
 - Não existe cancelamento manual nem status `CANCELLED`: a recusa conclui a OS e preenche
@@ -65,13 +70,35 @@ por ela:
   o valor unitário da peça no catálogo (`Part.unitPrice`) é usado. Na abertura o preço é sempre o do
   catálogo, copiado como snapshot.
 - `Estimate.totalAmount` é a soma do `totalPrice` de todos os itens.
-- Ao **aprovar** um orçamento (`PATCH /estimate/{estimateId}/approve`):
+- Ao **aprovar** um orçamento:
   - `WorkOrder.estimatedValue` recebe o `totalAmount` do orçamento aprovado.
   - Se a ordem estiver em `WAITING_APPROVAL`, ela avança automaticamente para `IN_PROGRESS` (gerando
     histórico). Se já estiver em outro status, apenas o `estimatedValue` é atualizado.
+  - A reserva de estoque feita na entrada em `WAITING_APPROVAL` é mantida: a aprovação apenas
+    confirma o compromisso com a execução.
   - Um orçamento já aprovado ou rejeitado não pode ser aprovado novamente (`EstimateAlreadyDecidedException`, HTTP 409).
-- Ao **recusar** um orçamento pendente em `WAITING_APPROVAL`, a OS avança para `COMPLETED`, recebe
-  `closedAt` e `cancelledAt` e fica bloqueada para novas alterações.
+- Ao **recusar** um orçamento pendente em `WAITING_APPROVAL`, as peças reservadas voltam ao estoque,
+  a OS avança para `COMPLETED`, recebe `closedAt` e `cancelledAt` e fica bloqueada para novas
+  alterações.
+
+### Decisão do cliente por e-mail
+
+Ao entrar em `WAITING_APPROVAL`, a oficina envia por SMTP um e-mail ao cliente com dois links, um
+para aprovar e outro para recusar. Cada link carrega um `EstimateDecisionToken` assinado com o par
+RS256 da API e gravado no banco.
+
+- A assinatura prova que o link saiu da oficina; o registro no banco é o que garante o **uso único**,
+  porque uma assinatura continua válida a cada vez que é apresentada.
+- O prazo é de **sete dias** a partir da emissão.
+- Decidido o orçamento por um dos links, o outro deixa de valer (`ESTIMATE_ALREADY_DECIDED`, 409).
+- Toda tentativa recusada — link forjado, expirado ou já usado — não altera OS nem estoque.
+
+O endpoint é um `POST`, e não um `GET`, porque o token vale uma única vez: um cliente de e-mail que
+pré-carrega os links da mensagem consumiria a decisão sem que o cliente a tomasse.
+
+O envio depende da configuração SMTP (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`,
+`MAIL_FROM`) e do endereço público que forma os links (`APP_PUBLIC_BASE_URL`). Sem `MAIL_HOST` o
+mailer opera em modo simulado e apenas registra a mensagem em log.
 - Uma ordem **não pode iniciar a execução** (`IN_PROGRESS`) **nem ser fechada** (`/close`) sem um
   orçamento aprovado (`EstimateNotApprovedException`, HTTP 422).
 
@@ -87,7 +114,9 @@ por ela:
 | `PATCH` | `/v1/work-orders/{id}/status` | Avança o status da ordem (exceto para `COMPLETED`). |
 | `POST` | `/v1/work-orders/{id}/estimate` | Cria um orçamento com itens do catálogo de peças. |
 | `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/approve` | Aprova um orçamento pendente. |
-| `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/reject` | Recusa o orçamento e conclui a OS com `cancelledAt`. |
+| `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/reject` | Recusa o orçamento, devolve as peças ao estoque e conclui a OS com `cancelledAt`. |
+| `GET` | `/v1/public/work-orders/{id}` | Canal do cliente: acompanha a OS. |
+| `POST` | `/v1/public/work-orders/estimate-decisions/{token}` | Canal do cliente: registra a decisão pelo link recebido por e-mail. |
 | `POST` | `/v1/work-orders/{id}/services` | Registra uma linha de mão de obra executada. |
 | `PATCH` | `/v1/work-orders/{id}/close` | Finaliza a ordem (`IN_PROGRESS` → `COMPLETED`). |
 
@@ -158,16 +187,28 @@ curl -s -X POST http://localhost:8080/v1/work-orders/<work-order-id>/estimate \
 ```
 
 A resposta traz o `estimateId`, o `totalAmount` calculado e cada item com seu `totalPrice`.
-A criação do orçamento move a ordem automaticamente de `DIAGNOSIS` para `WAITING_APPROVAL`.
+A criação do orçamento move a ordem automaticamente de `DIAGNOSIS` para `WAITING_APPROVAL` — e é
+essa entrada que reserva as peças no estoque e dispara o e-mail de decisão ao cliente. Se faltar
+saldo de qualquer peça, a requisição inteira falha com `422` e a ordem continua em `DIAGNOSIS`.
 
 ### 4. Aprovar o orçamento
+
+O caminho normal é o cliente clicar no link de aprovação que recebeu por e-mail:
+
+```shell
+curl -s -X POST http://localhost:8080/v1/public/work-orders/estimate-decisions/<token>
+```
+
+A oficina também pode registrar a decisão pelo canal administrativo, quando o cliente responde por
+outro meio:
 
 ```shell
 curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/estimate/<estimate-id>/approve
 ```
 
-A ordem (que estava em `WAITING_APPROVAL`) passa automaticamente para `IN_PROGRESS`, e
-`estimatedValue` recebe o `totalAmount` do orçamento.
+Em qualquer um dos caminhos, a ordem (que estava em `WAITING_APPROVAL`) passa automaticamente para
+`IN_PROGRESS`, `estimatedValue` recebe o `totalAmount` do orçamento e a reserva de estoque é
+mantida. O orçamento só aceita uma decisão: a segunda tentativa responde `409`.
 
 ### 5. Registrar a mão de obra executada
 
@@ -205,15 +246,14 @@ mais aceita.
 
 ### Recusar o orçamento
 
-O cliente pode recusar um orçamento pendente:
+O cliente recusa pelo link de recusa que recebeu por e-mail:
 
 ```shell
-curl -s -X PATCH \
-  http://localhost:8080/v1/public/work-orders/<work-order-id>/estimate/<estimate-id>/reject
+curl -s -X POST http://localhost:8080/v1/public/work-orders/estimate-decisions/<token>
 ```
 
-A OS passa para `COMPLETED`, recebe `closedAt` e `cancelledAt` e não pode ser entregue nem alterada.
-Não existe endpoint de cancelamento manual.
+As peças reservadas voltam ao estoque, a OS passa para `COMPLETED`, recebe `closedAt` e
+`cancelledAt` e não pode ser entregue nem alterada. Não existe endpoint de cancelamento manual.
 
 ---
 
@@ -221,10 +261,14 @@ Não existe endpoint de cancelamento manual.
 
 | HTTP | Código | Quando acontece |
 |---|---|---|
+| 400 | `DECISION_TOKEN_INVALID` | Link de decisão adulterado, malformado ou não emitido para decidir orçamento. |
 | 404 | `WORK_ORDER_NOT_FOUND` | Id de ordem inexistente. |
 | 404 | `ESTIMATE_PART_NOT_FOUND` | `partId` informado no orçamento não existe no catálogo. |
 | 404 | `ESTIMATE_NOT_FOUND` | `estimateId` não existe ou não pertence à ordem informada. |
 | 409 | `ESTIMATE_ALREADY_DECIDED` | Tentativa de aprovar um orçamento já aprovado/rejeitado. |
+| 410 | `DECISION_TOKEN_EXPIRED` | Link de decisão apresentado depois dos sete dias. |
+| 410 | `DECISION_TOKEN_ALREADY_USED` | Link de decisão apresentado uma segunda vez. |
+| 422 | `INSUFFICIENT_PART_STOCK` | Saldo insuficiente para reservar uma peça ao levar a OS a `WAITING_APPROVAL`. |
 | 422 | `WORK_ORDER_LOCKED` | Ordem já `DELIVERED` ou concluída por recusa do orçamento. |
 | 422 | `INVALID_STATUS_TRANSITION` | Transição de status inválida (pular etapa, ir direto para `COMPLETED`, etc.). |
 | 422 | `ESTIMATE_NOT_APPROVED` | Tentativa de iniciar (`IN_PROGRESS`) ou fechar (`/close`) sem orçamento aprovado. |
@@ -263,6 +307,16 @@ como `Classe.método`; todas vivem dentro de uma classe `@Nested` com o mesmo no
 | `/close` exige orçamento aprovado e status `IN_PROGRESS` | `Close.shouldReturn422WhenNotInProgress` | `Close.shouldThrow...WhenNotInProgress`, `...WhenThereIsNoApprovedEstimate` |
 | `finalValue` opcional no fechamento — usa `estimatedValue` se omitido | `Close.shouldCloseUsingEstimatedValueWhenOmitted` | `Close.shouldCompleteUsingTheApprovedEstimateValueWhenFinalValueIsOmitted` |
 | `finalValue` pode divergir do orçamento (serviço extra/desconto) | `Close.shouldCloseUsingProvidedFinalValue` | `Close.shouldUseTheProvidedFinalValueWhenPresent`, `...shouldRecordHistoryTransitionToCompletedWhenFinalValueDiffersFromTheEstimate` |
+| Entrada em `WAITING_APPROVAL` reserva todas as peças do orçamento pendente | `EstimateDecisionAndStock.shouldReserveStockWhenAwaitingApproval` | `SendEstimateToCustomer.shouldReservePartsAndInviteCustomer` |
+| Saldo insuficiente não reserva nada, não envia e-mail e mantém a OS em `DIAGNOSIS` | `EstimateDecisionAndStock.shouldKeepDiagnosisWhenInsufficientStock` | `SendEstimateToCustomer.shouldKeepDiagnosisWhenStockIsInsufficient` |
+| Orçamento criado sobre OS já em `WAITING_APPROVAL` também reserva e é enviado | `PublicChannel.shouldReserveAndEmailReplacementEstimate` | — (exercitado ponta a ponta) |
+| Entrada em `WAITING_APPROVAL` envia um link de aprovação e um de recusa | `PublicChannel.shouldEmailBothDecisionLinks` | `SendEstimateToCustomer.shouldIssueOneTokenPerDecision` |
+| Aprovação pelo link leva a OS a `IN_PROGRESS` e mantém a reserva | `PublicChannel.shouldApproveThroughEmailedLink` | `DecideEstimate.shouldApproveAndKeepReservation` |
+| Recusa pelo link devolve o estoque, conclui a OS e preenche `cancelledAt` | `PublicChannel.shouldRejectThroughEmailedLink` | `DecideEstimate.shouldRejectAndRestoreStock` |
+| Link de decisão vale uma única vez → 410 | `PublicChannel.shouldReturn410WhenLinkIsReused` | `DecideEstimate.shouldConsumeTokenOnce`, `...shouldRejectReusedToken` |
+| Link de decisão expira em sete dias → 410 | `PublicChannel.shouldReturn410WhenLinkHasExpired` | `DecideEstimate.shouldRejectExpiredToken` |
+| Link forjado ou não emitido pela oficina → 400, sem alterar OS nem estoque | `PublicChannel.shouldReturn400ForForgedLink` | `DecideEstimate.shouldRejectTamperedToken`, `...shouldRejectUnknownToken` |
+| Decidido o orçamento, o outro link deixa de valer → 409 | `PublicChannel.shouldReturn409WhenEstimateWasAlreadyDecided` | `DecideEstimate.shouldRejectSecondDecision` |
 | Peça inexistente no orçamento → 404 | `CreateEstimate.shouldReturn404WhenPartNotFound` | `CreateEstimate.shouldThrowEstimatePartNotFoundException` |
 | Itens de orçamento vazios são rejeitados → 400 | `CreateEstimate.shouldReturn400WhenItemsEmpty` | — (Bean Validation, não exercida no nível de serviço) |
 | Mão de obra pode ser registrada múltiplas vezes na mesma ordem | `AddService.shouldAddService` | `AddService.shouldPersistALaborServiceLine` |

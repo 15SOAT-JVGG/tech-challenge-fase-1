@@ -38,6 +38,15 @@ public class EstimateRepository
     }
 
     @Override
+    public Uni<Estimate> findPendingByWorkOrderId(UUID workOrderId) {
+        return find("FROM Estimate e LEFT JOIN FETCH e.items i LEFT JOIN FETCH i.part "
+                        + "WHERE e.workOrder.id = ?1 AND e.status = ?2 ORDER BY e.createdAt DESC",
+                workOrderId, EstimateStatus.PENDING)
+                .firstResult()
+                .map(EstimatePersistenceMapper::toDomain);
+    }
+
+    @Override
     public Uni<Boolean> existsApprovedByWorkOrderId(UUID workOrderId) {
         return count("workOrder.id = ?1 and status = ?2", workOrderId, EstimateStatus.APPROVED)
                 .map(total -> total > 0);

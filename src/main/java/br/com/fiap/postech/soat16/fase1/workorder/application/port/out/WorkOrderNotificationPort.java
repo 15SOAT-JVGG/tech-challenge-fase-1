@@ -7,7 +7,8 @@ import io.smallrye.mutiny.Uni;
 
 public interface WorkOrderNotificationPort {
 
-    Uni<Void> notifyEstimateReady(WorkOrder order, Estimate estimate);
+    Uni<Void> notifyEstimateAwaitingDecision(WorkOrder order, Estimate estimate,
+            EstimateDecisionInvitation invitation);
 
     Uni<Void> notifyWorkOrderCompleted(WorkOrder order);
 }

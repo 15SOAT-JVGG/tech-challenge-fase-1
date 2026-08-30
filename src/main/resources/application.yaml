@@ -88,6 +88,19 @@ quarkus:
     security-scheme-name: bearerAuth
     security-scheme-description: Provide the JWT token obtained from the login endpoint.
 
+  # ── SMTP ──────────────────────────────────────────────────────────────────--
+  # Credenciais e host ficam fora do código, como as do banco. Sem MAIL_HOST o mailer
+  # opera em modo simulado: registra a mensagem em log em vez de entregá-la, o que
+  # mantém o fluxo de orçamento utilizável em desenvolvimento sem um servidor SMTP.
+  mailer:
+    from: ${MAIL_FROM:oficina@localhost}
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    start-tls: ${MAIL_START_TLS:DISABLED}
+    mock: ${MAIL_MOCK:true}
+
   swagger-ui:
     path: /q/swagger-ui
     title: Mechanic Workshop API
@@ -118,6 +131,9 @@ mp:
         location: ${JWT_PUBLIC_KEY_LOCATION:.local-jwt/publicKey.pem}
 
 app:
+  # Endereço por onde o cliente alcança a API. É a base dos links de decisão enviados
+  # por e-mail, que precisam apontar para fora da rede da aplicação.
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
   seed:
     admin-username: ${APP_SEED_ADMIN_USERNAME:admin}
     admin-password: ${APP_SEED_ADMIN_PASSWORD:}

@@ -6,7 +6,7 @@ import jakarta.annotation.security.PermitAll;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.PATCH;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -38,24 +38,18 @@ public class PublicWorkOrderController implements PublicWorkOrderControllerDocs 
         return service.findById(id).map(WorkOrderRestMapper::toResponse);
     }
 
-    // CPD-OFF — este adaptador replica as decisões de orçamento para preservar a rota e a política
-    // de segurança específicas do cliente.
-
-    @PATCH
-    @Path("/{id}/estimate/{estimateId}/approve")
+    /**
+     * É um POST, e não um GET, porque o token vale uma única vez: um cliente de e-mail que
+     * pré-carrega os links de uma mensagem consumiria a decisão sem que o cliente a tomasse.
+     *
+     * <p>A decisão inteira cabe no token, então a requisição não tem corpo — daí o {@code WILDCARD},
+     * que dispensa o cliente de declarar um Content-Type só para satisfazer a rota.
+     */
+    @POST
+    @Path("/estimate-decisions/{token}")
+    @Consumes(MediaType.WILDCARD)
     @Override
-    public Uni<EstimateResponseDto> approveEstimate(@PathParam("id") UUID id,
-                                                    @PathParam("estimateId") UUID estimateId) {
-        return service.approveEstimate(id, estimateId).map(WorkOrderRestMapper::toResponse);
+    public Uni<EstimateResponseDto> decideEstimate(@PathParam("token") String token) {
+        return service.decideEstimate(token).map(WorkOrderRestMapper::toResponse);
     }
-
-    @PATCH
-    @Path("/{id}/estimate/{estimateId}/reject")
-    @Override
-    public Uni<EstimateResponseDto> rejectEstimate(@PathParam("id") UUID id,
-                                                   @PathParam("estimateId") UUID estimateId) {
-        return service.rejectEstimate(id, estimateId).map(WorkOrderRestMapper::toResponse);
-    }
-
-    // CPD-ON
 }

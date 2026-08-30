@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InsufficientPartStockException;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -39,5 +40,21 @@ public class EstimateItem {
         item.unitPrice = unitPrice;
         item.totalPrice = unitPrice.multiply(BigDecimal.valueOf(quantity));
         return item;
+    }
+
+    public void assertStockAvailable() {
+        if (part.getStockQuantity() < quantity) {
+            throw new InsufficientPartStockException(part.getName(), quantity, part.getStockQuantity());
+        }
+    }
+
+    public Part reserve() {
+        part.decreaseStock(quantity);
+        return part;
+    }
+
+    public Part restore() {
+        part.increaseStock(quantity);
+        return part;
     }
 }

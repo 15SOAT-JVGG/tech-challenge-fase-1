@@ -31,6 +31,7 @@ public final class EstimatePersistenceMapper {
         estimate.setTotalAmount(entity.getTotalAmount());
         estimate.setApprovedAt(entity.getApprovedAt());
         estimate.setSentAt(entity.getSentAt());
+        estimate.setReservedAt(entity.getReservedAt());
         AuditPersistenceMapper.copyToDomain(entity, estimate);
 
         List<EstimateItem> items = new ArrayList<>();
@@ -72,6 +73,7 @@ public final class EstimatePersistenceMapper {
         target.setTotalAmount(source.getTotalAmount());
         target.setApprovedAt(source.getApprovedAt());
         target.setSentAt(source.getSentAt());
+        target.setReservedAt(source.getReservedAt());
     }
 
     /**

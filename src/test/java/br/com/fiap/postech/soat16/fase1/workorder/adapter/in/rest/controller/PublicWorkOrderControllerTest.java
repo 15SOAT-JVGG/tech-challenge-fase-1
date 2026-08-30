@@ -22,7 +22,9 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.WorkOrderService;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateAlreadyDecidedException;
-import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateNotFoundException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateDecisionTokenAlreadyUsedException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.ExpiredEstimateDecisionTokenException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidEstimateDecisionTokenException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.WorkOrderNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderPriority;
@@ -41,17 +43,15 @@ class PublicWorkOrderControllerTest {
 
     private static final UUID WORK_ORDER_ID = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
     private static final UUID ESTIMATE_ID = UUID.fromString("c3b79cde-2872-4053-9622-37605bf124a3");
+    private static final String DECISION_TOKEN = "signed-decision-token";
 
     private WorkOrderResult workOrderResponse;
-    private EstimateResult estimateResponse;
 
     @BeforeEach
     void setUp() {
         controller = new PublicWorkOrderController(service);
         workOrderResponse = new WorkOrderResult(WORK_ORDER_ID, UUID.randomUUID(), UUID.randomUUID(), "desc",
             WorkOrderPriority.MEDIUM, WorkOrderStatus.WAITING_APPROVAL, null, null, null, null, null, null);
-        estimateResponse = new EstimateResult(ESTIMATE_ID, WORK_ORDER_ID, EstimateStatus.PENDING,
-            new BigDecimal("50.00"), new BigDecimal("0.00"), new BigDecimal("50.00"), null, null, null);
     }
 
     @Nested
@@ -81,68 +81,75 @@ class PublicWorkOrderControllerTest {
     }
 
     @Nested
-    @DisplayName("PATCH /v1/public/work-orders/{id}/estimate/{estimateId}/approve — approveEstimate")
-    class ApproveEstimate {
+    @DisplayName("POST /v1/public/work-orders/estimate-decisions/{token} — decideEstimate")
+    class DecideEstimate {
 
         @Test
-        @DisplayName("should approve estimate via public channel")
-        void shouldApprove() {
-            EstimateResult approved = new EstimateResult(ESTIMATE_ID, WORK_ORDER_ID, EstimateStatus.APPROVED,
-                new BigDecimal("50.00"), new BigDecimal("0.00"), new BigDecimal("50.00"), null, null, null);
-            when(service.approveEstimate(WORK_ORDER_ID, ESTIMATE_ID)).thenReturn(Uni.createFrom().item(approved));
+        @DisplayName("deve registrar a aprovação enviada pelo link do cliente")
+        void shouldRegisterApproval() {
+            when(service.decideEstimate(DECISION_TOKEN))
+                .thenReturn(Uni.createFrom().item(decision(EstimateStatus.APPROVED)));
 
-            EstimateResponseDto result = controller.approveEstimate(WORK_ORDER_ID, ESTIMATE_ID).await().indefinitely();
+            EstimateResponseDto result = controller.decideEstimate(DECISION_TOKEN).await().indefinitely();
 
             assertEquals(EstimateStatus.APPROVED, result.status());
-            verify(service).approveEstimate(WORK_ORDER_ID, ESTIMATE_ID);
+            verify(service).decideEstimate(DECISION_TOKEN);
         }
 
         @Test
-        @DisplayName("should propagate EstimateAlreadyDecidedException")
-        void shouldPropagateAlreadyDecided() {
-            when(service.approveEstimate(WORK_ORDER_ID, ESTIMATE_ID))
-                .thenReturn(Uni.createFrom().failure(new EstimateAlreadyDecidedException()));
+        @DisplayName("deve registrar a recusa enviada pelo link do cliente")
+        void shouldRegisterRejection() {
+            when(service.decideEstimate(DECISION_TOKEN))
+                .thenReturn(Uni.createFrom().item(decision(EstimateStatus.REJECTED)));
 
-            assertThrows(EstimateAlreadyDecidedException.class,
-                () -> controller.approveEstimate(WORK_ORDER_ID, ESTIMATE_ID).await().indefinitely());
-        }
-
-        @Test
-        @DisplayName("should propagate EstimateNotFoundException")
-        void shouldPropagateNotFound() {
-            when(service.approveEstimate(WORK_ORDER_ID, ESTIMATE_ID))
-                .thenReturn(Uni.createFrom().failure(new EstimateNotFoundException()));
-
-            assertThrows(EstimateNotFoundException.class,
-                () -> controller.approveEstimate(WORK_ORDER_ID, ESTIMATE_ID).await().indefinitely());
-        }
-    }
-
-    @Nested
-    @DisplayName("PATCH /v1/public/work-orders/{id}/estimate/{estimateId}/reject — rejectEstimate")
-    class RejectEstimate {
-
-        @Test
-        @DisplayName("should reject estimate via public channel")
-        void shouldReject() {
-            EstimateResult rejected = new EstimateResult(ESTIMATE_ID, WORK_ORDER_ID, EstimateStatus.REJECTED,
-                new BigDecimal("50.00"), new BigDecimal("0.00"), new BigDecimal("50.00"), null, null, null);
-            when(service.rejectEstimate(WORK_ORDER_ID, ESTIMATE_ID)).thenReturn(Uni.createFrom().item(rejected));
-
-            EstimateResponseDto result = controller.rejectEstimate(WORK_ORDER_ID, ESTIMATE_ID).await().indefinitely();
+            EstimateResponseDto result = controller.decideEstimate(DECISION_TOKEN).await().indefinitely();
 
             assertEquals(EstimateStatus.REJECTED, result.status());
-            verify(service).rejectEstimate(WORK_ORDER_ID, ESTIMATE_ID);
         }
 
         @Test
-        @DisplayName("should propagate EstimateAlreadyDecidedException")
+        @DisplayName("deve propagar o link inválido")
+        void shouldPropagateInvalidToken() {
+            when(service.decideEstimate(DECISION_TOKEN))
+                .thenReturn(Uni.createFrom().failure(new InvalidEstimateDecisionTokenException()));
+
+            assertThrows(InvalidEstimateDecisionTokenException.class,
+                () -> controller.decideEstimate(DECISION_TOKEN).await().indefinitely());
+        }
+
+        @Test
+        @DisplayName("deve propagar o link expirado")
+        void shouldPropagateExpiredToken() {
+            when(service.decideEstimate(DECISION_TOKEN))
+                .thenReturn(Uni.createFrom().failure(new ExpiredEstimateDecisionTokenException()));
+
+            assertThrows(ExpiredEstimateDecisionTokenException.class,
+                () -> controller.decideEstimate(DECISION_TOKEN).await().indefinitely());
+        }
+
+        @Test
+        @DisplayName("deve propagar o link já utilizado")
+        void shouldPropagateUsedToken() {
+            when(service.decideEstimate(DECISION_TOKEN))
+                .thenReturn(Uni.createFrom().failure(new EstimateDecisionTokenAlreadyUsedException()));
+
+            assertThrows(EstimateDecisionTokenAlreadyUsedException.class,
+                () -> controller.decideEstimate(DECISION_TOKEN).await().indefinitely());
+        }
+
+        @Test
+        @DisplayName("deve propagar o orçamento já decidido")
         void shouldPropagateAlreadyDecided() {
-            when(service.rejectEstimate(WORK_ORDER_ID, ESTIMATE_ID))
+            when(service.decideEstimate(DECISION_TOKEN))
                 .thenReturn(Uni.createFrom().failure(new EstimateAlreadyDecidedException()));
 
             assertThrows(EstimateAlreadyDecidedException.class,
-                () -> controller.rejectEstimate(WORK_ORDER_ID, ESTIMATE_ID).await().indefinitely());
+                () -> controller.decideEstimate(DECISION_TOKEN).await().indefinitely());
+        }
+
+        private EstimateResult decision(EstimateStatus status) {
+            return new EstimateResult(ESTIMATE_ID, WORK_ORDER_ID, status, new BigDecimal("50.00"),
+                new BigDecimal("0.00"), new BigDecimal("50.00"), null, null, null);
         }
     }
 }

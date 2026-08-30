@@ -32,7 +32,6 @@ import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
 import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.exception.ServiceItemNotFoundException;
 import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.model.ServiceItem;
 import br.com.fiap.postech.soat16.fase1.shared.application.result.PagedResult;
-import br.com.fiap.postech.soat16.fase1.shared.domain.exception.BusinessException;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.exception.VehicleNotFoundException;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.AddWorkOrderServiceCommand;
@@ -44,6 +43,9 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.command.OpenWorkOr
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.EstimateMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.WorkOrderMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.WorkOrderServiceMapper;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateDecisionInvitation;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateDecisionTokenPersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateDecisionTokenSignaturePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimatePersistencePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderNotificationPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderPersistencePort;
@@ -53,16 +55,22 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateRes
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateAlreadyDecidedException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateDecisionTokenAlreadyUsedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateNotApprovedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimatePartNotFoundException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.ExpiredEstimateDecisionTokenException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InsufficientPartStockException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidEstimateDecisionTokenException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidWorkOrderStatusTransitionException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.WorkOrderLockedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.WorkOrderNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.Estimate;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.model.EstimateDecisionToken;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.EstimateItem;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderHistory;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateDecision;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderStatus;
 
@@ -96,6 +104,12 @@ class WorkOrderServiceTest {
     @Mock
     private WorkOrderNotificationPort notificationService;
 
+    @Mock
+    private EstimateDecisionTokenPersistencePort decisionTokenRepository;
+
+    @Mock
+    private EstimateDecisionTokenSignaturePort decisionTokenSignature;
+
     private WorkOrderService service;
 
     private static final UUID WORK_ORDER_ID = UUID.randomUUID();
@@ -109,13 +123,20 @@ class WorkOrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new WorkOrderService(repository, estimateRepository, serviceRepository, catalog,
-                mapper, estimateMapper, serviceMapper, notificationService);
+        service = new WorkOrderService(repository, estimateRepository, serviceRepository,
+                decisionTokenRepository, catalog, mapper, estimateMapper, serviceMapper,
+                notificationService, decisionTokenSignature);
 
-        lenient().when(notificationService.notifyEstimateReady(any(), any()))
+        lenient().when(notificationService.notifyEstimateAwaitingDecision(any(), any(), any()))
                 .thenReturn(Uni.createFrom().voidItem());
         lenient().when(notificationService.notifyWorkOrderCompleted(any()))
                 .thenReturn(Uni.createFrom().voidItem());
+        lenient().when(decisionTokenRepository.save(any(EstimateDecisionToken.class)))
+                .thenAnswer(invocation -> Uni.createFrom().item(
+                        (EstimateDecisionToken) invocation.getArgument(0)));
+        lenient().when(decisionTokenSignature.sign(any(EstimateDecisionToken.class)))
+                .thenAnswer(invocation -> "signed-"
+                        + ((EstimateDecisionToken) invocation.getArgument(0)).getDecision());
 
         entity = new WorkOrder();
         entity.setId(WORK_ORDER_ID);
@@ -657,66 +678,282 @@ class WorkOrderServiceTest {
     }
 
     @Nested
-    @DisplayName("stock management")
-    class StockManagement {
+    @DisplayName("envio do orçamento ao entrar em WAITING_APPROVAL")
+    class SendEstimateToCustomer {
 
-        private Estimate estimateWithItem(Part part, int quantity) {
-            EstimateItem item = new EstimateItem();
-            item.setPart(part);
-            item.setQuantity(quantity);
-            item.setUnitPrice(part.getUnitPrice());
-            item.setTotalPrice(part.getUnitPrice().multiply(BigDecimal.valueOf(quantity)));
-            Estimate estimate = new Estimate();
-            estimate.setWorkOrder(entity);
-            estimate.setStatus(EstimateStatus.PENDING);
-            estimate.setTotalAmount(item.getTotalPrice());
-            estimate.setItems(new java.util.ArrayList<>(List.of(item)));
-            return estimate;
+        private static final UUID ESTIMATE_ID = UUID.randomUUID();
+
+        @Test
+        @DisplayName("deve reservar as peças, marcar o envio e convidar o cliente a decidir")
+        void shouldReservePartsAndInviteCustomer() {
+            entity.setStatus(WorkOrderStatus.DIAGNOSIS);
+            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN");
+            Estimate estimate = pendingEstimate(part, 2);
+
+            givenWaitingApprovalTransition(estimate);
+            when(catalog.saveParts(List.of(part))).thenReturn(Uni.createFrom().voidItem());
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
+
+            service.updateStatus(WORK_ORDER_ID,
+                    new ChangeWorkOrderStatusCommand(WorkOrderStatus.WAITING_APPROVAL)).await().indefinitely();
+
+            assertEquals(WorkOrderStatus.WAITING_APPROVAL, entity.getStatus());
+            assertEquals(3, part.getStockQuantity());
+            assertNotNull(estimate.getSentAt());
+            verify(notificationService).notifyEstimateAwaitingDecision(any(), any(), any());
         }
 
         @Test
-        @DisplayName("should decrease part stock when approving the estimate")
-        void shouldDecreaseStockOnApproval() {
-            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
-            UUID estimateId = UUID.randomUUID();
+        @DisplayName("deve emitir um token de aprovação e um de recusa, ambos válidos por sete dias")
+        void shouldIssueOneTokenPerDecision() {
+            entity.setStatus(WorkOrderStatus.DIAGNOSIS);
             Part part = new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN");
-            Estimate estimate = estimateWithItem(part, 2);
-            estimate.setId(estimateId);
+            Estimate estimate = pendingEstimate(part, 2);
+
+            givenWaitingApprovalTransition(estimate);
+            when(catalog.saveParts(List.of(part))).thenReturn(Uni.createFrom().voidItem());
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
+
+            service.updateStatus(WORK_ORDER_ID,
+                    new ChangeWorkOrderStatusCommand(WorkOrderStatus.WAITING_APPROVAL)).await().indefinitely();
+
+            ArgumentCaptor<EstimateDecisionToken> tokenCaptor =
+                    ArgumentCaptor.forClass(EstimateDecisionToken.class);
+            verify(decisionTokenRepository, times(2)).save(tokenCaptor.capture());
+            List<EstimateDecisionToken> tokens = tokenCaptor.getAllValues();
+            assertEquals(List.of(EstimateDecision.APPROVE, EstimateDecision.REJECT),
+                    tokens.stream().map(EstimateDecisionToken::getDecision).toList());
+            tokens.forEach(token -> {
+                assertEquals(ESTIMATE_ID, token.getEstimateId());
+                assertEquals(WORK_ORDER_ID, token.getWorkOrderId());
+                assertEquals(token.getIssuedAt().plusDays(7), token.getExpiresAt());
+            });
+
+            ArgumentCaptor<EstimateDecisionInvitation> invitationCaptor =
+                    ArgumentCaptor.forClass(EstimateDecisionInvitation.class);
+            verify(notificationService)
+                    .notifyEstimateAwaitingDecision(any(), any(), invitationCaptor.capture());
+            assertEquals("signed-APPROVE", invitationCaptor.getValue().approveToken());
+            assertEquals("signed-REJECT", invitationCaptor.getValue().rejectToken());
+        }
+
+        @Test
+        @DisplayName("deve manter a OS em DIAGNOSIS e não notificar quando faltar saldo de peça")
+        void shouldKeepDiagnosisWhenStockIsInsufficient() {
+            entity.setStatus(WorkOrderStatus.DIAGNOSIS);
+            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 1, "UN");
+            Estimate estimate = pendingEstimate(part, 5);
+
+            givenWaitingApprovalTransition(estimate);
+
+            assertThrows(InsufficientPartStockException.class,
+                    () -> service.updateStatus(WORK_ORDER_ID,
+                            new ChangeWorkOrderStatusCommand(WorkOrderStatus.WAITING_APPROVAL))
+                            .await().indefinitely());
+
+            assertEquals(1, part.getStockQuantity());
+            assertNull(estimate.getSentAt());
+            verify(notificationService, never()).notifyEstimateAwaitingDecision(any(), any(), any());
+            verify(catalog, never()).saveParts(any());
+        }
+
+        @Test
+        @DisplayName("deve falhar quando a ordem não tem orçamento pendente para enviar")
+        void shouldFailWithoutPendingEstimate() {
+            entity.setStatus(WorkOrderStatus.DIAGNOSIS);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findPendingByWorkOrderId(WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().nullItem());
+
+            assertThrows(EstimateNotFoundException.class,
+                    () -> service.updateStatus(WORK_ORDER_ID,
+                            new ChangeWorkOrderStatusCommand(WorkOrderStatus.WAITING_APPROVAL))
+                            .await().indefinitely());
+        }
+
+        private void givenWaitingApprovalTransition(Estimate estimate) {
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findPendingByWorkOrderId(WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(estimate));
+            lenient().when(mapper.toResult(entity)).thenReturn(response);
+        }
+
+        private Estimate pendingEstimate(Part part, int quantity) {
+            Estimate estimate = Estimate.create(entity, List.of(EstimateItem.create(part, quantity, null)),
+                    List.of());
+            estimate.setId(ESTIMATE_ID);
+            return estimate;
+        }
+    }
+
+    @Nested
+    @DisplayName("decideEstimate")
+    class DecideEstimate {
+
+        private static final String SIGNED_TOKEN = "signed-token";
+        private static final UUID TOKEN_ID = UUID.randomUUID();
+        private static final UUID ESTIMATE_ID = UUID.randomUUID();
+
+        @Test
+        @DisplayName("deve aprovar o orçamento, iniciar a execução e manter a reserva de estoque")
+        void shouldApproveAndKeepReservation() {
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
+            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN");
+            Estimate estimate = reservedEstimate(part, 2);
+
+            givenDecisionToken(EstimateDecision.APPROVE);
+            givenWorkOrderAndEstimate(estimate);
             when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
                     .thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
-            when(estimateMapper.toResult(estimate)).thenReturn(new EstimateResult(
-                    estimateId, WORK_ORDER_ID, EstimateStatus.APPROVED, BigDecimal.valueOf(20), BigDecimal.ZERO,
-                    BigDecimal.valueOf(20), null, null, List.of()));
+            when(estimateMapper.toResult(estimate)).thenReturn(estimateResult(EstimateStatus.APPROVED));
 
-            service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
+            service.decideEstimate(SIGNED_TOKEN).await().indefinitely();
 
+            assertEquals(EstimateStatus.APPROVED, estimate.getStatus());
+            assertEquals(WorkOrderStatus.IN_PROGRESS, entity.getStatus());
             assertEquals(3, part.getStockQuantity());
+            verify(catalog, never()).saveParts(any());
         }
 
         @Test
-        @DisplayName("should fail approval with insufficient stock and not change status")
-        void shouldFailApprovalWhenInsufficientStock() {
+        @DisplayName("deve recusar o orçamento, devolver as peças ao estoque e concluir a OS")
+        void shouldRejectAndRestoreStock() {
             entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
-            UUID estimateId = UUID.randomUUID();
-            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 1, "UN");
-            Estimate estimate = estimateWithItem(part, 5);
-            estimate.setId(estimateId);
+            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN");
+            Estimate estimate = reservedEstimate(part, 2);
 
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
-                    .thenReturn(Uni.createFrom().item(estimate));
+            givenDecisionToken(EstimateDecision.REJECT);
+            givenWorkOrderAndEstimate(estimate);
+            when(catalog.saveParts(List.of(part))).thenReturn(Uni.createFrom().voidItem());
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
+            when(estimateMapper.toResult(estimate)).thenReturn(estimateResult(EstimateStatus.REJECTED));
 
-            assertThrows(BusinessException.class,
-                    () -> service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely());
-            assertEquals(WorkOrderStatus.WAITING_APPROVAL, entity.getStatus());
-            assertEquals(1, part.getStockQuantity());
+            service.decideEstimate(SIGNED_TOKEN).await().indefinitely();
+
+            assertEquals(EstimateStatus.REJECTED, estimate.getStatus());
+            assertEquals(WorkOrderStatus.COMPLETED, entity.getStatus());
+            assertNotNull(entity.getCancelledAt());
+            assertEquals(5, part.getStockQuantity());
         }
 
+        @Test
+        @DisplayName("deve marcar o token como consumido ao registrar a decisão")
+        void shouldConsumeTokenOnce() {
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
+            Estimate estimate = reservedEstimate(new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN"), 2);
+
+            EstimateDecisionToken token = givenDecisionToken(EstimateDecision.APPROVE);
+            givenWorkOrderAndEstimate(estimate);
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
+            when(estimateMapper.toResult(estimate)).thenReturn(estimateResult(EstimateStatus.APPROVED));
+
+            service.decideEstimate(SIGNED_TOKEN).await().indefinitely();
+
+            assertNotNull(token.getConsumedAt());
+            verify(decisionTokenRepository).save(token);
+        }
+
+        @Test
+        @DisplayName("deve recusar um link já utilizado sem tocar na OS nem no estoque")
+        void shouldRejectReusedToken() {
+            EstimateDecisionToken token = givenDecisionToken(EstimateDecision.APPROVE);
+            token.consume(LocalDateTime.now().minusDays(1));
+
+            assertThrows(EstimateDecisionTokenAlreadyUsedException.class,
+                    () -> service.decideEstimate(SIGNED_TOKEN).await().indefinitely());
+
+            verify(repository, never()).findByWorkOrderId(any());
+            verify(catalog, never()).saveParts(any());
+        }
+
+        @Test
+        @DisplayName("deve recusar um link expirado sem tocar na OS nem no estoque")
+        void shouldRejectExpiredToken() {
+            EstimateDecisionToken token = givenDecisionToken(EstimateDecision.REJECT);
+            token.setExpiresAt(LocalDateTime.now().minusDays(1));
+
+            assertThrows(ExpiredEstimateDecisionTokenException.class,
+                    () -> service.decideEstimate(SIGNED_TOKEN).await().indefinitely());
+
+            verify(repository, never()).findByWorkOrderId(any());
+            verify(catalog, never()).saveParts(any());
+        }
+
+        @Test
+        @DisplayName("deve recusar um link assinado cujo token não existe mais")
+        void shouldRejectUnknownToken() {
+            when(decisionTokenSignature.readTokenId(SIGNED_TOKEN)).thenReturn(TOKEN_ID);
+            when(decisionTokenRepository.findByTokenId(TOKEN_ID)).thenReturn(Uni.createFrom().nullItem());
+
+            assertThrows(InvalidEstimateDecisionTokenException.class,
+                    () -> service.decideEstimate(SIGNED_TOKEN).await().indefinitely());
+        }
+
+        @Test
+        @DisplayName("deve propagar a assinatura inválida como link inválido")
+        void shouldRejectTamperedToken() {
+            when(decisionTokenSignature.readTokenId(SIGNED_TOKEN))
+                    .thenThrow(new InvalidEstimateDecisionTokenException());
+
+            assertThrows(InvalidEstimateDecisionTokenException.class,
+                    () -> service.decideEstimate(SIGNED_TOKEN).await().indefinitely());
+
+            verify(decisionTokenRepository, never()).findByTokenId(any());
+        }
+
+        @Test
+        @DisplayName("deve recusar a segunda decisão sobre um orçamento já decidido")
+        void shouldRejectSecondDecision() {
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
+            Estimate estimate = reservedEstimate(new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN"), 2);
+            estimate.approve(LocalDateTime.now());
+
+            givenDecisionToken(EstimateDecision.REJECT);
+            givenWorkOrderAndEstimate(estimate);
+
+            assertThrows(EstimateAlreadyDecidedException.class,
+                    () -> service.decideEstimate(SIGNED_TOKEN).await().indefinitely());
+
+            verify(catalog, never()).saveParts(any());
+        }
+
+        private EstimateDecisionToken givenDecisionToken(EstimateDecision decision) {
+            EstimateDecisionToken token = EstimateDecisionToken.issue(
+                    WORK_ORDER_ID, ESTIMATE_ID, decision, LocalDateTime.now());
+            token.setId(TOKEN_ID);
+            when(decisionTokenSignature.readTokenId(SIGNED_TOKEN)).thenReturn(TOKEN_ID);
+            when(decisionTokenRepository.findByTokenId(TOKEN_ID)).thenReturn(Uni.createFrom().item(token));
+            return token;
+        }
+
+        private void givenWorkOrderAndEstimate(Estimate estimate) {
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findByEstimateIdAndWorkOrderId(ESTIMATE_ID, WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(estimate));
+        }
+
+        private Estimate reservedEstimate(Part part, int quantity) {
+            Estimate estimate = Estimate.create(entity, List.of(EstimateItem.create(part, quantity, null)),
+                    List.of());
+            estimate.setId(ESTIMATE_ID);
+            estimate.reserveParts(LocalDateTime.now());
+            return estimate;
+        }
+
+        private EstimateResult estimateResult(EstimateStatus status) {
+            return new EstimateResult(ESTIMATE_ID, WORK_ORDER_ID, status, BigDecimal.valueOf(20),
+                    BigDecimal.ZERO, BigDecimal.valueOf(20), null, null, List.of());
+        }
     }
 
     @Nested

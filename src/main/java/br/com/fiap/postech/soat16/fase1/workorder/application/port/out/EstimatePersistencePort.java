@@ -12,6 +12,8 @@ public interface EstimatePersistencePort {
 
     Uni<Estimate> findApprovedByWorkOrderId(UUID workOrderId);
 
+    Uni<Estimate> findPendingByWorkOrderId(UUID workOrderId);
+
     Uni<Boolean> existsApprovedByWorkOrderId(UUID workOrderId);
 
     Uni<Estimate> save(Estimate estimate);

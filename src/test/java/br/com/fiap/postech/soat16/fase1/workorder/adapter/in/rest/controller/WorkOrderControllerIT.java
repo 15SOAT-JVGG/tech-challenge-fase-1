@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -45,11 +47,13 @@ import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.O
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderServiceResponseDto;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.EstimateDecisionTokenRepository;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.WorkOrderRepository;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderStatus;
 
 import io.quarkus.hibernate.reactive.panache.Panache;
+import io.quarkus.mailer.MockMailbox;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.vertx.VertxContextSupport;
@@ -66,7 +70,11 @@ import io.smallrye.mutiny.Uni;
 class WorkOrderControllerIT {
 
     private static final String WORK_ORDERS_PATH = "/v1/work-orders";
+    private static final String DECISION_LINK_MARKER = "/v1/public/work-orders/estimate-decisions/";
     private static final AtomicInteger PLATE_COUNTER = new AtomicInteger();
+
+    @Inject
+    MockMailbox mailbox;
 
     @Inject
     CustomerRepository customerRepository;
@@ -82,6 +90,9 @@ class WorkOrderControllerIT {
 
     @Inject
     WorkOrderRepository workOrderRepository;
+
+    @Inject
+    EstimateDecisionTokenRepository decisionTokenRepository;
 
     @BeforeAll
     static void authenticateAllRequests() {
@@ -117,13 +128,30 @@ class WorkOrderControllerIT {
     }
 
     private UUID seedCustomer() {
+        return seedCustomerWithEmail().id();
+    }
+
+    private SeededCustomer seedCustomerWithEmail() {
+        String email = "maria." + UUID.randomUUID() + "@example.com";
         Customer customer = new Customer();
         customer.setFirstName("Maria");
         customer.setLastName("Silva");
+        customer.setEmail(email);
         customer.setPhoneNumber("+5511999999999");
         customer.setDocument("DOC-" + UUID.randomUUID());
         customer.setDocumentType(DocumentType.CPF);
-        return persistInTransaction(() -> customerRepository.save(customer)).getId();
+        return new SeededCustomer(persistInTransaction(() -> customerRepository.save(customer)).getId(), email);
+    }
+
+    // O mailer roda em modo simulado nos testes, então a caixa de entrada é a única forma de
+    // observar exatamente o que o cliente recebeu — inclusive os links que ele vai clicar.
+    private List<String> decisionLinks(String customerEmail) {
+        return mailbox.getMailMessagesSentTo(customerEmail).stream()
+                .flatMap(mail -> mail.getText().lines())
+                .map(String::trim)
+                .filter(line -> line.contains(DECISION_LINK_MARKER))
+                .map(line -> line.substring(line.indexOf("http")))
+                .toList();
     }
 
     private UUID seedVehicle() {
@@ -298,7 +326,6 @@ class WorkOrderControllerIT {
         UUID workOrderId = createWorkOrder(customerId, vehicleId);
 
         updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
-        updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
         EstimateResponseDto estimate = createEstimate(workOrderId, partId, quantity);
         approveEstimate(workOrderId, estimate.estimateId());
 
@@ -330,10 +357,8 @@ class WorkOrderControllerIT {
             updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
             assertEquals(WorkOrderStatus.DIAGNOSIS, getWorkOrder(workOrderId).status());
 
-            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
-            assertEquals(WorkOrderStatus.WAITING_APPROVAL, getWorkOrder(workOrderId).status());
-
             EstimateResponseDto estimate = createEstimate(workOrderId, partId, 2);
+            assertEquals(WorkOrderStatus.WAITING_APPROVAL, getWorkOrder(workOrderId).status());
             assertEquals(EstimateStatus.PENDING, estimate.status());
             assertEquals(0, new BigDecimal("300.00").compareTo(estimate.totalAmount()));
 
@@ -734,7 +759,7 @@ class WorkOrderControllerIT {
         void shouldRejectApprovingWithoutApprovedEstimate() {
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
             updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
-            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
+            createEstimate(workOrderId, seedPart(new BigDecimal("50.00")), 1);
 
             ApiErrorResponseDto error = extractError(given()
                     .contentType("application/json")
@@ -810,7 +835,6 @@ class WorkOrderControllerIT {
             UUID partId = seedPart(new BigDecimal("80.00"));
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
             updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
-            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
             EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
 
             EstimateResponseDto approved = approveEstimate(workOrderId, estimate.estimateId());
@@ -840,7 +864,6 @@ class WorkOrderControllerIT {
             UUID partId = seedPart(new BigDecimal("80.00"));
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
             updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
-            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
             EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
             approveEstimate(workOrderId, estimate.estimateId());
 
@@ -998,7 +1021,6 @@ class WorkOrderControllerIT {
             UUID partId = seedPart(new BigDecimal("50.00"));
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
             updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
-            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
             EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
 
             EstimateResponseDto rejected = rejectEstimate(workOrderId, estimate.estimateId());
@@ -1042,22 +1064,67 @@ class WorkOrderControllerIT {
         }
 
         @Test
-        @DisplayName("deve retornar 422 ao aprovar com estoque insuficiente")
-        void shouldReturn422WhenInsufficientStock() {
+        @DisplayName("deve reservar o estoque ao levar a OS para aguardando aprovação")
+        void shouldReserveStockWhenAwaitingApproval() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            int stockBefore = stockOf(partId);
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+
+            createEstimate(workOrderId, partId, 3);
+
+            assertEquals(stockBefore - 3, stockOf(partId));
+        }
+
+        @Test
+        @DisplayName("deve manter a OS em diagnóstico e o estoque intacto quando falta saldo de peça")
+        void shouldKeepDiagnosisWhenInsufficientStock() {
             Part part = new Part("Peça rara", "estoque baixo", new BigDecimal("50.00"), 1, "UN");
             UUID partId = persistInTransaction(() -> partRepository.save(part)).getId();
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
             updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
-            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
-            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 5);
 
-            given()
+            ApiErrorResponseDto error = extractError(given()
+                    .contentType("application/json")
+                    .body("{\"items\":[{\"partId\":\"%s\",\"quantity\":5}]}".formatted(partId))
             .when()
-                    .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/estimate/" + estimate.estimateId() + "/approve")
+                    .post(WORK_ORDERS_PATH + "/" + workOrderId + "/estimate")
             .then()
-                    .statusCode(422);
+                    .statusCode(422)
+                    .extract().response());
 
+            assertEquals("INSUFFICIENT_PART_STOCK", error.code());
             assertEquals(1, stockOf(partId));
+            assertEquals(WorkOrderStatus.DIAGNOSIS, getWorkOrder(workOrderId).status());
+        }
+
+        @Test
+        @DisplayName("deve devolver as peças reservadas ao estoque quando o orçamento é recusado")
+        void shouldRestoreStockWhenEstimateIsRejected() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            int stockBefore = stockOf(partId);
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 3);
+            assertEquals(stockBefore - 3, stockOf(partId));
+
+            rejectEstimate(workOrderId, estimate.estimateId());
+
+            assertEquals(stockBefore, stockOf(partId));
+        }
+
+        @Test
+        @DisplayName("deve manter a reserva de estoque quando o orçamento é aprovado")
+        void shouldKeepStockReservedWhenEstimateIsApproved() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            int stockBefore = stockOf(partId);
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 3);
+
+            approveEstimate(workOrderId, estimate.estimateId());
+
+            assertEquals(stockBefore - 3, stockOf(partId));
         }
     }
 
@@ -1066,15 +1133,14 @@ class WorkOrderControllerIT {
     class PublicChannel {
 
         private static final String PUBLIC_PATH = "/v1/public/work-orders";
+        private static final String DECISION_PATH = PUBLIC_PATH + "/estimate-decisions/";
 
         @Test
-        @DisplayName("cliente deve acompanhar a OS e aprovar o orçamento")
-        void shouldTrackAndApproveAsClient() {
-            UUID partId = seedPart(new BigDecimal("80.00"));
+        @DisplayName("cliente deve acompanhar a OS sem autenticação")
+        void shouldTrackAsClient() {
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
             updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
-            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
-            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
+            createEstimate(workOrderId, seedPart(new BigDecimal("80.00")), 1);
 
             WorkOrderResponseDto tracked = given()
             .when()
@@ -1082,39 +1148,157 @@ class WorkOrderControllerIT {
             .then()
                     .statusCode(200)
                     .extract().as(WorkOrderResponseDto.class);
+
             assertEquals(WorkOrderStatus.WAITING_APPROVAL, tracked.status());
-
-            EstimateResponseDto approved = given()
-            .when()
-                    .patch(PUBLIC_PATH + "/" + workOrderId + "/estimate/" + estimate.estimateId() + "/approve")
-            .then()
-                    .statusCode(200)
-                    .extract().as(EstimateResponseDto.class);
-
-            assertEquals(EstimateStatus.APPROVED, approved.status());
-            assertEquals(WorkOrderStatus.IN_PROGRESS, getWorkOrder(workOrderId).status());
         }
 
         @Test
-        @DisplayName("cliente deve recusar o orçamento e concluir a OS com cancelamento")
-        void shouldRejectAsClient() {
-            UUID partId = seedPart(new BigDecimal("80.00"));
-            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+        @DisplayName("deve enviar por e-mail um link de aprovação e um de recusa ao aguardar a decisão")
+        void shouldEmailBothDecisionLinks() {
+            SeededCustomer customer = seedCustomerWithEmail();
+            UUID workOrderId = createWorkOrder(customer.id(), seedVehicle());
             updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
-            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
 
-            EstimateResponseDto rejected = given()
-            .when()
-                    .patch(PUBLIC_PATH + "/" + workOrderId + "/estimate/" + estimate.estimateId() + "/reject")
-            .then()
-                    .statusCode(200)
-                    .extract().as(EstimateResponseDto.class);
+            createEstimate(workOrderId, seedPart(new BigDecimal("80.00")), 1);
 
-            WorkOrderResponseDto workOrder = getWorkOrder(workOrderId);
+            assertEquals(2, decisionLinks(customer.email()).size());
+        }
+
+        @Test
+        @DisplayName("novo orçamento sobre uma OS já em WAITING_APPROVAL também reserva e é enviado")
+        void shouldReserveAndEmailReplacementEstimate() {
+            SeededCustomer customer = seedCustomerWithEmail();
+            UUID workOrderId = createWorkOrder(customer.id(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            UUID partId = seedPart(new BigDecimal("80.00"));
+            int stockBefore = stockOf(partId);
+            createEstimate(workOrderId, partId, 2);
+
+            createEstimate(workOrderId, partId, 3);
+
+            assertEquals(stockBefore - 5, stockOf(partId));
+            assertEquals(4, decisionLinks(customer.email()).size());
+        }
+
+        @Test
+        @DisplayName("cliente deve aprovar pelo link recebido, iniciando a execução e mantendo a reserva")
+        void shouldApproveThroughEmailedLink() {
+            UUID partId = seedPart(new BigDecimal("80.00"));
+            int stockBefore = stockOf(partId);
+            Scenario scenario = awaitingDecision(partId, 2);
+
+            EstimateResponseDto approved = decide(scenario.approveToken(), 200)
+                    .as(EstimateResponseDto.class);
+
+            assertEquals(EstimateStatus.APPROVED, approved.status());
+            assertEquals(WorkOrderStatus.IN_PROGRESS, getWorkOrder(scenario.workOrderId()).status());
+            assertEquals(stockBefore - 2, stockOf(partId));
+        }
+
+        @Test
+        @DisplayName("cliente deve recusar pelo link recebido, devolvendo o estoque e cancelando a OS")
+        void shouldRejectThroughEmailedLink() {
+            UUID partId = seedPart(new BigDecimal("80.00"));
+            int stockBefore = stockOf(partId);
+            Scenario scenario = awaitingDecision(partId, 2);
+
+            EstimateResponseDto rejected = decide(scenario.rejectToken(), 200)
+                    .as(EstimateResponseDto.class);
+
+            WorkOrderResponseDto workOrder = getWorkOrder(scenario.workOrderId());
             assertEquals(EstimateStatus.REJECTED, rejected.status());
             assertEquals(WorkOrderStatus.COMPLETED, workOrder.status());
             assertNotNull(workOrder.cancelledAt());
+            assertEquals(stockBefore, stockOf(partId));
         }
+
+        @Test
+        @DisplayName("deve retornar 410 ao reutilizar um link de decisão")
+        void shouldReturn410WhenLinkIsReused() {
+            Scenario scenario = awaitingDecision(seedPart(new BigDecimal("80.00")), 1);
+            decide(scenario.approveToken(), 200);
+
+            ApiErrorResponseDto error = extractError(decide(scenario.approveToken(), 410));
+
+            assertEquals("DECISION_TOKEN_ALREADY_USED", error.code());
+        }
+
+        @Test
+        @DisplayName("deve retornar 409 quando o outro link decide um orçamento já decidido")
+        void shouldReturn409WhenEstimateWasAlreadyDecided() {
+            UUID partId = seedPart(new BigDecimal("80.00"));
+            int stockBefore = stockOf(partId);
+            Scenario scenario = awaitingDecision(partId, 2);
+            decide(scenario.approveToken(), 200);
+
+            ApiErrorResponseDto error = extractError(decide(scenario.rejectToken(), 409));
+
+            assertEquals("ESTIMATE_ALREADY_DECIDED", error.code());
+            assertEquals(stockBefore - 2, stockOf(partId));
+            assertEquals(WorkOrderStatus.IN_PROGRESS, getWorkOrder(scenario.workOrderId()).status());
+        }
+
+        @Test
+        @DisplayName("deve retornar 410 para um link apresentado depois dos sete dias")
+        void shouldReturn410WhenLinkHasExpired() {
+            UUID partId = seedPart(new BigDecimal("80.00"));
+            int stockBefore = stockOf(partId);
+            Scenario scenario = awaitingDecision(partId, 2);
+            expireDecisionWindow(scenario.workOrderId());
+
+            ApiErrorResponseDto error = extractError(decide(scenario.approveToken(), 410));
+
+            assertEquals("DECISION_TOKEN_EXPIRED", error.code());
+            assertEquals(stockBefore - 2, stockOf(partId));
+            assertEquals(WorkOrderStatus.WAITING_APPROVAL, getWorkOrder(scenario.workOrderId()).status());
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 para um link que não foi emitido pela oficina")
+        void shouldReturn400ForForgedLink() {
+            ApiErrorResponseDto error = extractError(decide("nao-e-um-link-valido", 400));
+
+            assertEquals("DECISION_TOKEN_INVALID", error.code());
+        }
+
+        private Response decide(String token, int expectedStatus) {
+            return given()
+            .when()
+                    .post(DECISION_PATH + token)
+            .then()
+                    .statusCode(expectedStatus)
+                    .extract().response();
+        }
+
+        // Leva uma OS recém-aberta até WAITING_APPROVAL e recolhe do e-mail os dois links que a
+        // oficina enviou ao cliente, que é como o cliente real chega ao endpoint de decisão.
+        private Scenario awaitingDecision(UUID partId, int quantity) {
+            SeededCustomer customer = seedCustomerWithEmail();
+            UUID workOrderId = createWorkOrder(customer.id(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            createEstimate(workOrderId, partId, quantity);
+
+            List<String> links = decisionLinks(customer.email());
+            return new Scenario(workOrderId, tokenOf(links.get(0)), tokenOf(links.get(1)));
+        }
+
+        private String tokenOf(String link) {
+            return link.substring(link.lastIndexOf('/') + 1);
+        }
+    }
+
+    // Esperar sete dias não é uma opção, então o vencimento dos links é antecipado na base.
+    private void expireDecisionWindow(UUID workOrderId) {
+        persistInTransaction(() -> decisionTokenRepository.update(
+                "expiresAt = ?1 where workOrderId = ?2",
+                LocalDateTime.now(ZoneId.systemDefault()).minusDays(1),
+                workOrderId));
+    }
+
+    private record Scenario(UUID workOrderId, String approveToken, String rejectToken) {
+    }
+
+    private record SeededCustomer(UUID id, String email) {
     }
 
     @Nested
@@ -1129,7 +1313,7 @@ class WorkOrderControllerIT {
             updateStatus(diagnosis, WorkOrderStatus.DIAGNOSIS);
             UUID waitingApproval = createWorkOrder(seedCustomer(), seedVehicle());
             updateStatus(waitingApproval, WorkOrderStatus.DIAGNOSIS);
-            updateStatus(waitingApproval, WorkOrderStatus.WAITING_APPROVAL);
+            createEstimate(waitingApproval, seedPart(new BigDecimal("40.00")), 1);
             UUID inProgress = createWorkOrderInProgress(new BigDecimal("100.00"), 1);
 
             List<UUID> queue = operationalQueueIds();
