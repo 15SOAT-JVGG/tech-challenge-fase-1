@@ -33,3 +33,24 @@ data:
   # Swagger UI é a porta de entrada da banca. Num ambiente real vale `false`, como diz
   # o comentário em application.yaml — expor a superfície da API é risco desnecessário.
   SWAGGER_UI_ENABLED: "true"
+
+  # Servidor de e-mail. Host, porta e remetente são configuração; usuário e senha são
+  # segredo e chegam pelo Secret oficina-mecanica-env, montado por
+  # infra/scripts/create-app-credentials.sh.
+  #
+  # `MAIL_MOCK: "false"` é o que faz o mailer entregar de verdade: com `true`, que é o
+  # default de desenvolvimento, a mensagem só é registrada em log e o cliente nunca
+  # recebe o link de decisão do orçamento.
+  #
+  # O destino é o sandbox do Mailtrap, que captura a mensagem em vez de entregá-la ao
+  # endereço do cliente — num ambiente de avaliação é o que se quer, porque o link de
+  # decisão pode ser conferido sem enviar e-mail a pessoa alguma. Como nada é entregue
+  # de fato, o remetente é livre: nenhum servidor de destino valida o domínio.
+  #
+  # A porta 2525 é a alternativa que o Mailtrap oferece justamente porque provedores de
+  # nuvem costumam bloquear a saída na 25.
+  MAIL_MOCK: "false"
+  MAIL_FROM: no-reply@oficina-mecanica.com
+  MAIL_HOST: sandbox.smtp.mailtrap.io
+  MAIL_PORT: "2525"
+  MAIL_START_TLS: REQUIRED
