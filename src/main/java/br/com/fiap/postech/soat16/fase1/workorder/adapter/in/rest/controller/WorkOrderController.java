@@ -50,8 +50,9 @@ public class WorkOrderController implements WorkOrderControllerDocs {
 
     @GET
     @Override
-    public Uni<PageableResponseDto<WorkOrderResponseDto>> findAll(@BeanParam @Valid PageableRequestDto pageable) {
-        return service.findAll(pageable.getQ(), pageable.getPage(), pageable.getSize())
+    public Uni<PageableResponseDto<WorkOrderResponseDto>> findOperationalQueue(
+            @BeanParam @Valid PageableRequestDto pageable) {
+        return service.findOperationalQueue(pageable.getPage(), pageable.getSize())
                 .map(WorkOrderRestMapper::toResponse);
     }
 

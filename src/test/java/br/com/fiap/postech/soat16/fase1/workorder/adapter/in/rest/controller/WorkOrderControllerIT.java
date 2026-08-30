@@ -3,12 +3,15 @@ package br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.controller;
 import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,6 +45,7 @@ import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.O
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderServiceResponseDto;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.WorkOrderRepository;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderStatus;
 
@@ -76,6 +80,9 @@ class WorkOrderControllerIT {
     @Inject
     ServiceItemRepository serviceItemRepository;
 
+    @Inject
+    WorkOrderRepository workOrderRepository;
+
     @BeforeAll
     static void authenticateAllRequests() {
         String token = Jwt.issuer("oficina-api")
@@ -91,7 +98,7 @@ class WorkOrderControllerIT {
 
     @AfterAll
     static void clearAuthentication() {
-        RestAssured.replaceFiltersWith(java.util.List.of());
+        RestAssured.replaceFiltersWith(List.of());
     }
 
     // Persiste fora do event loop, estabelecendo o contexto Vert.x exigido pelo Hibernate
@@ -165,17 +172,37 @@ class WorkOrderControllerIT {
         return openWorkOrder(body).workOrder().workOrderId();
     }
 
-    private boolean workOrderExistsForVehicle(UUID vehicleId) {
-        PageableResponseDto<WorkOrderResponseDto> page = given()
-                .queryParam("size", 100)
+    private PageableResponseDto<WorkOrderResponseDto> operationalQueuePage(int page, int size) {
+        return given()
+                .queryParam("page", page)
+                .queryParam("size", size)
         .when()
                 .get(WORK_ORDERS_PATH)
         .then()
                 .statusCode(200)
                 .extract().as(new TypeRef<>() {
                 });
+    }
 
-        return page.content().stream().anyMatch(workOrder -> vehicleId.equals(workOrder.vehicleId()));
+    // A base é compartilhada por toda a classe, então a fila é percorrida por inteiro antes de
+    // afirmar sobre a posição relativa das ordens criadas pelo teste.
+    private List<WorkOrderResponseDto> operationalQueue() {
+        List<WorkOrderResponseDto> queue = new ArrayList<>();
+        PageableResponseDto<WorkOrderResponseDto> firstPage = operationalQueuePage(0, 100);
+        for (int index = 0; index < firstPage.pagination().totalPages(); index++) {
+            PageableResponseDto<WorkOrderResponseDto> current =
+                    index == 0 ? firstPage : operationalQueuePage(index, 100);
+            queue.addAll(current.content());
+        }
+        return queue;
+    }
+
+    private List<UUID> operationalQueueIds() {
+        return operationalQueue().stream().map(WorkOrderResponseDto::workOrderId).toList();
+    }
+
+    private boolean workOrderExistsForVehicle(UUID vehicleId) {
+        return operationalQueue().stream().anyMatch(workOrder -> vehicleId.equals(workOrder.vehicleId()));
     }
 
     private WorkOrderResponseDto getWorkOrder(UUID workOrderId) {
@@ -250,6 +277,13 @@ class WorkOrderControllerIT {
     private void repricePart(UUID partId, BigDecimal unitPrice) {
         persistInTransaction(() -> partRepository.find("id = ?1", partId).firstResult()
                 .invoke(entity -> entity.setUnitPrice(unitPrice)));
+    }
+
+    // A API não permite escolher a data de abertura, então a fila só pode ser exercitada por data
+    // retroagindo a OS direto na base.
+    private void backdateOpening(UUID workOrderId, Duration age) {
+        persistInTransaction(() -> workOrderRepository.find("id = ?1", workOrderId).firstResult()
+                .invoke(entity -> entity.setOpenedAt(entity.getOpenedAt().minus(age))));
     }
 
     private void repriceServiceItem(UUID serviceItemId, BigDecimal basePrice) {
@@ -1080,6 +1114,122 @@ class WorkOrderControllerIT {
             assertEquals(EstimateStatus.REJECTED, rejected.status());
             assertEquals(WorkOrderStatus.COMPLETED, workOrder.status());
             assertNotNull(workOrder.cancelledAt());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /v1/work-orders — fila operacional")
+    class OperationalQueue {
+
+        @Test
+        @DisplayName("deve agrupar por estágio de trabalho, do IN_PROGRESS ao RECEIVED")
+        void shouldGroupByWorkStage() {
+            UUID received = createWorkOrder(seedCustomer(), seedVehicle());
+            UUID diagnosis = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(diagnosis, WorkOrderStatus.DIAGNOSIS);
+            UUID waitingApproval = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(waitingApproval, WorkOrderStatus.DIAGNOSIS);
+            updateStatus(waitingApproval, WorkOrderStatus.WAITING_APPROVAL);
+            UUID inProgress = createWorkOrderInProgress(new BigDecimal("100.00"), 1);
+
+            List<UUID> queue = operationalQueueIds();
+
+            assertTrue(queue.containsAll(List.of(inProgress, waitingApproval, diagnosis, received)));
+            assertTrue(queue.indexOf(inProgress) < queue.indexOf(waitingApproval));
+            assertTrue(queue.indexOf(waitingApproval) < queue.indexOf(diagnosis));
+            assertTrue(queue.indexOf(diagnosis) < queue.indexOf(received));
+        }
+
+        // A OS aberta por último é retroagida para que a ordem de criação e a ordem esperada fiquem
+        // invertidas — sem isso o teste passaria mesmo se a fila devolvesse na ordem de inserção.
+        @Test
+        @DisplayName("deve colocar a OS mais antiga à frente dentro do mesmo status")
+        void shouldPlaceTheOldestFirstWithinTheSameStatus() {
+            UUID createdFirst = createWorkOrder(seedCustomer(), seedVehicle());
+            UUID oldest = createWorkOrder(seedCustomer(), seedVehicle());
+            backdateOpening(oldest, Duration.ofDays(1));
+
+            List<UUID> queue = operationalQueueIds();
+
+            assertTrue(queue.containsAll(List.of(createdFirst, oldest)));
+            assertTrue(queue.indexOf(oldest) < queue.indexOf(createdFirst));
+        }
+
+        @Test
+        @DisplayName("deve excluir da fila as OS concluídas, entregues e concluídas por recusa")
+        void shouldExcludeClosedWorkOrders() {
+            UUID completed = createWorkOrderInProgress(new BigDecimal("100.00"), 1);
+            closeWorkOrder(completed);
+            UUID delivered = createWorkOrderInProgress(new BigDecimal("100.00"), 1);
+            closeWorkOrder(delivered);
+            updateStatus(delivered, WorkOrderStatus.DELIVERED);
+            UUID cancelled = createWorkOrderRejectedByCustomer();
+
+            List<UUID> queue = operationalQueueIds();
+
+            assertFalse(queue.contains(completed));
+            assertFalse(queue.contains(delivered));
+            assertFalse(queue.contains(cancelled));
+            assertEquals(WorkOrderStatus.COMPLETED, getWorkOrder(cancelled).status());
+            assertNotNull(getWorkOrder(cancelled).cancelledAt());
+        }
+
+        @Test
+        @DisplayName("deve contar apenas as OS que continuam na fila")
+        void shouldCountOnlyTheQueuedWorkOrders() {
+            long before = operationalQueuePage(0, 1).pagination().totalElements();
+
+            createWorkOrder(seedCustomer(), seedVehicle());
+            closeWorkOrder(createWorkOrderInProgress(new BigDecimal("100.00"), 1));
+
+            assertEquals(before + 1, operationalQueuePage(0, 1).pagination().totalElements());
+        }
+
+        @Test
+        @DisplayName("deve paginar exatamente o conjunto filtrado")
+        void shouldPaginateTheFilteredSet() {
+            createWorkOrder(seedCustomer(), seedVehicle());
+            createWorkOrder(seedCustomer(), seedVehicle());
+
+            PageableResponseDto<WorkOrderResponseDto> firstPage = operationalQueuePage(0, 1);
+            PageableResponseDto<WorkOrderResponseDto> secondPage = operationalQueuePage(1, 1);
+
+            assertEquals(1, firstPage.content().size());
+            assertEquals(operationalQueueIds().size(), firstPage.pagination().totalElements());
+            assertEquals(firstPage.pagination().totalElements(), secondPage.pagination().totalElements());
+            assertTrue(firstPage.pagination().hasNext());
+            assertTrue(secondPage.pagination().hasPrevious());
+            assertNotEquals(firstPage.content().get(0).workOrderId(), secondPage.content().get(0).workOrderId());
+        }
+
+        @Test
+        @DisplayName("deve devolver uma página vazia além da última")
+        void shouldReturnAnEmptyPageBeyondTheLastOne() {
+            createWorkOrder(seedCustomer(), seedVehicle());
+
+            PageableResponseDto<WorkOrderResponseDto> page =
+                    operationalQueuePage(operationalQueuePage(0, 100).pagination().totalPages(), 100);
+
+            assertTrue(page.content().isEmpty());
+            assertFalse(page.pagination().hasNext());
+        }
+
+        private void closeWorkOrder(UUID workOrderId) {
+            given()
+                    .contentType("application/json")
+                    .body("{}")
+            .when()
+                    .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/close")
+            .then()
+                    .statusCode(200);
+        }
+
+        private UUID createWorkOrderRejectedByCustomer() {
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            EstimateResponseDto estimate = createEstimate(workOrderId, seedPart(new BigDecimal("60.00")), 1);
+            rejectEstimate(workOrderId, estimate.estimateId());
+            return workOrderId;
         }
     }
 

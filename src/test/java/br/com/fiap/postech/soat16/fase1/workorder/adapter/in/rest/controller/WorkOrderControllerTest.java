@@ -72,24 +72,24 @@ class WorkOrderControllerTest {
     }
 
     @Nested
-    @DisplayName("GET /v1/work-orders — findAll")
-    class FindAll {
+    @DisplayName("GET /v1/work-orders — findOperationalQueue")
+    class FindOperationalQueue {
 
         @Test
-        @DisplayName("should return paginated list when work orders exist")
+        @DisplayName("should return the paginated operational queue")
         void shouldReturnPaginatedList() {
             PageableRequestDto pageable = mock(PageableRequestDto.class);
-            when(pageable.getQ()).thenReturn(null);
             when(pageable.getPage()).thenReturn(0);
             when(pageable.getSize()).thenReturn(10);
 
             PagedResult<WorkOrderResult> page = PagedResult.of(List.of(response), 0, 10, 1L);
-            when(service.findAll(null, 0, 10)).thenReturn(Uni.createFrom().item(page));
+            when(service.findOperationalQueue(0, 10)).thenReturn(Uni.createFrom().item(page));
 
-            PageableResponseDto<WorkOrderResponseDto> result = controller.findAll(pageable).await().indefinitely();
+            PageableResponseDto<WorkOrderResponseDto> result =
+                    controller.findOperationalQueue(pageable).await().indefinitely();
 
             assertEquals(1, result.content().size());
-            verify(service).findAll(null, 0, 10);
+            verify(service).findOperationalQueue(0, 10);
         }
     }
 

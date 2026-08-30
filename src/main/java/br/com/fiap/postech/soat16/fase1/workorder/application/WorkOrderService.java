@@ -64,9 +64,14 @@ public class WorkOrderService {
     private final WorkOrderServiceMapper serviceMapper;
     private final WorkOrderNotificationPort notificationService;
 
+    /**
+     * A fila operacional da oficina: somente ordens ainda em atendimento, agrupadas pelo estágio de
+     * trabalho e, dentro de cada grupo, da mais antiga para a mais recente.
+     */
     @WithSession
-    public Uni<PagedResult<WorkOrderResult>> findAll(String q, int page, int size) {
-        return Uni.combine().all().unis(repository.findPage(page, size), repository.countWorkOrders()).asTuple()
+    public Uni<PagedResult<WorkOrderResult>> findOperationalQueue(int page, int size) {
+        return Uni.combine().all()
+                .unis(repository.findOperationalQueuePage(page, size), repository.countOperationalQueue()).asTuple()
                 .map(tuple -> PagedResult.of(
                         tuple.getItem1().stream().map(mapper::toResult).toList(),
                         page,

@@ -45,12 +45,15 @@ import io.smallrye.mutiny.Uni;
 public interface WorkOrderControllerDocs {
 
     @GET
-    @Operation(summary = "List work orders", description = "Returns a paginated list of work orders.")
+    @Operation(summary = "List the operational queue",
+            description = "Returns a paginated list of the work orders still in progress. COMPLETED and DELIVERED "
+                    + "work orders are excluded. Results are grouped by IN_PROGRESS, WAITING_APPROVAL, DIAGNOSIS and "
+                    + "RECEIVED, and within each group the oldest opening date comes first.")
     @APIResponse(responseCode = "200", description = "Work orders retrieved successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = PageableResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid query parameters")
-    Uni<PageableResponseDto<WorkOrderResponseDto>> findAll(@BeanParam @Valid PageableRequestDto pageable);
+    Uni<PageableResponseDto<WorkOrderResponseDto>> findOperationalQueue(@BeanParam @Valid PageableRequestDto pageable);
 
     @GET
     @Path("/metrics/average-execution-time")

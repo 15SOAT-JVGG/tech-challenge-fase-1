@@ -126,17 +126,17 @@ class WorkOrderServiceTest {
     }
 
     @Nested
-    @DisplayName("findAll")
-    class FindAll {
+    @DisplayName("findOperationalQueue")
+    class FindOperationalQueue {
 
         @Test
-        @DisplayName("should return paginated response")
+        @DisplayName("deve paginar a fila operacional pelo total de ordens ainda em atendimento")
         void shouldReturnPaginatedResponse() {
-            when(repository.findPage(0, 10)).thenReturn(Uni.createFrom().item(List.of(entity)));
-            when(repository.countWorkOrders()).thenReturn(Uni.createFrom().item(1L));
+            when(repository.findOperationalQueuePage(0, 10)).thenReturn(Uni.createFrom().item(List.of(entity)));
+            when(repository.countOperationalQueue()).thenReturn(Uni.createFrom().item(1L));
             when(mapper.toResult(entity)).thenReturn(response);
 
-            PagedResult<WorkOrderResult> result = service.findAll(null, 0, 10).await().indefinitely();
+            PagedResult<WorkOrderResult> result = service.findOperationalQueue(0, 10).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(1, result.content().size());

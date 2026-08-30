@@ -41,9 +41,19 @@ RECEIVED ──► DIAGNOSIS ──► WAITING_APPROVAL ──► IN_PROGRESS �
 
 ### Prioridade (`priority`)
 
-`LOW`, `MEDIUM` (padrão quando não informada), `HIGH`, `URGENT`. A listagem
-(`GET /v1/work-orders`) é sempre ordenada por prioridade — `URGENT` primeiro, `LOW` por último — e,
-dentro da mesma prioridade, pelas mais recentes primeiro.
+`LOW`, `MEDIUM` (padrão quando não informada), `HIGH`, `URGENT`. A prioridade é um atributo de
+triagem da ordem; ela não influencia a ordenação da listagem operacional.
+
+### Fila operacional (`GET /v1/work-orders`)
+
+A listagem administrativa é a fila de trabalho da oficina, e não um espelho de tudo que já passou
+por ela:
+
+- só entram as OS ainda em atendimento — `COMPLETED` e `DELIVERED` ficam de fora, inclusive as
+  concluídas por recusa do orçamento;
+- os grupos aparecem na ordem `IN_PROGRESS`, `WAITING_APPROVAL`, `DIAGNOSIS` e `RECEIVED`;
+- dentro do mesmo status, a OS aberta há mais tempo vem primeiro;
+- a contagem e a paginação (`page`, `size`) consideram exatamente esse conjunto filtrado.
 
 ---
 
@@ -73,7 +83,7 @@ dentro da mesma prioridade, pelas mais recentes primeiro.
 |---|---|---|
 | `POST` | `/v1/work-orders` | Abre uma nova ordem de serviço e, junto dela, o orçamento pendente da solicitação inicial. |
 | `GET` | `/v1/work-orders/{id}` | Busca uma ordem por id. |
-| `GET` | `/v1/work-orders` | Lista ordens, paginado e ordenado por prioridade. |
+| `GET` | `/v1/work-orders` | Lista a fila operacional: apenas OS em atendimento, paginadas e ordenadas por estágio de trabalho. |
 | `PATCH` | `/v1/work-orders/{id}/status` | Avança o status da ordem (exceto para `COMPLETED`). |
 | `POST` | `/v1/work-orders/{id}/estimate` | Cria um orçamento com itens do catálogo de peças. |
 | `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/approve` | Aprova um orçamento pendente. |
@@ -256,6 +266,9 @@ como `Classe.método`; todas vivem dentro de uma classe `@Nested` com o mesmo no
 | Peça inexistente no orçamento → 404 | `CreateEstimate.shouldReturn404WhenPartNotFound` | `CreateEstimate.shouldThrowEstimatePartNotFoundException` |
 | Itens de orçamento vazios são rejeitados → 400 | `CreateEstimate.shouldReturn400WhenItemsEmpty` | — (Bean Validation, não exercida no nível de serviço) |
 | Mão de obra pode ser registrada múltiplas vezes na mesma ordem | `AddService.shouldAddService` | `AddService.shouldPersistALaborServiceLine` |
+| Fila operacional agrupa por estágio e ordena pela OS mais antiga | `OperationalQueue.shouldGroupByWorkStage`, `...shouldPlaceTheOldestFirstWithinTheSameStatus` | `WorkOrderStatusTest.OperationalQueue.ordersFromTheMostAdvancedStage` |
+| Fila operacional exclui OS concluídas, entregues e recusadas | `OperationalQueue.shouldExcludeClosedWorkOrders` | `WorkOrderStatusTest.OperationalQueue.excludesClosedStatuses` |
+| Contagem e paginação consideram só o conjunto filtrado | `OperationalQueue.shouldCountOnlyTheQueuedWorkOrders`, `...shouldPaginateTheFilteredSet`, `...shouldReturnAnEmptyPageBeyondTheLastOne` | `FindOperationalQueue.shouldReturnPaginatedResponse` |
 
 Cenários de validação de payload (`@Valid`/Bean Validation, ex.: descrição em branco, preço/valor
 zero) só existem na camada de integração — só ali a requisição passa pelo filtro JAX-RS real antes
