@@ -120,7 +120,7 @@ class WorkOrderServiceTest {
         entity.setStatus(WorkOrderStatus.RECEIVED);
 
         response = new WorkOrderResult(WORK_ORDER_ID, CUSTOMER_ID, VEHICLE_ID, "desc", null,
-                WorkOrderStatus.RECEIVED, null, null, null, null, null);
+                WorkOrderStatus.RECEIVED, null, null, null, null, null, null);
     }
 
     @Nested
@@ -254,27 +254,11 @@ class WorkOrderServiceTest {
         @DisplayName("should reject skipping stages")
         void shouldRejectSkippingStages() {
             entity.setStatus(WorkOrderStatus.RECEIVED);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.APPROVED);
+            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.IN_PROGRESS);
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
 
             assertThrows(InvalidWorkOrderStatusTransitionException.class,
                     () -> service.updateStatus(WORK_ORDER_ID, request).await().indefinitely());
-        }
-
-        @Test
-        @DisplayName("should allow CANCELLED from any non-terminal status")
-        void shouldAllowCancelledFromAnyNonTerminalStatus() {
-            entity.setStatus(WorkOrderStatus.DIAGNOSIS);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.CANCELLED);
-
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(entity));
-            when(mapper.toResult(entity)).thenReturn(response);
-
-            service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
-
-            assertEquals(WorkOrderStatus.CANCELLED, entity.getStatus());
         }
 
         @Test
@@ -308,17 +292,6 @@ class WorkOrderServiceTest {
         @DisplayName("should throw WorkOrderLockedException when current status is DELIVERED")
         void shouldThrowLockedWhenDelivered() {
             entity.setStatus(WorkOrderStatus.DELIVERED);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.CANCELLED);
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-
-            assertThrows(WorkOrderLockedException.class,
-                    () -> service.updateStatus(WORK_ORDER_ID, request).await().indefinitely());
-        }
-
-        @Test
-        @DisplayName("should throw WorkOrderLockedException when current status is CANCELLED")
-        void shouldThrowLockedWhenCancelled() {
-            entity.setStatus(WorkOrderStatus.CANCELLED);
             ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.DIAGNOSIS);
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
 
@@ -329,7 +302,7 @@ class WorkOrderServiceTest {
         @Test
         @DisplayName("should throw EstimateNotApprovedException when starting execution without approved estimate")
         void shouldThrowWhenStartingWithoutApprovedEstimate() {
-            entity.setStatus(WorkOrderStatus.APPROVED);
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
             ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.IN_PROGRESS);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
@@ -343,7 +316,7 @@ class WorkOrderServiceTest {
         @Test
         @DisplayName("should allow starting execution when an approved estimate exists")
         void shouldAllowStartingWithApprovedEstimate() {
-            entity.setStatus(WorkOrderStatus.APPROVED);
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
             ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.IN_PROGRESS);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
@@ -356,38 +329,6 @@ class WorkOrderServiceTest {
             service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
 
             assertEquals(WorkOrderStatus.IN_PROGRESS, entity.getStatus());
-        }
-
-        @Test
-        @DisplayName("should throw EstimateNotApprovedException when approving without an approved estimate")
-        void shouldThrowWhenApprovingWithoutApprovedEstimate() {
-            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.APPROVED);
-
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
-                    .thenReturn(Uni.createFrom().item(false));
-
-            assertThrows(EstimateNotApprovedException.class,
-                    () -> service.updateStatus(WORK_ORDER_ID, request).await().indefinitely());
-        }
-
-        @Test
-        @DisplayName("should allow approving when an approved estimate exists")
-        void shouldAllowApprovingWithApprovedEstimate() {
-            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.APPROVED);
-
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
-                    .thenReturn(Uni.createFrom().item(true));
-            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(entity));
-            when(mapper.toResult(entity)).thenReturn(response);
-
-            service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
-
-            assertEquals(WorkOrderStatus.APPROVED, entity.getStatus());
         }
 
         @Test
@@ -447,9 +388,9 @@ class WorkOrderServiceTest {
         }
 
         @Test
-        @DisplayName("should throw WorkOrderLockedException when work order is delivered or cancelled")
+        @DisplayName("should throw WorkOrderLockedException when work order is delivered")
         void shouldThrowWhenLocked() {
-            entity.setStatus(WorkOrderStatus.CANCELLED);
+            entity.setStatus(WorkOrderStatus.DELIVERED);
             CreateEstimateCommand request = new CreateEstimateCommand(
                     List.of(new Item(UUID.randomUUID(), 1, BigDecimal.ONE)));
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
@@ -487,7 +428,7 @@ class WorkOrderServiceTest {
             service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
 
             assertEquals(EstimateStatus.APPROVED, estimate.getStatus());
-            assertEquals(WorkOrderStatus.APPROVED, entity.getStatus());
+            assertEquals(WorkOrderStatus.IN_PROGRESS, entity.getStatus());
             assertEquals(BigDecimal.valueOf(100), entity.getEstimatedValue());
         }
 
@@ -550,8 +491,8 @@ class WorkOrderServiceTest {
     class RejectEstimate {
 
         @Test
-        @DisplayName("should reject a pending estimate and move WAITING_APPROVAL back to DIAGNOSIS")
-        void shouldRejectAndReturnToDiagnosis() {
+        @DisplayName("should reject a pending estimate, complete the work order and record cancellation")
+        void shouldRejectAndCompleteWorkOrder() {
             entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
             UUID estimateId = UUID.randomUUID();
             Estimate estimate = new Estimate();
@@ -573,7 +514,9 @@ class WorkOrderServiceTest {
             service.rejectEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
 
             assertEquals(EstimateStatus.REJECTED, estimate.getStatus());
-            assertEquals(WorkOrderStatus.DIAGNOSIS, entity.getStatus());
+            assertEquals(WorkOrderStatus.COMPLETED, entity.getStatus());
+            assertNotNull(entity.getClosedAt());
+            assertNotNull(entity.getCancelledAt());
         }
 
         @Test
@@ -653,27 +596,6 @@ class WorkOrderServiceTest {
             assertEquals(1, part.getStockQuantity());
         }
 
-        @Test
-        @DisplayName("should restore part stock when cancelling an APPROVED work order")
-        void shouldRestoreStockOnCancel() {
-            entity.setStatus(WorkOrderStatus.APPROVED);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.CANCELLED);
-            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 3, "UN");
-            Estimate approvedEstimate = estimateWithItem(part, 2);
-            approvedEstimate.setStatus(EstimateStatus.APPROVED);
-
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.findApprovedByWorkOrderId(WORK_ORDER_ID))
-                    .thenReturn(Uni.createFrom().item(approvedEstimate));
-            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(entity));
-            when(mapper.toResult(entity)).thenReturn(response);
-
-            service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
-
-            assertEquals(WorkOrderStatus.CANCELLED, entity.getStatus());
-            assertEquals(5, part.getStockQuantity());
-        }
     }
 
     @Nested

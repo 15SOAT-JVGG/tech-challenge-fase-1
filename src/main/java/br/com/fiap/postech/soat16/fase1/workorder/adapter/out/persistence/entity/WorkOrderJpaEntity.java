@@ -65,6 +65,9 @@ public class WorkOrderJpaEntity extends AuditableJpaEntity {
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
 
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
     @Column(name = "estimated_value", precision = 10, scale = 2)
     private BigDecimal estimatedValue;
 

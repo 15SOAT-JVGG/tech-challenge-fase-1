@@ -87,8 +87,8 @@ public interface WorkOrderControllerDocs {
     @Path("/{id}/status")
     @Operation(summary = "Update work order status",
             description = "Moves the work order to the next status in the lifecycle. Use /close to reach "
-                    + "COMPLETED. Moving to IN_PROGRESS requires an approved estimate. DELIVERED and CANCELLED "
-                    + "block further changes.")
+                    + "COMPLETED. Moving to IN_PROGRESS requires an approved estimate. DELIVERED blocks "
+                    + "further changes.")
     @APIResponse(responseCode = "200", description = "Status updated successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = WorkOrderResponseDto.class)))
@@ -120,7 +120,7 @@ public interface WorkOrderControllerDocs {
     @Path("/{id}/estimate/{estimateId}/approve")
     @Operation(summary = "Approve estimate",
             description = "Approves a pending estimate. Sets the work order's estimatedValue to the estimate's "
-                    + "totalAmount and, if the work order is WAITING_APPROVAL, advances it to APPROVED.")
+                    + "totalAmount and, if the work order is WAITING_APPROVAL, advances it to IN_PROGRESS.")
     @APIResponse(responseCode = "200", description = "Estimate approved successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = EstimateResponseDto.class)))
@@ -136,8 +136,8 @@ public interface WorkOrderControllerDocs {
     @PATCH
     @Path("/{id}/estimate/{estimateId}/reject")
     @Operation(summary = "Reject estimate",
-            description = "Rejects a pending estimate. If the work order is WAITING_APPROVAL it is moved back to "
-                    + "DIAGNOSIS so a revised estimate can be issued. No stock is reserved on rejection.")
+            description = "Rejects a pending estimate. If the work order is WAITING_APPROVAL it is completed and "
+                    + "records cancelledAt. No stock is reserved on rejection.")
     @APIResponse(responseCode = "200", description = "Estimate rejected successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = EstimateResponseDto.class)))

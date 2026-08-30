@@ -75,6 +75,7 @@ public final class WorkOrderRestMapper {
                 result.status(),
                 result.openedAt(),
                 result.closedAt(),
+                result.cancelledAt(),
                 result.estimatedValue(),
                 result.finalValue(),
                 result.assignedWorkerId());

@@ -28,6 +28,7 @@ public final class WorkOrderPersistenceMapper {
         workOrder.setStatus(entity.getStatus());
         workOrder.setOpenedAt(entity.getOpenedAt());
         workOrder.setClosedAt(entity.getClosedAt());
+        workOrder.setCancelledAt(entity.getCancelledAt());
         workOrder.setEstimatedValue(entity.getEstimatedValue());
         workOrder.setFinalValue(entity.getFinalValue());
         AuditPersistenceMapper.copyToDomain(entity, workOrder);
@@ -70,6 +71,7 @@ public final class WorkOrderPersistenceMapper {
         target.setStatus(source.getStatus());
         target.setOpenedAt(source.getOpenedAt());
         target.setClosedAt(source.getClosedAt());
+        target.setCancelledAt(source.getCancelledAt());
         target.setEstimatedValue(source.getEstimatedValue());
         target.setFinalValue(source.getFinalValue());
     }

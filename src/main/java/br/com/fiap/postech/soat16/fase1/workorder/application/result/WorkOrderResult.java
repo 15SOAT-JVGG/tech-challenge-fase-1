@@ -16,6 +16,7 @@ public record WorkOrderResult(
         WorkOrderStatus status,
         LocalDateTime openedAt,
         LocalDateTime closedAt,
+        LocalDateTime cancelledAt,
         BigDecimal estimatedValue,
         BigDecimal finalValue,
         UUID assignedWorkerId

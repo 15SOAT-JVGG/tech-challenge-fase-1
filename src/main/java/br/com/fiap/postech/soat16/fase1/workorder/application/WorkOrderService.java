@@ -127,18 +127,14 @@ public class WorkOrderService {
                     Uni<Boolean> approvedEstimate = requiresApprovedEstimate(request.status())
                             ? hasApprovedEstimate(id)
                             : Uni.createFrom().item(false);
-                    Uni<Void> restoreStock = request.status() == WorkOrderStatus.CANCELLED
-                            ? restoreStockIfReserved(order)
-                            : Uni.createFrom().voidItem();
                     return approvedEstimate
-                            .flatMap(hasApproved -> restoreStock
-                                    .flatMap(ignored -> {
-                                        var history = order.transitionTo(
-                                                request.status(),
-                                                hasApproved,
-                                                LocalDateTime.now(ZoneId.systemDefault()));
-                                        return persistOrderWithHistory(order, Optional.of(history));
-                                    }))
+                            .flatMap(hasApproved -> {
+                                var history = order.transitionTo(
+                                        request.status(),
+                                        hasApproved,
+                                        LocalDateTime.now(ZoneId.systemDefault()));
+                                return persistOrderWithHistory(order, Optional.of(history));
+                            })
                             .map(mapper::toResult);
                 });
     }
@@ -281,29 +277,6 @@ public class WorkOrderService {
         return catalog.saveParts(parts);
     }
 
-    /**
-     * Restaura o estoque somente quando as peças estão reservadas, mas ainda não foram consumidas.
-     */
-    private Uni<Void> restoreStockIfReserved(WorkOrder order) {
-        if (!order.hasReservedStock()) {
-            return Uni.createFrom().voidItem();
-        }
-        return estimateRepository.findApprovedByWorkOrderId(order.getId())
-                .flatMap(estimate -> {
-                    if (estimate == null) {
-                        return Uni.createFrom().voidItem();
-                    }
-                    List<Part> parts = estimate.getItems().stream()
-                            .map(item -> {
-                                Part part = item.getPart();
-                                part.increaseStock(item.getQuantity());
-                                return part;
-                            })
-                            .toList();
-                    return catalog.saveParts(parts);
-                });
-    }
-
     private Uni<WorkOrder> persistOrderWithHistory(WorkOrder order,
             Optional<WorkOrderHistory> history) {
         return history
@@ -317,6 +290,6 @@ public class WorkOrderService {
     }
 
     private boolean requiresApprovedEstimate(WorkOrderStatus target) {
-        return target == WorkOrderStatus.APPROVED || target == WorkOrderStatus.IN_PROGRESS;
+        return target == WorkOrderStatus.IN_PROGRESS;
     }
 }

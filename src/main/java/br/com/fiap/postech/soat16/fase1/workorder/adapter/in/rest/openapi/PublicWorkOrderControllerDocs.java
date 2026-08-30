@@ -53,7 +53,7 @@ public interface PublicWorkOrderControllerDocs {
     @Path("/{id}/estimate/{estimateId}/approve")
     @Operation(summary = "Approve estimate (client)",
             description = "Client authorizes the estimate. Reserves the parts in stock and advances the work "
-                    + "order to APPROVED.")
+                    + "order to IN_PROGRESS.")
     @APIResponse(responseCode = "200", description = "Estimate approved successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = EstimateResponseDto.class)))

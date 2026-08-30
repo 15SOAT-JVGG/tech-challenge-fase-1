@@ -21,6 +21,7 @@ public class WorkOrderMapper {
                 entity.getStatus(),
                 entity.getOpenedAt(),
                 entity.getClosedAt(),
+                entity.getCancelledAt(),
                 entity.getEstimatedValue(),
                 entity.getFinalValue(),
                 entity.getAssignedWorker() != null ? entity.getAssignedWorker().getId() : null

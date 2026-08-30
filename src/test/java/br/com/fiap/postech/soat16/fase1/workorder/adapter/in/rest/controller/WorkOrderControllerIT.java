@@ -243,7 +243,6 @@ class WorkOrderControllerIT {
         updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
         EstimateResponseDto estimate = createEstimate(workOrderId, partId, quantity);
         approveEstimate(workOrderId, estimate.estimateId());
-        updateStatus(workOrderId, WorkOrderStatus.IN_PROGRESS);
 
         return workOrderId;
     }
@@ -257,7 +256,7 @@ class WorkOrderControllerIT {
     class FullLifecycle {
 
         @Test
-        @DisplayName("deve percorrer RECEIVED -> DIAGNOSIS -> WAITING_APPROVAL -> APPROVED -> IN_PROGRESS -> COMPLETED -> DELIVERED")
+        @DisplayName("deve percorrer RECEIVED -> DIAGNOSIS -> WAITING_APPROVAL -> IN_PROGRESS -> COMPLETED -> DELIVERED")
         void shouldCompleteFullLifecycle() {
             UUID customerId = seedCustomer();
             UUID vehicleId = seedVehicle();
@@ -284,7 +283,7 @@ class WorkOrderControllerIT {
             assertEquals(EstimateStatus.APPROVED, approved.status());
 
             WorkOrderResponseDto afterApproval = getWorkOrder(workOrderId);
-            assertEquals(WorkOrderStatus.APPROVED, afterApproval.status());
+            assertEquals(WorkOrderStatus.IN_PROGRESS, afterApproval.status());
             assertEquals(0, new BigDecimal("300.00").compareTo(afterApproval.estimatedValue()));
 
             WorkOrderServiceResponseDto service = given()
@@ -296,9 +295,6 @@ class WorkOrderControllerIT {
                     .statusCode(201)
                     .extract().as(WorkOrderServiceResponseDto.class);
             assertEquals("Troca de óleo", service.description());
-
-            updateStatus(workOrderId, WorkOrderStatus.IN_PROGRESS);
-            assertEquals(WorkOrderStatus.IN_PROGRESS, getWorkOrder(workOrderId).status());
 
             WorkOrderResponseDto closed = given()
                     .contentType("application/json")
@@ -317,14 +313,17 @@ class WorkOrderControllerIT {
         }
 
         @Test
-        @DisplayName("deve cancelar a partir de um status não terminal")
-        void shouldCancelFromNonTerminalStatus() {
+        @DisplayName("deve rejeitar o status CANCELLED removido do contrato")
+        void shouldRejectRemovedCancelledStatus() {
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
 
-            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
-            updateStatus(workOrderId, WorkOrderStatus.CANCELLED);
-
-            assertEquals(WorkOrderStatus.CANCELLED, getWorkOrder(workOrderId).status());
+            given()
+                    .contentType("application/json")
+                    .body("{\"status\":\"CANCELLED\"}")
+            .when()
+                    .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/status")
+            .then()
+                    .statusCode(400);
         }
 
         @Test
@@ -344,7 +343,7 @@ class WorkOrderControllerIT {
 
             ApiErrorResponseDto error = extractError(given()
                     .contentType("application/json")
-                    .body("{\"status\":\"CANCELLED\"}")
+                    .body("{\"status\":\"DIAGNOSIS\"}")
             .when()
                     .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/status")
             .then()
@@ -438,19 +437,18 @@ class WorkOrderControllerIT {
         }
 
         @Test
-        @DisplayName("deve rejeitar pular etapas (RECEIVED -> APPROVED)")
-        void shouldRejectSkippingStages() {
+        @DisplayName("deve rejeitar o status APPROVED removido do contrato")
+        void shouldRejectRemovedApprovedStatus() {
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
 
-            ApiErrorResponseDto error = extractError(given()
+            given()
                     .contentType("application/json")
                     .body("{\"status\":\"APPROVED\"}")
             .when()
                     .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/status")
             .then()
-                    .statusCode(422)
-                    .extract().response());
-            assertEquals("INVALID_STATUS_TRANSITION", error.code());
+                    .statusCode(400)
+                    .extract().response();
         }
 
         @Test
@@ -478,7 +476,7 @@ class WorkOrderControllerIT {
 
             ApiErrorResponseDto error = extractError(given()
                     .contentType("application/json")
-                    .body("{\"status\":\"APPROVED\"}")
+                    .body("{\"status\":\"IN_PROGRESS\"}")
             .when()
                     .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/status")
             .then()
@@ -538,27 +536,6 @@ class WorkOrderControllerIT {
                     .statusCode(400);
         }
 
-        @Test
-        @DisplayName("deve retornar 422 quando a ordem está cancelada")
-        void shouldReturn422WhenWorkOrderLocked() {
-            UUID partId = seedPart(new BigDecimal("50.00"));
-            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
-            updateStatus(workOrderId, WorkOrderStatus.CANCELLED);
-
-            String body = """
-                    {"items":[{"partId":"%s","quantity":1}]}
-                    """.formatted(partId);
-
-            ApiErrorResponseDto error = extractError(given()
-                    .contentType("application/json")
-                    .body(body)
-            .when()
-                    .post(WORK_ORDERS_PATH + "/" + workOrderId + "/estimate")
-            .then()
-                    .statusCode(422)
-                    .extract().response());
-            assertEquals("WORK_ORDER_LOCKED", error.code());
-        }
     }
 
     @Nested
@@ -578,7 +555,7 @@ class WorkOrderControllerIT {
 
             assertEquals(EstimateStatus.APPROVED, approved.status());
             assertNotNull(approved.approvedAt());
-            assertEquals(WorkOrderStatus.APPROVED, getWorkOrder(workOrderId).status());
+            assertEquals(WorkOrderStatus.IN_PROGRESS, getWorkOrder(workOrderId).status());
         }
 
         @Test
@@ -651,22 +628,6 @@ class WorkOrderControllerIT {
                     .statusCode(400);
         }
 
-        @Test
-        @DisplayName("deve retornar 422 quando a ordem está cancelada")
-        void shouldReturn422WhenWorkOrderLocked() {
-            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
-            updateStatus(workOrderId, WorkOrderStatus.CANCELLED);
-
-            ApiErrorResponseDto error = extractError(given()
-                    .contentType("application/json")
-                    .body("{\"description\":\"Alinhamento\",\"price\":80.00}")
-            .when()
-                    .post(WORK_ORDERS_PATH + "/" + workOrderId + "/services")
-            .then()
-                    .statusCode(422)
-                    .extract().response());
-            assertEquals("WORK_ORDER_LOCKED", error.code());
-        }
     }
 
     @Nested
@@ -770,8 +731,8 @@ class WorkOrderControllerIT {
         }
 
         @Test
-        @DisplayName("deve recusar o orçamento e retornar a OS para diagnóstico")
-        void shouldRejectEstimateAndReturnToDiagnosis() {
+        @DisplayName("deve recusar o orçamento, concluir a OS e registrar o cancelamento")
+        void shouldRejectEstimateAndCompleteWorkOrder() {
             UUID partId = seedPart(new BigDecimal("50.00"));
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
             updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
@@ -781,25 +742,10 @@ class WorkOrderControllerIT {
             EstimateResponseDto rejected = rejectEstimate(workOrderId, estimate.estimateId());
 
             assertEquals(EstimateStatus.REJECTED, rejected.status());
-            assertEquals(WorkOrderStatus.DIAGNOSIS, getWorkOrder(workOrderId).status());
-        }
-
-        @Test
-        @DisplayName("deve dar baixa no estoque ao aprovar e restaurar ao cancelar")
-        void shouldDecreaseStockOnApprovalAndRestoreOnCancel() {
-            UUID partId = seedPart(new BigDecimal("50.00"));
-            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
-            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
-            updateStatus(workOrderId, WorkOrderStatus.WAITING_APPROVAL);
-            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 3);
-
-            assertEquals(100, stockOf(partId));
-
-            approveEstimate(workOrderId, estimate.estimateId());
-            assertEquals(97, stockOf(partId));
-
-            updateStatus(workOrderId, WorkOrderStatus.CANCELLED);
-            assertEquals(100, stockOf(partId));
+            WorkOrderResponseDto workOrder = getWorkOrder(workOrderId);
+            assertEquals(WorkOrderStatus.COMPLETED, workOrder.status());
+            assertNotNull(workOrder.closedAt());
+            assertNotNull(workOrder.cancelledAt());
         }
 
         @Test
@@ -853,7 +799,7 @@ class WorkOrderControllerIT {
                     .extract().as(EstimateResponseDto.class);
 
             assertEquals(EstimateStatus.APPROVED, approved.status());
-            assertEquals(WorkOrderStatus.APPROVED, getWorkOrder(workOrderId).status());
+            assertEquals(WorkOrderStatus.IN_PROGRESS, getWorkOrder(workOrderId).status());
         }
     }
 

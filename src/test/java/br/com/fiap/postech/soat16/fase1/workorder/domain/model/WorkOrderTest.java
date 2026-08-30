@@ -120,16 +120,16 @@ class WorkOrderTest {
             WorkOrder order = workOrder(UUID.randomUUID(), WorkOrderStatus.RECEIVED);
 
             assertThrows(InvalidWorkOrderStatusTransitionException.class,
-                    () -> order.transitionTo(WorkOrderStatus.APPROVED, true, CHANGED_AT));
+                    () -> order.transitionTo(WorkOrderStatus.IN_PROGRESS, true, CHANGED_AT));
         }
 
         @Test
-        @DisplayName("requires an approved estimate before approval or execution")
+        @DisplayName("requires an approved estimate before execution")
         void requiresApprovedEstimate() {
             WorkOrder order = workOrder(UUID.randomUUID(), WorkOrderStatus.WAITING_APPROVAL);
 
             assertThrows(EstimateNotApprovedException.class,
-                    () -> order.transitionTo(WorkOrderStatus.APPROVED, false, CHANGED_AT));
+                    () -> order.transitionTo(WorkOrderStatus.IN_PROGRESS, false, CHANGED_AT));
         }
 
         @Test
@@ -147,7 +147,7 @@ class WorkOrderTest {
             WorkOrder order = workOrder(UUID.randomUUID(), WorkOrderStatus.DELIVERED);
 
             assertThrows(WorkOrderLockedException.class,
-                    () -> order.transitionTo(WorkOrderStatus.CANCELLED, false, CHANGED_AT));
+                    () -> order.transitionTo(WorkOrderStatus.DIAGNOSIS, false, CHANGED_AT));
         }
     }
 
@@ -171,7 +171,7 @@ class WorkOrderTest {
         }
 
         @Test
-        @DisplayName("approval advances a waiting work order")
+        @DisplayName("approval advances a waiting work order to execution")
         void registersApproval() {
             WorkOrder order = workOrder(UUID.randomUUID(), WorkOrderStatus.WAITING_APPROVAL);
             Estimate estimate = estimate(order, "175.00");
@@ -179,19 +179,21 @@ class WorkOrderTest {
 
             var history = order.registerEstimateApproval(estimate, CHANGED_AT);
 
-            assertEquals(WorkOrderStatus.APPROVED, order.getStatus());
+            assertEquals(WorkOrderStatus.IN_PROGRESS, order.getStatus());
             assertTrue(history.isPresent());
             assertTrue(order.hasReservedStock());
         }
 
         @Test
-        @DisplayName("rejection returns a waiting work order to diagnosis")
+        @DisplayName("rejection completes a waiting work order and records cancellation time")
         void registersRejection() {
             WorkOrder order = workOrder(UUID.randomUUID(), WorkOrderStatus.WAITING_APPROVAL);
 
             var history = order.registerEstimateRejection(CHANGED_AT);
 
-            assertEquals(WorkOrderStatus.DIAGNOSIS, order.getStatus());
+            assertEquals(WorkOrderStatus.COMPLETED, order.getStatus());
+            assertEquals(CHANGED_AT, order.getClosedAt());
+            assertEquals(CHANGED_AT, order.getCancelledAt());
             assertTrue(history.isPresent());
         }
     }
