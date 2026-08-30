@@ -21,6 +21,11 @@ TERRAFORM_DIR="$REPO_ROOT/infra/terraform"
 CONFIGMAP_FILE="$REPO_ROOT/k8s/configmap.yaml"
 JWT_DIR="${1:-$REPO_ROOT/.local-jwt}"
 
+ENV_SECRET="oficina-mecanica-env"
+JWT_SECRET="oficina-mecanica-jwt"
+PRIVATE_PEM="privateKey.pem"
+PUBLIC_PEM="publicKey.pem"
+
 for tool in kubectl terraform; do
     command -v "$tool" >/dev/null || { echo "$tool não encontrado" >&2; exit 1; }
 done
@@ -41,10 +46,11 @@ DATABASE_PASSWORD="$(terraform -chdir="$TERRAFORM_DIR" output -raw database_pass
 # O endereço do banco é configuração não sensível e por isso mora no ConfigMap, que é
 # versionado. Recriar a instância troca esse endereço, e o sintoma seria um pod que
 # nunca fica pronto — comparar aqui transforma isso numa mensagem de erro.
-if ! grep -q "INFRA_HOST_POSTGRES: *$DATABASE_HOST" "$CONFIGMAP_FILE"; then
+CONFIGURED_HOST="$(sed -n 's/^ *INFRA_HOST_POSTGRES: *//p' "$CONFIGMAP_FILE")"
+if [[ "$CONFIGURED_HOST" != "$DATABASE_HOST" ]]; then
     echo "O ConfigMap não aponta para o banco atual." >&2
     echo "  Terraform: $DATABASE_HOST" >&2
-    echo "  ConfigMap: $(grep 'INFRA_HOST_POSTGRES:' "$CONFIGMAP_FILE" | sed 's/.*: *//')" >&2
+    echo "  ConfigMap: $CONFIGURED_HOST" >&2
     echo "Atualize INFRA_HOST_POSTGRES em k8s/configmap.yaml e rode de novo." >&2
     exit 1
 fi
@@ -54,11 +60,11 @@ JWT_WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$JWT_WORK_DIR"' EXIT
 
 if [[ -n "${JWT_PRIVATE_KEY_B64:-}" && -n "${JWT_PUBLIC_KEY_B64:-}" ]]; then
-    base64 --decode <<<"$JWT_PRIVATE_KEY_B64" >"$JWT_WORK_DIR/privateKey.pem"
-    base64 --decode <<<"$JWT_PUBLIC_KEY_B64" >"$JWT_WORK_DIR/publicKey.pem"
+    base64 --decode <<<"$JWT_PRIVATE_KEY_B64" >"$JWT_WORK_DIR/$PRIVATE_PEM"
+    base64 --decode <<<"$JWT_PUBLIC_KEY_B64" >"$JWT_WORK_DIR/$PUBLIC_PEM"
     echo "Par RS256 lido das variáveis de ambiente."
-elif [[ -s "$JWT_DIR/privateKey.pem" && -s "$JWT_DIR/publicKey.pem" ]]; then
-    cp "$JWT_DIR/privateKey.pem" "$JWT_DIR/publicKey.pem" "$JWT_WORK_DIR/"
+elif [[ -s "$JWT_DIR/$PRIVATE_PEM" && -s "$JWT_DIR/$PUBLIC_PEM" ]]; then
+    cp "$JWT_DIR/$PRIVATE_PEM" "$JWT_DIR/$PUBLIC_PEM" "$JWT_WORK_DIR/"
     echo "Par RS256 lido de $JWT_DIR."
 else
     echo "Par RS256 não encontrado." >&2
@@ -69,16 +75,16 @@ fi
 
 # `kubectl create` sozinho falha quando o objeto já existe; passar por --dry-run=client
 # e aplicar é o que torna a reexecução possível.
-kubectl create secret generic oficina-mecanica-env \
+kubectl create secret generic "$ENV_SECRET" \
     --from-literal=POSTGRES_USERNAME="$DATABASE_USERNAME" \
     --from-literal=POSTGRES_PASSWORD="$DATABASE_PASSWORD" \
     --from-literal=APP_SEED_ADMIN_PASSWORD="$APP_SEED_ADMIN_PASSWORD" \
     --from-literal=APP_SEED_MECHANIC_PASSWORD="$APP_SEED_MECHANIC_PASSWORD" \
     --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl create secret generic oficina-mecanica-jwt \
-    --from-file=privateKey.pem="$JWT_WORK_DIR/privateKey.pem" \
-    --from-file=publicKey.pem="$JWT_WORK_DIR/publicKey.pem" \
+kubectl create secret generic "$JWT_SECRET" \
+    --from-file="$PRIVATE_PEM=$JWT_WORK_DIR/$PRIVATE_PEM" \
+    --from-file="$PUBLIC_PEM=$JWT_WORK_DIR/$PUBLIC_PEM" \
     --dry-run=client -o yaml | kubectl apply -f -
 
-echo "oficina-mecanica-env e oficina-mecanica-jwt aplicados."
+echo "$ENV_SECRET e $JWT_SECRET aplicados."

@@ -2,8 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: oficina-mecanica
-  labels:
-    app.kubernetes.io/name: oficina-mecanica
 spec:
   # Uma réplica no primeiro deploy é o que deixa o Flyway migrar sem concorrência. O
   # HPA passa a mandar no número de réplicas depois (#35), e o lock da tabela de

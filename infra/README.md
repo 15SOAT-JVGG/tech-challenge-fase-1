@@ -138,6 +138,14 @@ privada não entram no repositório. `infra/scripts/create-app-credentials.sh` o
 outputs do Terraform e do par RS256, e recusa a execução se o `ConfigMap` apontar para um banco
 diferente do que o Terraform conhece.
 
+Dois valores nos manifestos dependem da conta e do apply, e precisam bater com o que o Terraform
+produziu. Numa conta nova, ajuste os dois antes do primeiro deploy:
+
+| Onde | Chave | De onde vem |
+|---|---|---|
+| `k8s/configmap.yaml` | `INFRA_HOST_POSTGRES` | `terraform -chdir=infra/terraform output -raw database_host` |
+| `k8s/kustomization.yaml` | `images[0].newName` | `terraform -chdir=infra/terraform output -raw ecr_repository_url` |
+
 ```bash
 # Uma vez: gera o par RS256 fora do build da imagem.
 infra/scripts/generate-jwt-pair.sh
@@ -147,13 +155,16 @@ infra/scripts/create-app-credentials.sh
 
 infra/scripts/publish-image.sh
 kubectl apply -k k8s/
+# A tag versionada é `latest`, então o apply sozinho não muda o pod: é o restart que
+# faz o Kubernetes buscar a imagem recém-publicada.
+kubectl rollout restart deploy/oficina-mecanica
 kubectl rollout status deploy/oficina-mecanica
 ```
 
-O endereço público sai do `Service`; o ELB leva um minuto para começar a responder:
+O endereço público sai do `Service`; o ELB leva cerca de um minuto para começar a responder:
 
 ```bash
-kubectl get svc oficina-mecanica -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+ELB="$(kubectl get svc oficina-mecanica -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
 curl "http://$ELB/q/health/ready"
 ```
 

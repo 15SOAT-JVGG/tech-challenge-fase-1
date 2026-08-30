@@ -4,15 +4,17 @@ metadata:
   name: oficina-mecanica-config
 data:
   # Endereço do RDS. Sai de `terraform -chdir=infra/terraform output -raw database_host`
-  # e muda se a instância for recriada; infra/scripts/create-app-secrets.sh compara os
-  # dois valores e recusa o deploy quando divergem.
+  # e muda se a instância for recriada; infra/scripts/create-app-credentials.sh compara
+  # os dois valores e recusa o deploy quando divergem.
   INFRA_HOST_POSTGRES: oficina-mecanica-db.ct7ua73ac1o4.us-east-1.rds.amazonaws.com
   POSTGRES_DB: oficina
 
-  # O RDS recusa conexão sem criptografia. `require` cifra o transporte sem validar o
-  # certificado do servidor, o que dispensa embarcar o bundle de CA da AWS na imagem —
-  # o tráfego não sai da VPC e o banco não é alcançável de fora dela.
+  # O RDS recusa conexão sem criptografia. As duas variáveis andam juntas: `require`
+  # cifra o transporte, e sem confiar na cadeia o cliente reativo aborta o handshake,
+  # porque a CA da AWS não está no truststore da JVM. Isso dispensa embarcar o bundle
+  # de CA na imagem — o tráfego não sai da VPC e o banco não é alcançável de fora dela.
   POSTGRES_SSLMODE: require
+  POSTGRES_TRUST_ALL: "true"
 
   QUARKUS_HTTP_PORT: "8080"
 

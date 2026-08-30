@@ -6,17 +6,22 @@ resources:
   - deployment.yaml
   - service.yaml
 
-# Os dois Secrets referenciados pelo Deployment (oficina-mecanica-env e
-# oficina-mecanica-jwt) não estão aqui de propósito: senha do banco, credenciais de
-# seed e chave privada não entram no repositório. Eles são criados por
-# infra/scripts/create-app-credentials.sh, que os monta a partir dos outputs do
-# Terraform e dos secrets do repositório.
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: oficina-mecanica
+
+# Os Secrets que o Deployment consome não estão aqui. O porquê e como criá-los estão
+# em infra/README.md, na seção "Implantando a aplicação".
 
 images:
   - name: oficina-mecanica
     # Sai de `terraform -chdir=infra/terraform output -raw ecr_repository_url`. Em
     # outra conta o ID muda, como no bucket de state em infra/terraform/versions.tf.
     newName: 059056506203.dkr.ecr.us-east-1.amazonaws.com/oficina-mecanica
-    # O deploy sobrescreve com o SHA do commit, para que o rollout seja sempre uma
-    # mudança real de imagem: `kustomize edit set image oficina-mecanica=...:$SHA`.
+    # `latest` é o que faz `kubectl apply -k k8s/` funcionar num checkout limpo, e é
+    # por isso que o Deployment pede imagePullPolicy: Always. Como a tag não muda, o
+    # apply sozinho não dispara rollout — o caminho manual fecha com um
+    # `kubectl rollout restart`. A pipeline (#36) troca por `:$SHA`, e aí o rollout
+    # vem do próprio apply.
     newTag: latest
