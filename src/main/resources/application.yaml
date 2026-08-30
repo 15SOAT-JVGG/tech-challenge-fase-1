@@ -18,13 +18,22 @@ quarkus:
   devservices:
     enabled: false
 
+  # POSTGRES_SSLMODE controla a criptografia do transporte. O default `disable` serve o
+  # Postgres local do docker compose, que não fala TLS. O RDS recusa conexão em claro
+  # (rds.force_ssl é padrão no Postgres 16), então lá o ConfigMap manda `require`.
   datasource:
     username: ${POSTGRES_USERNAME:admin}
     password: ${POSTGRES_PASSWORD:changeme}
     jdbc:
-      url: jdbc:postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?currentSchema=oficina_mecanica
+      url: jdbc:postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?currentSchema=oficina_mecanica&sslmode=${POSTGRES_SSLMODE:disable}
     reactive:
-      url: postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?search_path=oficina_mecanica
+      url: postgresql://${INFRA_HOST_POSTGRES:localhost}/${POSTGRES_DB:oficina}?search_path=oficina_mecanica&sslmode=${POSTGRES_SSLMODE:disable}
+      # Acompanha POSTGRES_SSLMODE: sem isto o cliente reativo valida a cadeia do
+      # certificado e o handshake com o RDS falha, porque a CA da AWS não está no
+      # truststore da JVM. Equipara o comportamento ao do JDBC, cujo `sslmode=require`
+      # também cifra sem validar. O default `false` mantém a validação ligada para
+      # quem apontar a aplicação a um servidor com certificado confiável.
+      trust-all: ${POSTGRES_TRUST_ALL:false}
 
   hibernate-orm:
     physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy

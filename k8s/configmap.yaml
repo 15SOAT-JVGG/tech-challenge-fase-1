@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oficina-mecanica-config
+data:
+  # Endereço do RDS. Sai de `terraform -chdir=infra/terraform output -raw database_host`
+  # e muda se a instância for recriada; infra/scripts/create-app-credentials.sh compara
+  # os dois valores e recusa o deploy quando divergem.
+  INFRA_HOST_POSTGRES: oficina-mecanica-db.ct7ua73ac1o4.us-east-1.rds.amazonaws.com
+  POSTGRES_DB: oficina
+
+  # O RDS recusa conexão sem criptografia. As duas variáveis andam juntas: `require`
+  # cifra o transporte, e sem confiar na cadeia o cliente reativo aborta o handshake,
+  # porque a CA da AWS não está no truststore da JVM. Isso dispensa embarcar o bundle
+  # de CA na imagem — o tráfego não sai da VPC e o banco não é alcançável de fora dela.
+  POSTGRES_SSLMODE: require
+  POSTGRES_TRUST_ALL: "true"
+
+  QUARKUS_HTTP_PORT: "8080"
+
+  JWT_ISSUER: oficina-api
+  JWT_EXPIRATION_HOURS: "8"
+
+  # O par RS256 chega por Secret montado em /etc/jwt. Qualquer caminho diferente do
+  # default de desenvolvimento também é o que satisfaz o JwtKeyStartupGuard.
+  JWT_PRIVATE_KEY_LOCATION: file:/etc/jwt/privateKey.pem
+  JWT_PUBLIC_KEY_LOCATION: file:/etc/jwt/publicKey.pem
+
+  APP_SEED_ADMIN_USERNAME: admin
+  APP_SEED_MECHANIC_USERNAME: mecanico
+
+  # Ligado de propósito: este ambiente existe para ser demonstrado e avaliado, e o
+  # Swagger UI é a porta de entrada da banca. Num ambiente real vale `false`, como diz
+  # o comentário em application.yaml — expor a superfície da API é risco desnecessário.
+  SWAGGER_UI_ENABLED: "true"

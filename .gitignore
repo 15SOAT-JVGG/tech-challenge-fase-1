@@ -49,6 +49,17 @@ nb-configuration.xml
 # Par RS256 do ambiente local, gerado por infra/scripts/generate-jwt-pair.sh
 .local-jwt/
 
+# Terraform: plugins baixados, state local e planos salvos. O state real vive no S3,
+# e o .terraform.lock.hcl é versionado de propósito.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+*.tfvars
+*.tfvars.json
+crash.log
+
 # Relatório gerado pelo infra/scripts/verify-lab.sh: vale apenas para a sessão do lab em
 # que foi coletado, então versioná-lo só produziria um registro desatualizado
 lab-capabilities*.md
