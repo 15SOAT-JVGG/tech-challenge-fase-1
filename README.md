@@ -32,6 +32,7 @@ Terraform**, com **Postgres gerenciado no RDS**, exposição por **Load Balancer
 - [Collection das APIs](#collection-das-apis)
 - [Vídeo demonstrativo](#vídeo-demonstrativo)
 - [Testes automatizados e cobertura](#testes-automatizados-e-cobertura)
+- [Build](#build)
 - [Análise estática e segurança](#análise-estática-e-segurança)
 - [Documentação e decisões](#documentação-e-decisões)
 
@@ -98,23 +99,28 @@ flowchart LR
 
     subgraph aplicacao["Aplicação Quarkus"]
         rest["adapter/in/rest<br/>controllers · DTOs · OpenAPI"]
-        seguranca["adapter/out/security<br/>SmallRye JWT RS256 · RBAC"]
-        casos["application<br/>services · commands · results · ports"]
+        casos["application<br/>services · commands · results"]
         dominio["domain<br/>WorkOrder · Estimate · Customer · Vehicle<br/>Part · ServiceItem · Worker"]
+        portas["application/port/out<br/>as interfaces que a aplicação exige"]
         persistencia["adapter/out/persistence<br/>Hibernate Reactive + Panache"]
+        seguranca["adapter/out/security<br/>JWT RS256 · hash de senha"]
     end
 
     banco[("PostgreSQL 16<br/>schema oficina_mecanica<br/>migrations Flyway")]
 
     operacao --> rest
     cliente --> rest
-    rest --> seguranca
     rest --> casos
     casos --> dominio
-    casos --> persistencia
+    casos --> portas
+    persistencia -. "implementa" .-> portas
+    seguranca -. "implementa" .-> portas
     persistencia --> dominio
     persistencia --> banco
 ```
+
+As setas cheias são dependência em tempo de compilação; as pontilhadas, implementação. Note que
+nenhuma sai do `domain`: é isso que o mantém livre de framework e testável sem infraestrutura.
 
 Contextos: `auth`, `customer`, `part`, `servicecatalog`, `vehicle`, `worker`, `workorder`, mais o
 `shared` com os utilitários transversais. As regras de dependência entre camadas não são convenção de
@@ -170,9 +176,11 @@ O detalhe de cada recurso, das restrições da conta e do que fazer quando o lab
 
 ### Fluxo de deploy
 
-Três workflows, com responsabilidades separadas: qualidade no pull request, provisionamento por
-disparo manual e entrega no merge. A divisão está registrada em
-[ADR-0003](docs/adr/0003-pipeline-dividida-entre-provisionamento-e-entrega.md).
+Três workflows cobrem o caminho do código, com responsabilidades separadas: qualidade no pull
+request, provisionamento por disparo manual e entrega no merge. A divisão está registrada em
+[ADR-0003](docs/adr/0003-pipeline-dividida-entre-provisionamento-e-entrega.md). Um quarto,
+`pr-title-lint.yml`, fica fora do desenho porque não toca em build nem em ambiente: só valida o
+título do pull request contra Conventional Commits.
 
 ```mermaid
 flowchart TB
@@ -360,6 +368,14 @@ fica órfão na conta — ele não está no state.
 O mesmo Terraform também roda pelo GitHub Actions, no workflow **Workflow Infra**
 (`.github/workflows/infra.yml`), com disparo **manual** e as ações `plan` (default) e `apply`. Nenhum
 merge inicia vinte minutos de convergência de control plane por acidente.
+
+Os comandos acima valem para qualquer conta. Região, nome do projeto, versão do cluster, tamanho do
+node group e classe do banco são **variáveis** do Terraform, todas com default — `aws_region` é
+`us-east-1`. Para provisionar em outra região, passe `-var aws_region=...` ou ajuste o default, e
+confira antes quais AZs daquela região ofertam a instância dos nós, porque é esse filtro que decide
+as subnets. O que está fixo no código e precisa ser editado à mão numa conta nova são três valores: o
+nome do bucket no bloco `backend` de `versions.tf` e os dois da tabela em
+[Implantando no cluster](#implantando-no-cluster).
 
 Variáveis, saídas, o que fazer quando o lab é reiniciado e como acessar o banco criado:
 [`infra/README.md`](infra/README.md).
@@ -723,6 +739,23 @@ infraestrutura.
 
 ---
 
+## Build
+
+Para o cluster, quem constrói a imagem é `infra/scripts/publish-image.sh` (ou o caminho de entrega).
+Fora dele, direto do Maven:
+
+```shell
+# JAR
+./mvnw package
+java -jar target/quarkus-app/quarkus-run.jar
+
+# Nativo (GraalVM ou container)
+./mvnw package -Dnative
+./mvnw package -Dnative -Dquarkus.native.container-build=true
+```
+
+---
+
 ## Análise estática e segurança
 
 `./mvnw verify` executa Spotless, Checkstyle, PMD, SpotBugs e JaCoCo.
@@ -731,7 +764,8 @@ A esteira de CI (`.github/workflows/ci.yml`) adiciona, a cada pull request: **Gi
 **Semgrep** (SAST), **OWASP Dependency-Check** (SCA, reprovando em CVSS >= 8), **SonarQube** (quality
 gate) e a **validação de IaC** — `terraform fmt` e `validate` com `-backend=false`, mais
 `kubectl kustomize` e `kubeconform -strict` nos manifestos de `k8s/`. O resultado consolidado está em
-[docs/RELATORIO-VULNERABILIDADES.md](docs/RELATORIO-VULNERABILIDADES.md).
+[docs/RELATORIO-VULNERABILIDADES.md](docs/RELATORIO-VULNERABILIDADES.md), e o relatório bruto de
+dependências em `dependency-check-report.zip`.
 
 Postura do ambiente implantado: container **non-root** sem escalonamento de privilégio e com todas as
 capabilities removidas; banco **sem acesso público**, alcançável apenas pelo security group dos nós;
