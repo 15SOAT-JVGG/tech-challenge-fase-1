@@ -1,6 +1,6 @@
 # Collection Postman — Oficina Mecânica API (E2E)
 
-`Oficina-Mecanica-E2E.postman_collection.json` reúne 97 requisições em 10 pastas, executadas em ordem:
+`Oficina-Mecanica-E2E.postman_collection.json` reúne 99 requisições em 10 pastas, executadas em ordem:
 
 | Pasta | Cobertura |
 |---|---|
@@ -10,7 +10,7 @@
 | 03 - Workers | CRUD (ADMIN-only), login de worker (não gera JWT — só valida credenciais) |
 | 04 - Parts and Supplies | CRUD, ajuste de estoque, low-stock, RBAC (mutação só ADMIN) |
 | 05 - Service Catalog | CRUD, RBAC (mutação só ADMIN) |
-| 06 - Work Orders - Happy Path | Ciclo completo: RECEIVED → DIAGNOSIS → orçamento → aprovação → IN_PROGRESS → fechamento → DELIVERED, métricas |
+| 06 - Work Orders - Happy Path | Abertura com solicitação inicial (orçamento pendente atômico) e ciclo completo: RECEIVED → DIAGNOSIS → orçamento → aprovação → IN_PROGRESS → fechamento → DELIVERED, métricas |
 | 07 - Ordens de Serviço - Canal Público | Acompanhamento e aprovação de orçamento pelo canal público (sem auth) |
 | 08 - Ordens de Serviço - Recusa de Orçamento e Bloqueio | Recusa de orçamento conclui a OS com `cancelledAt` e bloqueia novas mutações com `WORK_ORDER_LOCKED` |
 | 09 - Cross-cutting Security | 401 sem token, 404 para recurso inexistente |
@@ -46,4 +46,5 @@ docker run --rm --network=tech-challenge_oficina_mecanica_net \
 
 - A collection é auto-contida: tokens e ids são gerados e propagados via variáveis de coleção (CPF e placa válidos são gerados dinamicamente nos pre-request scripts).
 - Pode ser executada repetidamente sem reset do banco — usa dados aleatórios e CPFs/placas únicos a cada run.
-- `List Work Orders (capture id)` busca a OS recém-criada filtrando por `description` (os endpoints de criação de Customer/Vehicle/Worker/WorkOrder não retornam corpo), com `size=100`. Em bases com muitas OS acumuladas de runs antigos, isso pode falhar — nesse caso, considere limpar o banco antes de rodar.
+- A abertura de OS devolve o id no corpo do `201`, então as requisições de criação capturam `work_order_id` direto da resposta. As requisições de listagem apenas conferem que a OS recém-aberta aparece na fila, filtrando por `description` com `size=100`. Em bases com muitas OS acumuladas de runs antigos, essa conferência pode falhar — nesse caso, considere limpar o banco antes de rodar.
+- Os endpoints de criação de Customer/Vehicle/Worker continuam sem corpo de resposta: os ids são capturados pelas buscas por documento/placa/login.

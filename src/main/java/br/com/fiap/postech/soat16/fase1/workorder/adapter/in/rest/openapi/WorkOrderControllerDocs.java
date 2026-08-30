@@ -31,6 +31,7 @@ import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.Wo
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.WorkOrderServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.WorkOrderStatusUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.OpenedWorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderServiceResponseDto;
@@ -74,13 +75,17 @@ public interface WorkOrderControllerDocs {
 
     @POST
     @Operation(summary = "Open work order",
-            description = "Creates a new work order. Initial status is RECEIVED, default priority is MEDIUM, "
-                    + "openedAt is set automatically.")
-    @APIResponse(responseCode = "201", description = "Work order created successfully")
+            description = "Creates a new work order for an existing customer and vehicle. Initial status is "
+                    + "RECEIVED, default priority is MEDIUM, openedAt is set automatically. When the initial "
+                    + "request carries catalog services or parts, the matching pending estimate is created in "
+                    + "the same transaction, with prices snapshotted from the catalog.")
+    @APIResponse(responseCode = "201", description = "Work order opened successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = OpenedWorkOrderResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid request body")
-    @APIResponse(responseCode = "404", description = "Customer or vehicle not found")
+    @APIResponse(responseCode = "404", description = "Customer, vehicle, worker, service item or part not found")
     Uni<Response> create(
-            @RequestBody(description = "Work order data for opening")
+            @RequestBody(description = "Work order data for opening, including the initial service and part request")
             @Valid WorkOrderRequestDto body);
 
     @PATCH

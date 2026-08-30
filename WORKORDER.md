@@ -49,8 +49,11 @@ dentro da mesma prioridade, pelas mais recentes primeiro.
 
 ## Regras de orçamento (Estimate)
 
+- O orçamento inicial nasce junto da OS quando a abertura traz `services` ou `parts`, com status
+  `PENDING` e sem `sentAt` — ele só é enviado ao cliente mais adiante no ciclo.
 - `EstimateItem.totalPrice = quantity * unitPrice`. Se `unitPrice` não for informado na requisição,
-  o valor unitário da peça no catálogo (`Part.unitPrice`) é usado.
+  o valor unitário da peça no catálogo (`Part.unitPrice`) é usado. Na abertura o preço é sempre o do
+  catálogo, copiado como snapshot.
 - `Estimate.totalAmount` é a soma do `totalPrice` de todos os itens.
 - Ao **aprovar** um orçamento (`PATCH /estimate/{estimateId}/approve`):
   - `WorkOrder.estimatedValue` recebe o `totalAmount` do orçamento aprovado.
@@ -68,7 +71,7 @@ dentro da mesma prioridade, pelas mais recentes primeiro.
 
 | Método | Caminho | Descrição |
 |---|---|---|
-| `POST` | `/v1/work-orders` | Abre uma nova ordem de serviço. |
+| `POST` | `/v1/work-orders` | Abre uma nova ordem de serviço e, junto dela, o orçamento pendente da solicitação inicial. |
 | `GET` | `/v1/work-orders/{id}` | Busca uma ordem por id. |
 | `GET` | `/v1/work-orders` | Lista ordens, paginado e ordenado por prioridade. |
 | `PATCH` | `/v1/work-orders/{id}/status` | Avança o status da ordem (exceto para `COMPLETED`). |
@@ -94,12 +97,34 @@ curl -s -X POST http://localhost:8080/v1/work-orders \
         "vehicleId": "<vehicle-uuid>",
         "description": "Revisão dos 10.000km",
         "priority": "HIGH",
-        "assignedWorkerId": "<worker-uuid>"
+        "assignedWorkerId": "<worker-uuid>",
+        "services": [{"serviceItemId": "<service-item-uuid>"}],
+        "parts": [{"partId": "<part-uuid>", "quantity": 2}]
       }'
 ```
 
 A ordem é criada com `status = RECEIVED`, `openedAt` preenchido automaticamente. `priority` é opcional —
 se omitido, assume `MEDIUM`. `assignedWorkerId` — identifica o mecânico responsável pela OS.
+
+`services` e `parts` formam a **solicitação inicial** e são opcionais. Quando qualquer um deles vem
+preenchido, a mesma transação cria a OS e o orçamento pendente correspondente: os serviços viram
+linhas de mão de obra com o `basePrice` do catálogo e as peças viram itens do orçamento com o
+`unitPrice` do catálogo. Como os preços são copiados na abertura, uma atualização posterior do
+catálogo não altera o orçamento já emitido. Uma referência inválida (cliente, veículo, mecânico,
+item de serviço ou peça) faz a requisição inteira falhar sem deixar dados parciais.
+
+A resposta `201` traz a ordem aberta e o orçamento inicial, além do cabeçalho `Location` apontando
+para a nova OS:
+
+```json
+{
+  "workOrder": {"workOrderId": "...", "status": "RECEIVED", "estimatedValue": 270.00},
+  "estimate": {"estimateId": "...", "status": "PENDING", "partsAmount": 150.00,
+               "laborAmount": 120.00, "totalAmount": 270.00, "items": []}
+}
+```
+
+`estimate` vem `null` quando a abertura não traz solicitação inicial.
 
 ### 2. Avançar para diagnóstico
 
@@ -212,6 +237,10 @@ como `Classe.método`; todas vivem dentro de uma classe `@Nested` com o mesmo no
 | Regra de negócio | Integração (`WorkOrderControllerIT`) | Unitário (`WorkOrderServiceTest`) |
 |---|---|---|
 | Ordem nasce em `RECEIVED`, `openedAt` automático | `FullLifecycle.shouldCompleteFullLifecycle`, `Create.shouldCreateWorkOrder` | `Create.shouldPersistWorkOrder...` |
+| Abertura devolve a identificação da OS no corpo e no `Location` | `Create.shouldReturnCreatedWorkOrderIdentification` | `WorkOrderControllerTest.Create.shouldReturn201WhenCreateSucceeds` |
+| Solicitação inicial abre OS e orçamento pendente na mesma transação | `Create.shouldOpenWorkOrderWithInitialPendingEstimate` | `Create.shouldCreatePendingEstimateFromInitialRequest` |
+| Preços do orçamento são snapshot do catálogo | `Create.shouldKeepEstimatePricesAfterCatalogUpdate` | `Create.shouldSnapshotServicePrice` |
+| Item de serviço ou peça inválido na abertura → 404 sem dados parciais | `Create.shouldReturn404WhenServiceItemNotFound` / `...RequestedPartNotFound` | `Create.shouldThrowWhenRequestedServiceItemMissing` / `...RequestedPartMissing` |
 | Cliente/veículo inexistente ao criar → 404 | `Create.shouldReturn404WhenCustomerNotFound` / `...VehicleNotFound` | `Create.shouldThrow...NotFoundException` |
 | Não é permitido pular etapas (ex.: `RECEIVED` → `IN_PROGRESS` direto) | `UpdateStatus.shouldRejectSkippingCanonicalStages` | `UpdateStatus.shouldRejectSkippingStages` |
 | `COMPLETED` só via `/close`, nunca pelo `/status` | `UpdateStatus.shouldRejectCompletedViaGenericEndpoint` | `UpdateStatus.shouldRejectJumpingDirectlyToCompleted` |

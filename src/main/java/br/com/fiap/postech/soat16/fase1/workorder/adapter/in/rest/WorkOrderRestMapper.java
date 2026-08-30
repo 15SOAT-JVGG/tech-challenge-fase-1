@@ -1,14 +1,19 @@
 package br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest;
 
+import java.util.List;
+
 import br.com.fiap.postech.soat16.fase1.shared.adapter.in.rest.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.shared.application.result.PagedResult;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.EstimateRequestDto;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.InitialPartRequestDto;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.InitialServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.WorkOrderCloseRequestDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.WorkOrderRequestDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.WorkOrderServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.WorkOrderStatusUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.EstimateItemResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.OpenedWorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderServiceResponseDto;
@@ -18,6 +23,7 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.command.CloseWorkO
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.CreateEstimateCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.OpenWorkOrderCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.OpenWorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderMetricsResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
@@ -33,7 +39,23 @@ public final class WorkOrderRestMapper {
                 request.vehicleId(),
                 request.description(),
                 request.priority(),
-                request.assignedWorkerId());
+                request.assignedWorkerId(),
+                toRequestedServices(request.services()),
+                toRequestedParts(request.parts()));
+    }
+
+    private static List<OpenWorkOrderCommand.RequestedService> toRequestedServices(
+            List<InitialServiceRequestDto> services) {
+        return services.stream()
+                .map(service -> new OpenWorkOrderCommand.RequestedService(service.serviceItemId()))
+                .toList();
+    }
+
+    private static List<OpenWorkOrderCommand.RequestedPart> toRequestedParts(
+            List<InitialPartRequestDto> parts) {
+        return parts.stream()
+                .map(part -> new OpenWorkOrderCommand.RequestedPart(part.partId(), part.quantity()))
+                .toList();
     }
 
     public static ChangeWorkOrderStatusCommand toCommand(WorkOrderStatusUpdateRequestDto request) {
@@ -63,6 +85,12 @@ public final class WorkOrderRestMapper {
                 page.page(),
                 page.size(),
                 page.totalElements());
+    }
+
+    public static OpenedWorkOrderResponseDto toResponse(OpenWorkOrderResult result) {
+        return new OpenedWorkOrderResponseDto(
+                toResponse(result.workOrder()),
+                result.estimate() != null ? toResponse(result.estimate()) : null);
     }
 
     public static WorkOrderResponseDto toResponse(WorkOrderResult result) {

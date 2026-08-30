@@ -101,6 +101,8 @@ class WorkOrderServiceTest {
     private static final UUID WORK_ORDER_ID = UUID.randomUUID();
     private static final UUID CUSTOMER_ID = UUID.randomUUID();
     private static final UUID VEHICLE_ID = UUID.randomUUID();
+    private static final UUID SERVICE_ITEM_ID = UUID.randomUUID();
+    private static final UUID PART_ID = UUID.randomUUID();
 
     private WorkOrder entity;
     private WorkOrderResult response;
@@ -171,12 +173,26 @@ class WorkOrderServiceTest {
     @DisplayName("create")
     class Create {
 
+        private OpenWorkOrderCommand openCommand(
+                List<OpenWorkOrderCommand.RequestedService> services,
+                List<OpenWorkOrderCommand.RequestedPart> parts) {
+            return new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null, services, parts);
+        }
+
+        private void givenCustomerAndVehicleExist() {
+            when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(new Customer()));
+            when(catalog.findVehicleById(VEHICLE_ID)).thenReturn(Uni.createFrom().item(new Vehicle()));
+            when(repository.save(any(WorkOrder.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item(
+                            (WorkOrder) invocation.getArgument(0)));
+        }
+
         @Test
         @DisplayName("should persist work order when customer and vehicle exist")
         void shouldPersistWhenCustomerAndVehicleExist() {
             Customer customer = new Customer();
             Vehicle vehicle = new Vehicle();
-            OpenWorkOrderCommand request = new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
+            OpenWorkOrderCommand request = openCommand(List.of(), List.of());
 
             when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
             when(catalog.findVehicleById(VEHICLE_ID)).thenReturn(Uni.createFrom().item(vehicle));
@@ -190,12 +206,112 @@ class WorkOrderServiceTest {
             assertEquals(WorkOrderStatus.RECEIVED, orderCaptor.getValue().getStatus());
             assertEquals(customer, orderCaptor.getValue().getCustomer());
             assertEquals(vehicle, orderCaptor.getValue().getVehicle());
+            verify(estimateRepository, never()).save(any(Estimate.class));
+        }
+
+        @Test
+        @DisplayName("should create the pending estimate from the initial service and part request")
+        void shouldCreatePendingEstimateFromInitialRequest() {
+            givenCustomerAndVehicleExist();
+
+            ServiceItem serviceItem = new ServiceItem();
+            serviceItem.setId(SERVICE_ITEM_ID);
+            serviceItem.setName("Alinhamento");
+            serviceItem.setBasePrice(new BigDecimal("120.00"));
+            Part part = new Part("Filtro", "Filtro", new BigDecimal("50.00"), 10, "UN");
+
+            when(catalog.findServiceItemById(SERVICE_ITEM_ID)).thenReturn(Uni.createFrom().item(serviceItem));
+            when(catalog.findPartById(PART_ID)).thenReturn(Uni.createFrom().item(part));
+            when(serviceRepository.save(any(
+                    br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item(
+                            (br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService)
+                                    invocation.getArgument(0)));
+            when(estimateRepository.save(any(Estimate.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item(
+                            (Estimate) invocation.getArgument(0)));
+
+            OpenWorkOrderCommand request = openCommand(
+                    List.of(new OpenWorkOrderCommand.RequestedService(SERVICE_ITEM_ID)),
+                    List.of(new OpenWorkOrderCommand.RequestedPart(PART_ID, 3)));
+
+            service.create(request).await().indefinitely();
+
+            ArgumentCaptor<Estimate> estimateCaptor = ArgumentCaptor.forClass(Estimate.class);
+            verify(estimateRepository).save(estimateCaptor.capture());
+            Estimate estimate = estimateCaptor.getValue();
+            assertEquals(EstimateStatus.PENDING, estimate.getStatus());
+            assertEquals(0, new BigDecimal("150.00").compareTo(estimate.getPartsAmount()));
+            assertEquals(0, new BigDecimal("120.00").compareTo(estimate.getLaborAmount()));
+            assertEquals(0, new BigDecimal("270.00").compareTo(estimate.getTotalAmount()));
+            assertEquals(0, new BigDecimal("270.00").compareTo(estimate.getWorkOrder().getEstimatedValue()));
+            assertEquals(WorkOrderStatus.RECEIVED, estimate.getWorkOrder().getStatus());
+        }
+
+        @Test
+        @DisplayName("should snapshot the catalog base price on the requested service line")
+        void shouldSnapshotServicePrice() {
+            givenCustomerAndVehicleExist();
+
+            ServiceItem serviceItem = new ServiceItem();
+            serviceItem.setId(SERVICE_ITEM_ID);
+            serviceItem.setName("Alinhamento");
+            serviceItem.setBasePrice(new BigDecimal("120.00"));
+
+            when(catalog.findServiceItemById(SERVICE_ITEM_ID)).thenReturn(Uni.createFrom().item(serviceItem));
+            when(serviceRepository.save(any(
+                    br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item(
+                            (br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService)
+                                    invocation.getArgument(0)));
+            when(estimateRepository.save(any(Estimate.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item(
+                            (Estimate) invocation.getArgument(0)));
+
+            service.create(openCommand(
+                    List.of(new OpenWorkOrderCommand.RequestedService(SERVICE_ITEM_ID)), List.of()))
+                    .await().indefinitely();
+
+            var serviceCaptor = ArgumentCaptor.forClass(
+                    br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService.class);
+            verify(serviceRepository).save(serviceCaptor.capture());
+            assertEquals("Alinhamento", serviceCaptor.getValue().getDescription());
+            assertEquals(0, new BigDecimal("120.00").compareTo(serviceCaptor.getValue().getPrice()));
+            assertEquals(serviceItem, serviceCaptor.getValue().getServiceItem());
+        }
+
+        @Test
+        @DisplayName("should throw ServiceItemNotFoundException and skip the estimate when the item is unknown")
+        void shouldThrowWhenRequestedServiceItemMissing() {
+            givenCustomerAndVehicleExist();
+            when(catalog.findServiceItemById(SERVICE_ITEM_ID)).thenReturn(Uni.createFrom().nullItem());
+
+            OpenWorkOrderCommand request = openCommand(
+                    List.of(new OpenWorkOrderCommand.RequestedService(SERVICE_ITEM_ID)), List.of());
+
+            assertThrows(ServiceItemNotFoundException.class,
+                    () -> service.create(request).await().indefinitely());
+            verify(estimateRepository, never()).save(any(Estimate.class));
+        }
+
+        @Test
+        @DisplayName("should throw EstimatePartNotFoundException and skip the estimate when the part is unknown")
+        void shouldThrowWhenRequestedPartMissing() {
+            givenCustomerAndVehicleExist();
+            when(catalog.findPartById(PART_ID)).thenReturn(Uni.createFrom().nullItem());
+
+            OpenWorkOrderCommand request = openCommand(
+                    List.of(), List.of(new OpenWorkOrderCommand.RequestedPart(PART_ID, 1)));
+
+            assertThrows(EstimatePartNotFoundException.class,
+                    () -> service.create(request).await().indefinitely());
+            verify(estimateRepository, never()).save(any(Estimate.class));
         }
 
         @Test
         @DisplayName("should throw CustomerNotFoundException when customer does not exist")
         void shouldThrowWhenCustomerMissing() {
-            OpenWorkOrderCommand request = new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
+            OpenWorkOrderCommand request = openCommand(List.of(), List.of());
             when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().nullItem());
 
             assertThrows(CustomerNotFoundException.class,
@@ -207,7 +323,7 @@ class WorkOrderServiceTest {
         @DisplayName("should throw VehicleNotFoundException when vehicle does not exist")
         void shouldThrowWhenVehicleMissing() {
             Customer customer = new Customer();
-            OpenWorkOrderCommand request = new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
+            OpenWorkOrderCommand request = openCommand(List.of(), List.of());
 
             when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
             when(catalog.findVehicleById(VEHICLE_ID)).thenReturn(Uni.createFrom().nullItem());

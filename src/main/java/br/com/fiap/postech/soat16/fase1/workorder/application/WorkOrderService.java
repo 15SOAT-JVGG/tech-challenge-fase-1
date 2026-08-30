@@ -31,6 +31,7 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrder
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderServicePersistencePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkshopCatalogPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.OpenWorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderMetricsResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
@@ -46,6 +47,7 @@ import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderSt
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.quarkus.logging.Log;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import lombok.RequiredArgsConstructor;
 
@@ -93,8 +95,14 @@ public class WorkOrderService {
                 .map(mapper::toResult);
     }
 
+    /**
+     * Abre a ordem em RECEIVED e, quando a solicitação inicial traz peças ou serviços, o orçamento
+     * pendente correspondente. A transação única garante que uma referência inválida não deixe
+     * ordem, linhas de serviço ou orçamento pela metade.
+     */
     @WithTransaction
-    public Uni<Void> create(OpenWorkOrderCommand request) {
+    public Uni<OpenWorkOrderResult> create(OpenWorkOrderCommand request) {
+        LocalDateTime openedAt = LocalDateTime.now(ZoneId.systemDefault());
         return catalog.findCustomerById(request.customerId())
                 .onItem().ifNull().failWith(CustomerNotFoundException::new)
                 .flatMap(customer -> catalog.findVehicleById(request.vehicleId())
@@ -106,8 +114,56 @@ public class WorkOrderService {
                                         worker,
                                         request.description(),
                                         request.priority(),
-                                        LocalDateTime.now(ZoneId.systemDefault())))
-                                        .replaceWithVoid())));
+                                        openedAt)))))
+                .flatMap(order -> openInitialEstimate(order, request, openedAt)
+                        .map(estimate -> new OpenWorkOrderResult(
+                                mapper.toResult(order),
+                                estimateMapper.toResult(estimate))));
+    }
+
+    private Uni<Estimate> openInitialEstimate(WorkOrder order, OpenWorkOrderCommand request,
+            LocalDateTime openedAt) {
+        if (!request.hasInitialRequest()) {
+            return Uni.createFrom().nullItem();
+        }
+        return requestServices(order, request.services(), openedAt)
+                .flatMap(services -> requestParts(request.parts())
+                        .flatMap(items -> persistEstimate(order, items, services)))
+                .flatMap(estimate -> persistOrderWithHistory(order, order.registerEstimate(estimate, openedAt))
+                        .replaceWith(estimate));
+    }
+
+    /**
+     * As linhas são gravadas em sequência: a sessão reativa do Hibernate não aceita escritas
+     * concorrentes.
+     */
+    private Uni<List<br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService>> requestServices(
+            WorkOrder order, List<OpenWorkOrderCommand.RequestedService> requested, LocalDateTime openedAt) {
+        return Multi.createFrom().iterable(requested)
+                .onItem().transformToUniAndConcatenate(service -> catalog
+                        .findServiceItemById(service.serviceItemId())
+                        .onItem().ifNull()
+                        .failWith(() -> new ServiceItemNotFoundException(service.serviceItemId()))
+                        .flatMap(serviceItem -> serviceRepository.save(
+                                br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService
+                                        .requestFromCatalog(order, serviceItem, openedAt))))
+                .collect().asList();
+    }
+
+    private Uni<List<EstimateItem>> requestParts(List<OpenWorkOrderCommand.RequestedPart> requested) {
+        if (requested.isEmpty()) {
+            return Uni.createFrom().item(List.of());
+        }
+        List<Uni<EstimateItem>> itemUnis = requested.stream()
+                .map(part -> lookupPart(part.partId())
+                        .map(found -> EstimateItem.create(found, part.quantity(), null)))
+                .toList();
+        return Uni.join().all(itemUnis).andFailFast();
+    }
+
+    private Uni<Part> lookupPart(UUID partId) {
+        return catalog.findPartById(partId)
+                .onItem().ifNull().failWith(() -> new EstimatePartNotFoundException(partId));
     }
 
     private Uni<Worker> resolveAssignedWorker(UUID assignedWorkerId) {
@@ -246,8 +302,7 @@ public class WorkOrderService {
 
     private Uni<List<EstimateItem>> buildItems(CreateEstimateCommand request) {
         List<Uni<EstimateItem>> itemUnis = request.items().stream()
-                .map(itemDto -> catalog.findPartById(itemDto.partId())
-                        .onItem().ifNull().failWith(() -> new EstimatePartNotFoundException(itemDto.partId()))
+                .map(itemDto -> lookupPart(itemDto.partId())
                         .map(part -> EstimateItem.create(part, itemDto.quantity(), itemDto.unitPrice())))
                 .toList();
         return Uni.join().all(itemUnis).andFailFast();

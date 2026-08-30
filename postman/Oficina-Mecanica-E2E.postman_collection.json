@@ -2454,7 +2454,11 @@
                                                         "script":  {
                                                                        "type":  "text/javascript",
                                                                        "exec":  [
-                                                                                    "pm.test(\u0027status 201\u0027, () =\u003e pm.response.to.have.status(201));"
+                                                                                    "pm.test(\u0027status 201\u0027, () =\u003e pm.response.to.have.status(201));",
+                                                                                    "const opened = pm.response.json();",
+                                                                                    "pm.test(\u0027resposta traz o id da ordem aberta\u0027, () =\u003e pm.expect(opened.workOrder.workOrderId).to.be.a(\u0027string\u0027));",
+                                                                                    "pm.test(\u0027ordem nasce em RECEIVED\u0027, () =\u003e pm.expect(opened.workOrder.status).to.eql(\u0027RECEIVED\u0027));",
+                                                                                    "pm.collectionVariables.set(\u0027work_order_id\u0027, opened.workOrder.workOrderId);"
                                                                                 ]
                                                                    }
                                                     }
@@ -2487,6 +2491,103 @@
                                                    ]
                                   },
                                   {
+                                      "name":  "Abrir OS com solicitação inicial (orçamento pendente)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "prerequest",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.collectionVariables.set(\u0027work_order_initial_description\u0027, `E2E Solicitação inicial - revisão completa ${Date.now()}`);"
+                                                                                ]
+                                                                   }
+                                                    },
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status 201\u0027, () =\u003e pm.response.to.have.status(201));",
+                                                                                    "const opened = pm.response.json();",
+                                                                                    "pm.test(\u0027resposta traz o id da ordem aberta\u0027, () =\u003e pm.expect(opened.workOrder.workOrderId).to.be.a(\u0027string\u0027));",
+                                                                                    "pm.test(\u0027ordem nasce em RECEIVED\u0027, () =\u003e pm.expect(opened.workOrder.status).to.eql(\u0027RECEIVED\u0027));",
+                                                                                    "pm.test(\u0027orçamento inicial nasce pendente\u0027, () =\u003e pm.expect(opened.estimate.status).to.eql(\u0027PENDING\u0027));",
+                                                                                    "pm.test(\u0027orçamento soma peças e serviços\u0027, () =\u003e pm.expect(Number(opened.estimate.totalAmount)).to.eql(Number(opened.estimate.partsAmount) + Number(opened.estimate.laborAmount)));",
+                                                                                    "pm.test(\u0027valor estimado da ordem acompanha o orçamento\u0027, () =\u003e pm.expect(Number(opened.workOrder.estimatedValue)).to.eql(Number(opened.estimate.totalAmount)));",
+                                                                                    "pm.collectionVariables.set(\u0027work_order_initial_id\u0027, opened.workOrder.workOrderId);"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{mechanic_token}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"customerId\": \"{{customer_id}}\",\n  \"vehicleId\": \"{{vehicle_id}}\",\n  \"description\": \"{{work_order_initial_description}}\",\n  \"priority\": \"HIGH\",\n  \"services\": [\n    { \"serviceItemId\": \"{{service_item_id}}\" }\n  ],\n  \"parts\": [\n    { \"partId\": \"{{part_id}}\", \"quantity\": 2 }\n  ]\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  "{{base_url}}/v1/work-orders"
+                                                  },
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
+                                      "name":  "Abrir OS com peça inexistente (espera 404)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027status 404\u0027, () =\u003e pm.response.to.have.status(404));",
+                                                                                    "pm.test(\u0027código do erro\u0027, () =\u003e pm.expect(pm.response.json().code).to.eql(\u0027ESTIMATE_PART_NOT_FOUND\u0027));"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{mechanic_token}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"customerId\": \"{{customer_id}}\",\n  \"vehicleId\": \"{{vehicle_id}}\",\n  \"description\": \"E2E solicitação inicial inválida\",\n  \"parts\": [\n    { \"partId\": \"00000000-0000-0000-0000-000000000000\", \"quantity\": 1 }\n  ]\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  "{{base_url}}/v1/work-orders"
+                                                  },
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
                                       "name":  "List Work Orders (capture id)",
                                       "event":  [
                                                     {
@@ -2497,8 +2598,7 @@
                                                                                     "pm.test(\u0027status 200\u0027, () =\u003e pm.response.to.have.status(200));",
                                                                                     "const body = pm.response.json();",
                                                                                     "const found = body.content.find(wo =\u003e wo.description === pm.collectionVariables.get(\u0027work_order_description\u0027));",
-                                                                                    "pm.test(\u0027work order found in list\u0027, () =\u003e pm.expect(found).to.not.be.undefined);",
-                                                                                    "if (found) { pm.collectionVariables.set(\u0027work_order_id\u0027, found.workOrderId); pm.test(\u0027status RECEIVED\u0027, () =\u003e pm.expect(found.status).to.eql(\u0027RECEIVED\u0027)); }"
+                                                                                    "pm.test(\u0027work order found in list\u0027, () =\u003e pm.expect(found).to.not.be.undefined);"
                                                                                 ]
                                                                    }
                                                     }
@@ -2957,7 +3057,11 @@
                                                         "script":  {
                                                                        "type":  "text/javascript",
                                                                        "exec":  [
-                                                                                    "pm.test(\u0027status 201\u0027, () =\u003e pm.response.to.have.status(201));"
+                                                                                    "pm.test(\u0027status 201\u0027, () =\u003e pm.response.to.have.status(201));",
+                                                                                    "const opened = pm.response.json();",
+                                                                                    "pm.test(\u0027resposta traz o id da ordem aberta\u0027, () =\u003e pm.expect(opened.workOrder.workOrderId).to.be.a(\u0027string\u0027));",
+                                                                                    "pm.test(\u0027ordem nasce em RECEIVED\u0027, () =\u003e pm.expect(opened.workOrder.status).to.eql(\u0027RECEIVED\u0027));",
+                                                                                    "pm.collectionVariables.set(\u0027wo2_id\u0027, opened.workOrder.workOrderId);"
                                                                                 ]
                                                                    }
                                                     }
@@ -3000,8 +3104,7 @@
                                                                                     "pm.test(\u0027status 200\u0027, () =\u003e pm.response.to.have.status(200));",
                                                                                     "const body = pm.response.json();",
                                                                                     "const found = body.content.find(wo =\u003e wo.description === pm.collectionVariables.get(\u0027wo2_description\u0027));",
-                                                                                    "pm.test(\u0027work order found in list\u0027, () =\u003e pm.expect(found).to.not.be.undefined);",
-                                                                                    "if (found) pm.collectionVariables.set(\u0027wo2_id\u0027, found.workOrderId);"
+                                                                                    "pm.test(\u0027work order found in list\u0027, () =\u003e pm.expect(found).to.not.be.undefined);"
                                                                                 ]
                                                                    }
                                                     }
@@ -3264,7 +3367,11 @@
                                                         "script":  {
                                                                        "type":  "text/javascript",
                                                                        "exec":  [
-                                                                                    "pm.test(\u0027status 201\u0027, () =\u003e pm.response.to.have.status(201));"
+                                                                                    "pm.test(\u0027status 201\u0027, () =\u003e pm.response.to.have.status(201));",
+                                                                                    "const opened = pm.response.json();",
+                                                                                    "pm.test(\u0027resposta traz o id da ordem aberta\u0027, () =\u003e pm.expect(opened.workOrder.workOrderId).to.be.a(\u0027string\u0027));",
+                                                                                    "pm.test(\u0027ordem nasce em RECEIVED\u0027, () =\u003e pm.expect(opened.workOrder.status).to.eql(\u0027RECEIVED\u0027));",
+                                                                                    "pm.collectionVariables.set(\u0027wo3_id\u0027, opened.workOrder.workOrderId);"
                                                                                 ]
                                                                    }
                                                     }
@@ -3307,8 +3414,7 @@
                                                                                     "pm.test(\u0027status 200\u0027, () =\u003e pm.response.to.have.status(200));",
                                                                                     "const body = pm.response.json();",
                                                                                     "const found = body.content.find(wo =\u003e wo.description === pm.collectionVariables.get(\u0027wo3_description\u0027));",
-                                                                                    "pm.test(\u0027ordem de serviço encontrada na lista\u0027, () =\u003e pm.expect(found).to.not.be.undefined);",
-                                                                                    "if (found) pm.collectionVariables.set(\u0027wo3_id\u0027, found.workOrderId);"
+                                                                                    "pm.test(\u0027ordem de serviço encontrada na lista\u0027, () =\u003e pm.expect(found).to.not.be.undefined);"
                                                                                 ]
                                                                    }
                                                     }

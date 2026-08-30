@@ -2,6 +2,7 @@ package br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.controller;
 
 import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,6 +27,8 @@ import br.com.fiap.postech.soat16.fase1.customer.domain.model.Customer;
 import br.com.fiap.postech.soat16.fase1.customer.domain.model.enums.DocumentType;
 import br.com.fiap.postech.soat16.fase1.part.adapter.out.persistence.PartRepository;
 import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.adapter.out.persistence.ServiceItemRepository;
+import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.model.ServiceItem;
 import br.com.fiap.postech.soat16.fase1.shared.adapter.in.rest.dto.ApiErrorResponseDto;
 import br.com.fiap.postech.soat16.fase1.shared.adapter.in.rest.pagination.PageableResponseDto;
 import br.com.fiap.postech.soat16.fase1.shared.domain.exception.ErrorType;
@@ -35,6 +38,7 @@ import br.com.fiap.postech.soat16.fase1.vehicle.adapter.out.persistence.VehicleR
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.enums.VehicleType;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.OpenedWorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderServiceResponseDto;
@@ -68,6 +72,9 @@ class WorkOrderControllerIT {
 
     @Inject
     PartRepository partRepository;
+
+    @Inject
+    ServiceItemRepository serviceItemRepository;
 
     @BeforeAll
     static void authenticateAllRequests() {
@@ -129,25 +136,36 @@ class WorkOrderControllerIT {
         return persistInTransaction(() -> partRepository.save(part)).getId();
     }
 
-    private UUID createWorkOrder(UUID customerId, UUID vehicleId) {
-        String body = """
-                {"customerId":"%s","vehicleId":"%s","description":"Revisão geral"}
-                """.formatted(customerId, vehicleId);
+    private UUID seedServiceItem(BigDecimal basePrice) {
+        ServiceItem serviceItem = new ServiceItem();
+        serviceItem.setName("Alinhamento e balanceamento");
+        serviceItem.setDescription("Serviço padrão de suspensão");
+        serviceItem.setBasePrice(basePrice);
+        serviceItem.setEstimatedDurationMinutes(60);
+        serviceItem.setActive(true);
+        return persistInTransaction(() -> serviceItemRepository.save(serviceItem)).getId();
+    }
 
-        given()
+    private OpenedWorkOrderResponseDto openWorkOrder(String body) {
+        return given()
                 .contentType("application/json")
                 .body(body)
         .when()
                 .post(WORK_ORDERS_PATH)
         .then()
-                .statusCode(201);
-
-        return findWorkOrderIdByVehicle(vehicleId);
+                .statusCode(201)
+                .extract().as(OpenedWorkOrderResponseDto.class);
     }
 
-    // POST /work-orders não retorna o id criado (apenas 201 sem corpo); localizamos pelo
-    // veículo, que é único por teste, usando só a API pública (sem tocar no repositório).
-    private UUID findWorkOrderIdByVehicle(UUID vehicleId) {
+    private UUID createWorkOrder(UUID customerId, UUID vehicleId) {
+        String body = """
+                {"customerId":"%s","vehicleId":"%s","description":"Revisão geral"}
+                """.formatted(customerId, vehicleId);
+
+        return openWorkOrder(body).workOrder().workOrderId();
+    }
+
+    private boolean workOrderExistsForVehicle(UUID vehicleId) {
         PageableResponseDto<WorkOrderResponseDto> page = given()
                 .queryParam("size", 100)
         .when()
@@ -157,11 +175,7 @@ class WorkOrderControllerIT {
                 .extract().as(new TypeRef<>() {
                 });
 
-        return page.content().stream()
-                .filter(workOrder -> vehicleId.equals(workOrder.vehicleId()))
-                .map(WorkOrderResponseDto::workOrderId)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Work order not found for vehicle " + vehicleId));
+        return page.content().stream().anyMatch(workOrder -> vehicleId.equals(workOrder.vehicleId()));
     }
 
     private WorkOrderResponseDto getWorkOrder(UUID workOrderId) {
@@ -231,6 +245,16 @@ class WorkOrderControllerIT {
     // pelo Hibernate Reactive), já que não há endpoint de leitura de peça neste teste.
     private int stockOf(UUID partId) {
         return persistInTransaction(() -> partRepository.find("id = ?1", partId).firstResult()).getStockQuantity();
+    }
+
+    private void repricePart(UUID partId, BigDecimal unitPrice) {
+        persistInTransaction(() -> partRepository.find("id = ?1", partId).firstResult()
+                .invoke(entity -> entity.setUnitPrice(unitPrice)));
+    }
+
+    private void repriceServiceItem(UUID serviceItemId, BigDecimal basePrice) {
+        persistInTransaction(() -> serviceItemRepository.find("id = ?1", serviceItemId).firstResult()
+                .invoke(entity -> entity.setBasePrice(basePrice)));
     }
 
     private UUID createWorkOrderInProgress(BigDecimal unitPrice, int quantity) {
@@ -363,6 +387,193 @@ class WorkOrderControllerIT {
         void shouldCreateWorkOrder() {
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
             assertEquals(WorkOrderStatus.RECEIVED, getWorkOrder(workOrderId).status());
+        }
+
+        @Test
+        @DisplayName("deve devolver a identificação da ordem recém-aberta no corpo e no Location")
+        void shouldReturnCreatedWorkOrderIdentification() {
+            UUID vehicleId = seedVehicle();
+            String body = """
+                    {"customerId":"%s","vehicleId":"%s","description":"Revisão geral"}
+                    """.formatted(seedCustomer(), vehicleId);
+
+            Response response = given()
+                    .contentType("application/json")
+                    .body(body)
+            .when()
+                    .post(WORK_ORDERS_PATH)
+            .then()
+                    .statusCode(201)
+                    .extract().response();
+
+            OpenedWorkOrderResponseDto opened = response.as(OpenedWorkOrderResponseDto.class);
+            UUID workOrderId = opened.workOrder().workOrderId();
+
+            assertNotNull(workOrderId);
+            assertNull(opened.estimate());
+            assertEquals(vehicleId, opened.workOrder().vehicleId());
+            assertTrue(response.header("Location").endsWith(WORK_ORDERS_PATH + "/" + workOrderId));
+            assertEquals(workOrderId, getWorkOrder(workOrderId).workOrderId());
+        }
+
+        @Test
+        @DisplayName("deve abrir a ordem e o orçamento pendente da solicitação inicial em uma única chamada")
+        void shouldOpenWorkOrderWithInitialPendingEstimate() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            UUID serviceItemId = seedServiceItem(new BigDecimal("120.00"));
+            String body = """
+                    {"customerId":"%s","vehicleId":"%s","description":"Revisão dos 10.000km",
+                     "services":[{"serviceItemId":"%s"}],
+                     "parts":[{"partId":"%s","quantity":3}]}
+                    """.formatted(seedCustomer(), seedVehicle(), serviceItemId, partId);
+
+            OpenedWorkOrderResponseDto opened = openWorkOrder(body);
+
+            assertEquals(WorkOrderStatus.RECEIVED, opened.workOrder().status());
+            EstimateResponseDto estimate = opened.estimate();
+            assertNotNull(estimate);
+            assertEquals(EstimateStatus.PENDING, estimate.status());
+            assertEquals(opened.workOrder().workOrderId(), estimate.workOrderId());
+            assertEquals(0, new BigDecimal("150.00").compareTo(estimate.partsAmount()));
+            assertEquals(0, new BigDecimal("120.00").compareTo(estimate.laborAmount()));
+            assertEquals(0, new BigDecimal("270.00").compareTo(estimate.totalAmount()));
+            assertEquals(1, estimate.items().size());
+            assertEquals(0, new BigDecimal("50.00").compareTo(estimate.items().get(0).unitPrice()));
+
+            WorkOrderResponseDto persisted = getWorkOrder(opened.workOrder().workOrderId());
+            assertEquals(0, new BigDecimal("270.00").compareTo(persisted.estimatedValue()));
+        }
+
+        @Test
+        @DisplayName("deve manter os preços do orçamento inalterados quando o catálogo é atualizado depois")
+        void shouldKeepEstimatePricesAfterCatalogUpdate() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            UUID serviceItemId = seedServiceItem(new BigDecimal("120.00"));
+            String body = """
+                    {"customerId":"%s","vehicleId":"%s","description":"Revisão",
+                     "services":[{"serviceItemId":"%s"}],
+                     "parts":[{"partId":"%s","quantity":1}]}
+                    """.formatted(seedCustomer(), seedVehicle(), serviceItemId, partId);
+
+            OpenedWorkOrderResponseDto opened = openWorkOrder(body);
+            UUID workOrderId = opened.workOrder().workOrderId();
+
+            repricePart(partId, new BigDecimal("999.00"));
+            repriceServiceItem(serviceItemId, new BigDecimal("999.00"));
+
+            assertEquals(0, new BigDecimal("170.00").compareTo(getWorkOrder(workOrderId).estimatedValue()));
+
+            // A aprovação relê o orçamento gravado, expondo o preço unitário efetivamente persistido.
+            EstimateResponseDto persisted = approveEstimate(workOrderId, opened.estimate().estimateId());
+            assertEquals(0, new BigDecimal("50.00").compareTo(persisted.items().get(0).unitPrice()));
+            assertEquals(0, new BigDecimal("120.00").compareTo(persisted.laborAmount()));
+            assertEquals(0, new BigDecimal("170.00").compareTo(persisted.totalAmount()));
+        }
+
+        @Test
+        @DisplayName("deve reverter as linhas de serviço já gravadas quando uma peça seguinte é inválida")
+        void shouldRollbackPersistedServicesWhenAPartIsInvalid() {
+            UUID vehicleId = seedVehicle();
+            String body = """
+                    {"customerId":"%s","vehicleId":"%s","description":"Revisão",
+                     "services":[{"serviceItemId":"%s"}],
+                     "parts":[{"partId":"%s","quantity":1}]}
+                    """.formatted(seedCustomer(), vehicleId,
+                    seedServiceItem(new BigDecimal("120.00")), UUID.randomUUID());
+
+            ApiErrorResponseDto error = extractError(given()
+                    .contentType("application/json")
+                    .body(body)
+            .when()
+                    .post(WORK_ORDERS_PATH)
+            .then()
+                    .statusCode(404)
+                    .extract().response());
+
+            assertEquals("ESTIMATE_PART_NOT_FOUND", error.code());
+            assertFalse(workOrderExistsForVehicle(vehicleId));
+        }
+
+        @Test
+        @DisplayName("deve gravar todos os serviços quando a solicitação inicial traz vários itens de catálogo")
+        void shouldOpenWorkOrderWithSeveralRequestedServices() {
+            String body = """
+                    {"customerId":"%s","vehicleId":"%s","description":"Revisão",
+                     "services":[{"serviceItemId":"%s"},{"serviceItemId":"%s"},{"serviceItemId":"%s"}]}
+                    """.formatted(seedCustomer(), seedVehicle(),
+                    seedServiceItem(new BigDecimal("120.00")),
+                    seedServiceItem(new BigDecimal("80.50")),
+                    seedServiceItem(new BigDecimal("40.00")));
+
+            OpenedWorkOrderResponseDto opened = openWorkOrder(body);
+
+            assertEquals(0, new BigDecimal("240.50").compareTo(opened.estimate().laborAmount()));
+            assertEquals(0, BigDecimal.ZERO.compareTo(opened.estimate().partsAmount()));
+            assertEquals(0, new BigDecimal("240.50").compareTo(opened.estimate().totalAmount()));
+        }
+
+        @Test
+        @DisplayName("deve retornar 404 e não abrir a ordem quando o item de serviço não existe")
+        void shouldReturn404WhenServiceItemNotFound() {
+            UUID vehicleId = seedVehicle();
+            String body = """
+                    {"customerId":"%s","vehicleId":"%s","description":"Revisão",
+                     "services":[{"serviceItemId":"%s"}]}
+                    """.formatted(seedCustomer(), vehicleId, UUID.randomUUID());
+
+            ApiErrorResponseDto error = extractError(given()
+                    .contentType("application/json")
+                    .body(body)
+            .when()
+                    .post(WORK_ORDERS_PATH)
+            .then()
+                    .statusCode(404)
+                    .extract().response());
+
+            assertEquals("SERVICE_ITEM_NOT_FOUND", error.code());
+            assertFalse(workOrderExistsForVehicle(vehicleId));
+        }
+
+        @Test
+        @DisplayName("deve retornar 404 e não abrir a ordem quando a peça não existe")
+        void shouldReturn404WhenRequestedPartNotFound() {
+            UUID vehicleId = seedVehicle();
+            String body = """
+                    {"customerId":"%s","vehicleId":"%s","description":"Revisão",
+                     "parts":[{"partId":"%s","quantity":1}]}
+                    """.formatted(seedCustomer(), vehicleId, UUID.randomUUID());
+
+            ApiErrorResponseDto error = extractError(given()
+                    .contentType("application/json")
+                    .body(body)
+            .when()
+                    .post(WORK_ORDERS_PATH)
+            .then()
+                    .statusCode(404)
+                    .extract().response());
+
+            assertEquals("ESTIMATE_PART_NOT_FOUND", error.code());
+            assertFalse(workOrderExistsForVehicle(vehicleId));
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 quando a quantidade de uma peça solicitada é menor que 1")
+        void shouldReturn400WhenRequestedQuantityIsBelowOne() {
+            UUID vehicleId = seedVehicle();
+            String body = """
+                    {"customerId":"%s","vehicleId":"%s","description":"Revisão",
+                     "parts":[{"partId":"%s","quantity":0}]}
+                    """.formatted(seedCustomer(), vehicleId, seedPart(new BigDecimal("50.00")));
+
+            given()
+                    .contentType("application/json")
+                    .body(body)
+            .when()
+                    .post(WORK_ORDERS_PATH)
+            .then()
+                    .statusCode(400);
+
+            assertFalse(workOrderExistsForVehicle(vehicleId));
         }
 
         @Test

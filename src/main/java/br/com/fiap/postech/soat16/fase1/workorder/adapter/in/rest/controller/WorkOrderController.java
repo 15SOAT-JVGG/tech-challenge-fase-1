@@ -1,5 +1,6 @@
 package br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.controller;
 
+import java.net.URI;
 import java.util.UUID;
 
 import jakarta.annotation.security.RolesAllowed;
@@ -37,11 +38,13 @@ import lombok.RequiredArgsConstructor;
 
 @ApplicationScoped
 @RequiredArgsConstructor
-@Path("/v1/work-orders")
+@Path(WorkOrderController.WORK_ORDERS_PATH)
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 @RolesAllowed({"ADMIN", "MECHANIC"})
 public class WorkOrderController implements WorkOrderControllerDocs {
+
+    static final String WORK_ORDERS_PATH = "/v1/work-orders";
 
     private final WorkOrderService service;
 
@@ -71,7 +74,11 @@ public class WorkOrderController implements WorkOrderControllerDocs {
     @Override
     public Uni<Response> create(@RequestBody @Valid WorkOrderRequestDto dto) {
         return service.create(WorkOrderRestMapper.toCommand(dto))
-                .replaceWith(Response.status(Response.Status.CREATED).build());
+                .map(WorkOrderRestMapper::toResponse)
+                .map(opened -> Response.status(Response.Status.CREATED)
+                        .location(URI.create(WORK_ORDERS_PATH + "/" + opened.workOrder().workOrderId()))
+                        .entity(opened)
+                        .build());
     }
 
     @PATCH
