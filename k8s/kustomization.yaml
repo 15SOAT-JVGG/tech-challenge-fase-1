@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+
+# Os dois Secrets referenciados pelo Deployment (oficina-mecanica-env e
+# oficina-mecanica-jwt) não estão aqui de propósito: senha do banco, credenciais de
+# seed e chave privada não entram no repositório. Eles são criados por
+# infra/scripts/create-app-credentials.sh, que os monta a partir dos outputs do
+# Terraform e dos secrets do repositório.
+
+images:
+  - name: oficina-mecanica
+    # Sai de `terraform -chdir=infra/terraform output -raw ecr_repository_url`. Em
+    # outra conta o ID muda, como no bucket de state em infra/terraform/versions.tf.
+    newName: 059056506203.dkr.ecr.us-east-1.amazonaws.com/oficina-mecanica
+    # O deploy sobrescreve com o SHA do commit, para que o rollout seja sempre uma
+    # mudança real de imagem: `kustomize edit set image oficina-mecanica=...:$SHA`.
+    newTag: latest

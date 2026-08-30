@@ -10,8 +10,9 @@ que decorrem disso estão em [ADR-0001](../docs/adr/0001-eks-provisionado-com-ro
 ```
 infra/
 ├── docker/     Dockerfile da aplicação
-├── scripts/    bootstrap do state, verificação do lab, publicação da imagem, chaves RS256
+├── scripts/    bootstrap do state, verificação do lab, publicação da imagem, chaves e credenciais
 └── terraform/  a IaC propriamente dita
+k8s/            os manifestos da aplicação, no diretório que o enunciado exige
 ```
 
 ## Recursos criados
@@ -119,6 +120,51 @@ O par de chaves RS256 do JWT segue caminho parecido — gerado uma vez por
 infra/scripts/publish-image.sh          # tag = SHA do commit atual
 infra/scripts/publish-image.sh 1.0.0    # ou uma tag explícita
 ```
+
+## Implantando a aplicação
+
+Os manifestos vivem em `k8s/`, fora de `infra/`, porque é onde o enunciado da fase os exige.
+
+| Objeto | Arquivo | O que carrega |
+|---|---|---|
+| `ConfigMap` `oficina-mecanica-config` | `k8s/configmap.yaml` | Host e nome do banco, modo TLS, porta, issuer e expiração do JWT, caminho das chaves, usuários de seed, flag do Swagger |
+| `Secret` `oficina-mecanica-env` | criado por script | Usuário e senha do banco, senhas de seed |
+| `Secret` `oficina-mecanica-jwt` | criado por script | O par RS256, montado como arquivo em `/etc/jwt` |
+| `Deployment` `oficina-mecanica` | `k8s/deployment.yaml` | Uma réplica, probes, requests e limits, container non-root |
+| `Service` `oficina-mecanica` | `k8s/service.yaml` | `LoadBalancer`, que o EKS materializa como ELB clássico |
+
+Os dois `Secret` não estão em `k8s/` de propósito — senha do banco, credenciais de seed e chave
+privada não entram no repositório. `infra/scripts/create-app-credentials.sh` os monta a partir dos
+outputs do Terraform e do par RS256, e recusa a execução se o `ConfigMap` apontar para um banco
+diferente do que o Terraform conhece.
+
+```bash
+# Uma vez: gera o par RS256 fora do build da imagem.
+infra/scripts/generate-jwt-pair.sh
+
+export APP_SEED_ADMIN_PASSWORD=... APP_SEED_MECHANIC_PASSWORD=...
+infra/scripts/create-app-credentials.sh
+
+infra/scripts/publish-image.sh
+kubectl apply -k k8s/
+kubectl rollout status deploy/oficina-mecanica
+```
+
+O endereço público sai do `Service`; o ELB leva um minuto para começar a responder:
+
+```bash
+kubectl get svc oficina-mecanica -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+curl "http://$ELB/q/health/ready"
+```
+
+Duas coisas que só aparecem contra o RDS e valem lembrar:
+
+- **TLS é obrigatório.** O Postgres 16 no RDS recusa conexão em claro, então o `ConfigMap` manda
+  `POSTGRES_SSLMODE=require`. O default da aplicação é `disable`, que é o que o Postgres do
+  docker compose fala.
+- **As migrations sobem sozinhas.** `V1__create_schema.sql` cria o schema `oficina_mecanica` e o
+  Flyway roda na inicialização, então o primeiro deploy converge contra um banco vazio. Uma réplica
+  no primeiro rollout é o que evita duas instâncias migrando ao mesmo tempo.
 
 ## Variáveis
 
