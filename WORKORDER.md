@@ -79,7 +79,7 @@ dentro da mesma prioridade, pelas mais recentes primeiro.
 
 ## Passo a passo (exemplo completo)
 
-> Os exemplos usam `curl`. Troque `$TOKEN` pelo token JWT (veja o [README.md](README.md#autenticação--gerando-e-usando-o-token-jwt)) se o ambiente exigir autenticação, e os UUIDs pelos valores reais retornados em cada chamada.
+> Os exemplos usam `curl`. Troque `$TOKEN` pelo token JWT (veja [docs/FASE-1.md](docs/FASE-1.md#autenticação-jwt)) se o ambiente exigir autenticação, e os UUIDs pelos valores reais retornados em cada chamada.
 
 ### 1. Abrir a ordem de serviço
 
