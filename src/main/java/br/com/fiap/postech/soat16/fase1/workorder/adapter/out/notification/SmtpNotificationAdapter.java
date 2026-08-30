@@ -67,7 +67,7 @@ public class SmtpNotificationAdapter implements WorkOrderNotificationPort {
                         decisionLink(invitation.approveToken()),
                         decisionLink(invitation.rejectToken()),
                         invitation.expiresAt().format(DEADLINE_FORMAT));
-        return mailer.send(Mail.withText(recipient,
+        return deliver(order, "orcamento aguardando decisao", Mail.withText(recipient,
                 "Orcamento da ordem de servico " + order.getId(), body));
     }
 
@@ -90,8 +90,26 @@ public class SmtpNotificationAdapter implements WorkOrderNotificationPort {
                         order.getId(),
                         invitation.expiresAt().format(DEADLINE_FORMAT),
                         trackingLink(invitation.trackingToken()));
-        return mailer.send(Mail.withText(recipient,
+        return deliver(order, "andamento da ordem de servico", Mail.withText(recipient,
                 "Andamento da ordem de servico " + order.getId(), body));
+    }
+
+    /**
+     * Entrega a mensagem sem deixar que o servidor de e-mail reprove a operação de negócio. A
+     * reserva de estoque e a mudança de status já foram decididas quando a notificação sai; um
+     * SMTP fora do ar, com a caixa cheia ou limitando a taxa de envio não pode desfazê-las, e
+     * propagar essa falha transformaria indisponibilidade de e-mail em erro de atendimento.
+     *
+     * <p>É o mesmo critério aplicado à ordem sem e-mail de cliente: registra-se a falta e o fluxo
+     * segue. O log é o que permite reenviar depois.
+     */
+    private Uni<Void> deliver(WorkOrder order, String subject, Mail mail) {
+        return mailer.send(mail)
+                .onFailure().recoverWithItem(failure -> {
+                    Log.warnf("Notificacao nao entregue: OS %s. Assunto=%s Causa=%s",
+                            order.getId(), subject, failure.getMessage());
+                    return null;
+                });
     }
 
     /**

@@ -11,6 +11,14 @@
       "value": "http://localhost:8080"
     },
     {
+      "key": "admin_password",
+      "value": "admin123"
+    },
+    {
+      "key": "mechanic_password",
+      "value": "mecanico123"
+    },
+    {
       "key": "admin_token",
       "value": ""
     },
@@ -174,7 +182,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"{{admin_password}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -212,7 +220,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"mecanico\",\n  \"password\": \"mecanico123\"\n}",
+              "raw": "{\n  \"username\": \"mecanico\",\n  \"password\": \"{{mechanic_password}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

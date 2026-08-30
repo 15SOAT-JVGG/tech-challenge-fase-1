@@ -1,5 +1,6 @@
 package br.com.fiap.postech.soat16.fase1.workorder.adapter.out.notification;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -99,6 +100,18 @@ class SmtpNotificationAdapterTest {
 
             verify(mailer, never()).send(any(Mail.class));
         }
+
+        @Test
+        @DisplayName("conclui sem erro quando o servidor de e-mail recusa a mensagem")
+        void completesWhenMailServerRejectsMessage() {
+            when(mailer.send(any(Mail.class))).thenReturn(Uni.createFrom()
+                    .failure(new IllegalStateException("550 Too many emails per second")));
+            WorkOrder order = workOrder(CUSTOMER_EMAIL);
+
+            assertDoesNotThrow(() -> adapter
+                    .notifyEstimateAwaitingDecision(order, estimate(order), invitation())
+                    .await().indefinitely());
+        }
     }
 
     @Nested
@@ -171,6 +184,18 @@ class SmtpNotificationAdapterTest {
             adapter.notifyWorkOrderProgress(order, tracking()).await().indefinitely();
 
             verify(mailer, never()).send(any(Mail.class));
+        }
+
+        @Test
+        @DisplayName("conclui sem erro quando o servidor de e-mail recusa a mensagem")
+        void completesWhenMailServerRejectsMessage() {
+            when(mailer.send(any(Mail.class))).thenReturn(Uni.createFrom()
+                    .failure(new IllegalStateException("550 Too many emails per second")));
+            WorkOrder order = workOrder(CUSTOMER_EMAIL);
+            order.setStatus(WorkOrderStatus.RECEIVED);
+
+            assertDoesNotThrow(() -> adapter
+                    .notifyWorkOrderProgress(order, tracking()).await().indefinitely());
         }
     }
 
