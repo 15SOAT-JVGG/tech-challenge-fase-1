@@ -16,6 +16,56 @@ infra/
 k8s/            os manifestos da aplicação, no diretório que o enunciado exige
 ```
 
+## Do zero ao ambiente no ar
+
+A sequência inteira, na ordem. Cada passo tem uma seção própria mais abaixo explicando o porquê e o
+que pode dar errado; aqui está só o roteiro.
+
+```bash
+# 1. Sessão do lab ativa e conferida. Rode de novo a cada reset: nomes de role e
+#    IDs de rede mudam junto, e o relatório é o que o Terraform espera encontrar.
+infra/scripts/verify-lab.sh infra/scripts/lab-capabilities.md
+
+# 2. Infraestrutura. Só na primeira vez na conta: bootstrap-tf-state.sh antes do init.
+terraform -chdir=infra/terraform init
+terraform -chdir=infra/terraform apply          # 15 a 20 minutos
+
+# 3. Acesso ao cluster.
+$(terraform -chdir=infra/terraform output -raw kubeconfig_command)
+kubectl get nodes
+
+# 4. O ConfigMap versionado precisa apontar para o banco que acabou de nascer.
+#    Se os dois valores divergirem, ajuste k8s/configmap.yaml antes de seguir.
+terraform -chdir=infra/terraform output -raw database_host
+rg INFRA_HOST_POSTGRES k8s/configmap.yaml
+
+# 5. Imagem no registry.
+infra/scripts/publish-image.sh
+
+# 6. Segredos. generate-jwt-pair.sh só na primeira vez; o par vale para os deploys seguintes.
+infra/scripts/generate-jwt-pair.sh
+export APP_SEED_ADMIN_PASSWORD=... APP_SEED_MECHANIC_PASSWORD=...
+infra/scripts/create-app-credentials.sh
+
+# 7. Aplicação. O restart é o que busca a imagem nova, porque a tag é `latest`.
+kubectl apply -k k8s/
+kubectl rollout restart deploy/oficina-mecanica
+kubectl rollout status deploy/oficina-mecanica
+
+# 8. Prova de que funcionou.
+infra/scripts/smoke-test.sh
+```
+
+**Reiniciar o lab não é a mesma coisa que reconstruir o ambiente.** Um `terraform destroy` leva tudo
+junto, e aí o roteiro acima vale inteiro. Já um reset de sessão do Learner Lab só cancela as
+credenciais: cluster, banco e imagens continuam de pé, e bastam os passos 1 a 3 — renovar a sessão,
+rodar o `apply` (que não terá nada a mudar) e regravar o kubeconfig.
+
+O que muda sozinho nesse reset são os **nós**: o lab derruba as instâncias, o node group cria
+substitutas, e os pods sobem de novo nelas. Enquanto o banco não volta, a aplicação reinicia em laço
+com `Acquisition timeout while waiting for new connection` no Flyway — é esperado e se resolve
+sozinho. Espere os pods em `1/1` e confirme com o smoke test antes de concluir que algo quebrou.
+
 ## Recursos criados
 
 Tudo abaixo nasce e morre com o Terraform em `infra/terraform`.
