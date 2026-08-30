@@ -1,0 +1,233 @@
+#!/usr/bin/env bash
+# Responde, num único comando, se o deploy funcionou. Exercita de fora para dentro o
+# balanceador, o pod, o ConfigMap, os Secret, a conectividade com o banco e as
+# migrations: se este script passa, o ambiente está de pé.
+#
+# O que ele verifica, e nada além disso:
+#   1. a aplicação reporta estar pronta (/q/health/ready)
+#   2. o login com o usuário de seed devolve um JWT
+#   3. uma ordem de serviço é criada e aparece na listagem em seguida
+#
+# Regra de negócio não se verifica aqui — WorkOrderControllerIT e SecurityIT já cobrem
+# ciclo de vida da OS, orçamento, estoque e RBAC contra um Postgres real. Uma falha
+# deste script aponta para infraestrutura, não para domínio.
+#
+# Cliente e veículo são criados porque a abertura da OS exige os dois; são preparação,
+# não afirmação. Os dados ficam no banco depois da execução, de propósito: eles são o
+# que a demonstração usa em seguida.
+#
+# Uso:
+#   infra/scripts/smoke-test.sh                       # descobre o endereço do Service no cluster
+#   infra/scripts/smoke-test.sh http://localhost:8080 # ou um endereço explícito
+#
+# Requer curl e jq, mais kubectl quando o endereço não é informado. E requer
+# APP_SEED_ADMIN_PASSWORD — a mesma senha entregue ao cluster por
+# infra/scripts/create-app-credentials.sh. APP_SEED_ADMIN_USERNAME é opcional
+# (default: admin), e READY_TIMEOUT_SECONDS ajusta a espera pelo readiness.
+set -euo pipefail
+
+SERVICE_NAME="oficina-mecanica"
+ADMIN_USERNAME="${APP_SEED_ADMIN_USERNAME:-admin}"
+READY_TIMEOUT_SECONDS="${READY_TIMEOUT_SECONDS:-180}"
+READY_RETRY_SECONDS=5
+REQUEST_TIMEOUT_SECONDS=30
+WORK_ORDERS_PAGE_SIZE=100
+
+for tool in curl jq; do
+    command -v "$tool" >/dev/null || { echo "$tool não encontrado" >&2; exit 1; }
+done
+
+if [[ -z "${APP_SEED_ADMIN_PASSWORD:-}" ]]; then
+    echo "APP_SEED_ADMIN_PASSWORD não definida." >&2
+    echo "É a senha do usuário de seed entregue ao cluster no Secret oficina-mecanica-env:" >&2
+    echo "  export APP_SEED_ADMIN_PASSWORD=..." >&2
+    exit 1
+fi
+
+BASE_URL="${1:-}"
+if [[ -z "$BASE_URL" ]]; then
+    command -v kubectl >/dev/null || { echo "kubectl não encontrado, e nenhum endereço informado" >&2; exit 1; }
+    ELB_HOSTNAME="$(kubectl get svc "$SERVICE_NAME" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+    if [[ -z "$ELB_HOSTNAME" ]]; then
+        echo "O Service $SERVICE_NAME ainda não tem endereço de balanceador." >&2
+        echo "Aguarde o provisionamento do ELB (cerca de um minuto) ou informe o endereço:" >&2
+        echo "  infra/scripts/smoke-test.sh http://meu-endereco" >&2
+        exit 1
+    fi
+    BASE_URL="http://$ELB_HOSTNAME"
+fi
+BASE_URL="${BASE_URL%/}"
+
+RESPONSE_BODY_FILE="$(mktemp)"
+trap 'rm -f "$RESPONSE_BODY_FILE"' EXIT
+
+TOKEN=""
+RESPONSE_BODY=""
+WORK_ORDER_ID=""
+
+fail() {
+    echo "FALHA: $*" >&2
+    exit 1
+}
+
+# Todo request passa por aqui para que a afirmação seja sempre a mesma: o código HTTP
+# esperado. O corpo fica em RESPONSE_BODY para quem precisa de um identificador.
+request() {
+    local method="$1" path="$2" expected_status="$3" payload="${4:-}"
+    local curl_args=(
+        --silent --show-error
+        --max-time "$REQUEST_TIMEOUT_SECONDS"
+        --request "$method"
+        --header 'Accept: application/json'
+        --output "$RESPONSE_BODY_FILE"
+        --write-out '%{http_code}'
+    )
+    [[ -n "$payload" ]] && curl_args+=(--header 'Content-Type: application/json' --data "$payload")
+    [[ -n "$TOKEN" ]] && curl_args+=(--header "Authorization: Bearer $TOKEN")
+
+    local status
+    status="$(curl "${curl_args[@]}" "$BASE_URL$path")" \
+        || fail "$method $path não recebeu resposta de $BASE_URL"
+
+    RESPONSE_BODY="$(cat "$RESPONSE_BODY_FILE")"
+    [[ "$status" == "$expected_status" ]] \
+        || fail "$method $path devolveu $status, esperado $expected_status: $RESPONSE_BODY"
+}
+
+extract() {
+    jq -er "$1" <<<"$RESPONSE_BODY" || fail "resposta sem $1: $RESPONSE_BODY"
+}
+
+# O ELB começa a responder cerca de um minuto depois de nascer, e o pod tem migrations
+# para rodar antes de ficar pronto. Esperar aqui é o que separa "ambiente quebrado" de
+# "ambiente ainda subindo".
+wait_until_ready() {
+    local deadline=$((SECONDS + READY_TIMEOUT_SECONDS)) status
+    while :; do
+        status="$(curl --silent --max-time "$REQUEST_TIMEOUT_SECONDS" \
+            --output "$RESPONSE_BODY_FILE" --write-out '%{http_code}' \
+            "$BASE_URL/q/health/ready")" || status="sem resposta"
+        if [[ "$status" == "200" ]]; then
+            RESPONSE_BODY="$(cat "$RESPONSE_BODY_FILE")"
+            [[ "$(jq -r '.status' <<<"$RESPONSE_BODY")" == "UP" ]] \
+                || fail "readiness respondeu 200 sem status UP: $RESPONSE_BODY"
+            return
+        fi
+        ((SECONDS < deadline)) \
+            || fail "a aplicação não ficou pronta em ${READY_TIMEOUT_SECONDS}s (último: $status)"
+        sleep "$READY_RETRY_SECONDS"
+    done
+}
+
+# Documento e placa novos a cada execução: rodar o smoke test duas vezes seguidas não
+# pode falhar por unicidade. Os dígitos verificadores do CPF são calculados aqui porque
+# a aplicação recusa documento inválido na entrada — é o algoritmo público do CPF, não
+# uma regra desta oficina.
+generate_document() {
+    local digits=() index check_digit sum first_weight remainder
+    for ((index = 0; index < 9; index++)); do
+        digits+=($((RANDOM % 10)))
+    done
+    for ((check_digit = 0; check_digit < 2; check_digit++)); do
+        sum=0
+        first_weight=$((10 + check_digit))
+        for ((index = 0; index < 9 + check_digit; index++)); do
+            sum=$((sum + digits[index] * (first_weight - index)))
+        done
+        remainder=$((sum % 11))
+        digits+=($((remainder < 2 ? 0 : 11 - remainder)))
+    done
+    printf '%s' "${digits[@]}"
+}
+
+random_letter() {
+    local alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    printf '%s' "${alphabet:RANDOM % ${#alphabet}:1}"
+}
+
+generate_license_plate() {
+    local plate="" index
+    for ((index = 0; index < 3; index++)); do
+        plate+="$(random_letter)"
+    done
+    printf '%s%d%s%02d' "$plate" $((RANDOM % 10)) "$(random_letter)" $((RANDOM % 100))
+}
+
+# A abertura da OS não devolve o identificador, então a recuperação é pela listagem. O
+# veículo é novo nesta execução e por isso tem uma OS só, mas ela pode cair em qualquer
+# página: a ordenação é por prioridade, e o banco do ambiente acumula OS de execuções
+# anteriores. Percorrer as páginas é o que evita uma falha que não é do ambiente.
+find_created_work_order() {
+    local page=0 total_pages
+    while :; do
+        request GET "/v1/work-orders?page=$page&size=$WORK_ORDERS_PAGE_SIZE" 200
+        WORK_ORDER_ID="$(jq -r --arg vehicleId "$VEHICLE_ID" \
+            'first(.content[] | select(.vehicleId == $vehicleId) | .workOrderId) // empty' \
+            <<<"$RESPONSE_BODY")"
+        if [[ -n "$WORK_ORDER_ID" ]]; then
+            return
+        fi
+        total_pages="$(extract '.pagination.totalPages')"
+        page=$((page + 1))
+        ((page < total_pages)) \
+            || fail "a OS criada para o veículo $VEHICLE_ID não apareceu nas $total_pages páginas da listagem"
+    done
+}
+
+echo "Smoke test contra $BASE_URL"
+
+wait_until_ready
+echo "1/4 aplicação pronta"
+
+request POST /v1/auth/login 200 "$(jq -nc \
+    --arg username "$ADMIN_USERNAME" \
+    --arg password "$APP_SEED_ADMIN_PASSWORD" \
+    '{username: $username, password: $password}')"
+TOKEN="$(extract '.token')"
+echo "2/4 autenticado como $ADMIN_USERNAME"
+
+DOCUMENT="$(generate_document)"
+LICENSE_PLATE="$(generate_license_plate)"
+
+request POST /v1/customer 201 "$(jq -nc --arg document "$DOCUMENT" '{
+    firstName: "Cliente",
+    lastName: "Smoke Test",
+    email: "smoke.\($document)@example.com",
+    phoneNumber: "+5511999887766",
+    document: $document
+}')"
+request GET "/v1/customer/by-document/$DOCUMENT" 200
+CUSTOMER_ID="$(extract '.customerId')"
+
+request POST /v1/vehicle 201 "$(jq -nc \
+    --arg customerId "$CUSTOMER_ID" \
+    --arg licensePlate "$LICENSE_PLATE" \
+    '{
+        customerId: $customerId,
+        licensePlate: $licensePlate,
+        manufacturer: "Fiat",
+        model: "Argo",
+        color: "Prata",
+        year: 2022,
+        kmDriven: 45000,
+        type: "CAR"
+    }')"
+request GET "/v1/vehicle/by-license-plate/$LICENSE_PLATE" 200
+VEHICLE_ID="$(extract '.id')"
+echo "3/4 cliente $CUSTOMER_ID e veículo $LICENSE_PLATE preparados"
+
+request POST /v1/work-orders 201 "$(jq -nc \
+    --arg customerId "$CUSTOMER_ID" \
+    --arg vehicleId "$VEHICLE_ID" \
+    '{
+        customerId: $customerId,
+        vehicleId: $vehicleId,
+        description: "Smoke test do ambiente implantado",
+        priority: "MEDIUM"
+    }')"
+
+find_created_work_order
+echo "4/4 ordem de serviço $WORK_ORDER_ID criada e recuperada"
+
+echo
+echo "OK — o ambiente em $BASE_URL está operacional"

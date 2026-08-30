@@ -10,7 +10,7 @@ que decorrem disso estão em [ADR-0001](../docs/adr/0001-eks-provisionado-com-ro
 ```
 infra/
 ├── docker/     Dockerfile da aplicação
-├── scripts/    bootstrap do state, verificação do lab, publicação da imagem, chaves e credenciais
+├── scripts/    bootstrap do state, verificação do lab, publicação da imagem, chaves, credenciais e smoke test
 └── terraform/  a IaC propriamente dita
 k8s/            os manifestos da aplicação, no diretório que o enunciado exige
 ```
@@ -167,6 +167,25 @@ O endereço público sai do `Service`; o ELB leva cerca de um minuto para começ
 ELB="$(kubectl get svc oficina-mecanica -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
 curl "http://$ELB/q/health/ready"
 ```
+
+## Smoke test
+
+Um comando responde se o deploy funcionou. Ele descobre o endereço do `Service` sozinho, espera o
+readiness, autentica com o usuário de seed, abre uma ordem de serviço e a recupera na listagem — o que
+exercita de uma vez o ELB, o pod, o `ConfigMap`, os dois `Secret`, a conectividade com o RDS e as
+migrations. Sai com código diferente de zero na primeira verificação que falhar.
+
+```bash
+export APP_SEED_ADMIN_PASSWORD=...       # a mesma senha entregue no Secret
+infra/scripts/smoke-test.sh              # ou: infra/scripts/smoke-test.sh http://localhost:8080
+```
+
+Ele é também o último passo da pipeline de entrega e o roteiro da parte de consumo das APIs na
+demonstração. Regra de negócio ele não verifica — isso é o que os `*IT` da aplicação já fazem contra um
+Postgres real, e por isso uma falha aqui aponta para infraestrutura.
+
+Requer `curl` e `jq`, mais `kubectl` quando o endereço não é informado. O cliente, o veículo e a OS
+criados ficam no banco depois da execução — são os dados que a demonstração usa em seguida.
 
 Duas coisas que só aparecem contra o RDS e valem lembrar:
 
