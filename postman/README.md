@@ -19,7 +19,24 @@
 
 A API precisa estar no ar (`docker compose up`, ver README principal).
 
-**Opção A — Postman GUI:** importe o arquivo, ajuste a variável de coleção `base_url` se necessário (default `http://localhost:8080`), rode com o Collection Runner em ordem de pasta.
+Três variáveis de coleção governam para onde a suíte aponta e com quem ela se autentica. Os
+defaults valem para o `docker compose`; contra outro ambiente, sobrescreva as três:
+
+| Variável | Default | O que é |
+|---|---|---|
+| `base_url` | `http://localhost:8080` | Endereço da API |
+| `admin_password` | `admin123` | Senha de seed do ADMIN (`APP_SEED_ADMIN_PASSWORD`) |
+| `mechanic_password` | `mecanico123` | Senha de seed do MECHANIC (`APP_SEED_MECHANIC_PASSWORD`) |
+
+**Opção A — Postman GUI:** importe o arquivo, ajuste as variáveis de coleção se necessário, rode com
+o Collection Runner em ordem de pasta.
+
+**Opção A' — Bruno:** o Bruno importa collection do schema v2.1 (*Import Collection → Postman
+Collection*), mas a tradução dos scripts é parcial, e esta collection depende deles: são 172
+asserções que capturam ids e tokens de um request para o próximo. Espere revisar o que não converter,
+com atenção às três requisições opcionais da pasta 07, que usam `pm.execution.skipRequest()`. Para
+apenas executar a suíte, o Newman abaixo é o caminho de menor atrito, porque roda a collection como
+ela foi escrita e não exige GUI nem conta.
 
 **Opção B — Newman via Docker (sem instalar nada):**
 
@@ -42,16 +59,38 @@ docker run --rm --network=tech-challenge_oficina_mecanica_net \
   --env-var base_url=http://srv-oficina-mecanica:8080
 ```
 
+**Opção C — Newman contra o ambiente implantado.** Sem `--network`, porque o endereço é público, e
+com as senhas daquele ambiente, que não são as do compose:
+
+```shell
+docker run --rm -v "$(pwd)/postman:/etc/newman" -t postman/newman:latest \
+  run /etc/newman/Oficina-Mecanica-E2E.postman_collection.json \
+  --env-var base_url="http://$(kubectl get svc oficina-mecanica \
+      -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')" \
+  --env-var admin_password="$APP_SEED_ADMIN_PASSWORD" \
+  --env-var mechanic_password="$APP_SEED_MECHANIC_PASSWORD"
+```
+
 ## Exercitando os links do cliente
 
 Os links de acompanhamento e de decisão só existem dentro do e-mail que a aplicação envia ao
-cliente, então a collection não consegue capturá-los sozinha. Sem servidor SMTP configurado o mailer
-opera em modo simulado e imprime a mensagem no log, que é de onde o token sai:
+cliente, então a collection não consegue capturá-los sozinha. Onde procurá-los depende de como o
+mailer está configurado.
+
+Sem servidor SMTP — `MAIL_MOCK` em `true`, o default de desenvolvimento — a mensagem não é entregue e
+sai no log, que é de onde o token vem:
 
 ```shell
 docker compose logs app | grep -o 'work-orders/tracking/[^ ]*'
 docker compose logs app | grep -o 'work-orders/estimate-decisions/[^ ]*'
 ```
+
+Com SMTP configurado, o log não traz mais o corpo da mensagem: o token está no e-mail. No ambiente
+implantado o destino é o sandbox do Mailtrap (ver `k8s/configmap.yaml`), então o link sai da caixa de
+entrada de lá — o e-mail chega mesmo com endereço de cliente fictício, porque o sandbox captura tudo
+em vez de entregar. Uma falha de entrega **não** reprova o atendimento: ela é registrada como
+`Notificacao nao entregue` no log e a OS segue seu curso, o que vale conferir quando o e-mail não
+aparecer.
 
 Cole o token (o trecho depois da última barra) nas variáveis de coleção `tracking_token` e
 `estimate_decision_token` e rode de novo a pasta 07: as três requisições que dependem deles deixam
