@@ -51,9 +51,9 @@ Pré-requisitos: `terraform >= 1.10`, `aws` CLI e uma sessão ativa do lab (`AWS
 # no bloco backend de infra/terraform/versions.tf antes de rodar.
 infra/scripts/bootstrap-tf-state.sh
 
-# Confere o que a conta autoriza e regrava infra/scripts/lab-capabilities.md.
-# Rode de novo depois de cada reset do lab: IDs de rede e nomes de role mudam.
-infra/scripts/verify-lab.sh
+# Confere o que a conta autoriza. Rode de novo depois de cada reset do lab:
+# IDs de rede e nomes de role mudam junto. O relatório é escrito no caminho passado.
+infra/scripts/verify-lab.sh infra/scripts/lab-capabilities.md
 
 terraform -chdir=infra/terraform init
 terraform -chdir=infra/terraform apply
@@ -71,8 +71,8 @@ terraform -chdir=infra/terraform destroy
 O `destroy` remove os nove recursos da tabela acima e nada mais — a rede e as roles não são nossas.
 O bucket de state sobrevive de propósito; subir o ambiente de novo é um `apply`.
 
-Um cuidado: recursos criados de dentro do Kubernetes não estão no state. Se houver um `Service` do
-tipo `LoadBalancer` no cluster, apague-o (`kubectl delete -k k8s/`) antes do `destroy`, ou o ELB fica
+Um cuidado: recursos que o Kubernetes cria na AWS por conta própria não estão no state. Se houver um
+`Service` do tipo `LoadBalancer` no cluster, apague-o com `kubectl` antes do `destroy`, ou o ELB fica
 órfão na conta.
 
 ## Acessando o que foi criado

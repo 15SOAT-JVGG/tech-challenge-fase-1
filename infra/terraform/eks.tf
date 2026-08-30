@@ -1,3 +1,9 @@
+locals {
+  # O grupo que o EKS cria e anexa aos nós do node group gerenciado. É a origem que o
+  # banco libera, e o [0] fica escondido aqui em vez de repetido em cada consumidor.
+  cluster_security_group_id = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+}
+
 resource "aws_eks_cluster" "main" {
   name     = var.project_name
   version  = var.kubernetes_version

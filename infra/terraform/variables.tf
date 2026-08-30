@@ -53,7 +53,7 @@ variable "node_max_size" {
 }
 
 variable "database_engine_version" {
-  description = "Versão do Postgres no RDS. Prefixo de major aceita a menor mais recente disponível."
+  description = "Versão do Postgres no RDS. Só o major mantém a instância na minor mais recente disponível."
   type        = string
   default     = "16"
 }

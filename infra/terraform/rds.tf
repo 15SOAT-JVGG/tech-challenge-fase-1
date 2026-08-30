@@ -1,5 +1,7 @@
 locals {
   postgres_port = 5432
+
+  database_name_prefix = "${var.project_name}-db"
 }
 
 # A senha nasce aqui e nunca entra em arquivo versionado: o valor vive só no state
@@ -13,33 +15,46 @@ resource "random_password" "database" {
   special = false
 }
 
-# As mesmas subnets do node group: us-east-1e não oferta nem t3.medium nem db.t3.micro,
-# e manter banco e nós nas mesmas AZs evita salto entre zonas em toda query.
+# As mesmas subnets do node group, por dois motivos independentes. O primeiro é que
+# us-east-1e também não serve para o banco — a AZ não oferta db.t3.micro, e um subnet
+# group que a inclua deixa a criação da instância à mercê da AZ que o RDS sortear:
+#
+#   aws rds describe-orderable-db-instance-options --engine postgres \
+#     --db-instance-class db.t3.micro \
+#     --query 'OrderableDBInstanceOptions[0].AvailabilityZones[].Name'
+#
+# O segundo é que banco e nós nas mesmas AZs evitam salto entre zonas em toda query.
+# Derivar a lista de um data source de RDS custaria mais de um minuto em cada plan.
 resource "aws_db_subnet_group" "database" {
-  name       = "${var.project_name}-db"
+  name       = local.database_name_prefix
   subnet_ids = local.node_subnet_ids
 }
 
+# A descrição vai sem acento porque a AWS só aceita ASCII no campo, e é imutável:
+# reescrevê-la substitui o security group e, junto, a regra de entrada.
 resource "aws_security_group" "database" {
-  name        = "${var.project_name}-db"
+  name        = local.database_name_prefix
   description = "Postgres da oficina, alcancavel apenas pelos nos do cluster"
   vpc_id      = data.aws_vpc.default.id
 }
 
 # Referenciar o security group do cluster, e não um bloco CIDR, é o que mantém a regra
 # correta mesmo se a VPC ou as subnets mudarem: quem entra é quem pertence ao cluster.
-# O EKS anexa esse grupo aos nós do node group gerenciado.
+# O grupo cobre os nós e as ENIs do control plane, o que é mais do que os pods precisam,
+# mas ainda é a fronteira mais estreita que o EKS oferece sem instalar nada.
+#
+# Sem regra de saída: o Postgres não inicia conexão.
 resource "aws_vpc_security_group_ingress_rule" "database_from_cluster" {
   security_group_id            = aws_security_group.database.id
   description                  = "Postgres a partir dos nos do EKS"
-  referenced_security_group_id = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+  referenced_security_group_id = local.cluster_security_group_id
   ip_protocol                  = "tcp"
   from_port                    = local.postgres_port
   to_port                      = local.postgres_port
 }
 
-resource "aws_db_instance" "main" {
-  identifier     = "${var.project_name}-db"
+resource "aws_db_instance" "database" {
+  identifier     = local.database_name_prefix
   engine         = "postgres"
   engine_version = var.database_engine_version
   instance_class = var.database_instance_class
@@ -56,12 +71,11 @@ resource "aws_db_instance" "main" {
   db_subnet_group_name   = aws_db_subnet_group.database.name
   vpc_security_group_ids = [aws_security_group.database.id]
   publicly_accessible    = false
-  multi_az               = false
 
   # Ambiente de avaliação, destruído ao fim de cada sessão do lab: backup e snapshot
-  # final só custariam tempo de apply e de destroy.
+  # final só custariam tempo de apply e de destroy, e esperar a janela de manutenção
+  # para uma alteração custaria uma sessão inteira.
   backup_retention_period = 0
   skip_final_snapshot     = true
-  deletion_protection     = false
   apply_immediately       = true
 }

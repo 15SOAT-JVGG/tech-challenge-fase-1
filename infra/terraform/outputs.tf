@@ -45,7 +45,7 @@ output "eks_cluster_endpoint" {
 
 output "eks_cluster_security_group_id" {
   description = "Security group que o EKS anexa aos nós; é a origem liberada no banco."
-  value       = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+  value       = local.cluster_security_group_id
 }
 
 # O acesso ao cluster sai daqui, não de um passo manual no console.
@@ -56,22 +56,22 @@ output "kubeconfig_command" {
 
 output "database_host" {
   description = "Host do Postgres, lido pela aplicação em INFRA_HOST_POSTGRES."
-  value       = aws_db_instance.main.address
+  value       = aws_db_instance.database.address
 }
 
 output "database_port" {
   description = "Porta do Postgres."
-  value       = aws_db_instance.main.port
+  value       = aws_db_instance.database.port
 }
 
 output "database_name" {
   description = "Banco criado na instância."
-  value       = aws_db_instance.main.db_name
+  value       = aws_db_instance.database.db_name
 }
 
 output "database_username" {
   description = "Usuário master do banco."
-  value       = aws_db_instance.main.username
+  value       = aws_db_instance.database.username
 }
 
 output "database_password" {
