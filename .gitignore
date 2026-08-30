@@ -55,6 +55,7 @@ nb-configuration.xml
 *.tfstate
 *.tfstate.*
 *.tfplan
+tfplan
 *.tfvars
 *.tfvars.json
 crash.log
