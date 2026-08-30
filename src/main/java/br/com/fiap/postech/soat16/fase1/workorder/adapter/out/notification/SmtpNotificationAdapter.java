@@ -8,6 +8,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateDecisionInvitation;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderNotificationPort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderTrackingInvitation;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.Estimate;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrder;
 
@@ -18,7 +19,8 @@ import io.smallrye.mutiny.Uni;
 
 /**
  * Entrega por SMTP as mensagens que a oficina deve ao cliente. É este adaptador que conhece o
- * endereço público da API e monta a URL de cada link de decisão a partir do token assinado.
+ * endereço público da API e monta a URL de cada link — de decisão ou de acompanhamento — a partir
+ * do token assinado.
  *
  * <p>Uma OS sem e-mail de cliente cadastrado não interrompe o atendimento: a falta é registrada em
  * log e o fluxo segue, porque a reserva de estoque e a mudança de status já foram decididas.
@@ -27,6 +29,7 @@ import io.smallrye.mutiny.Uni;
 public class SmtpNotificationAdapter implements WorkOrderNotificationPort {
 
     private static final String DECISION_PATH = "/v1/public/work-orders/estimate-decisions/";
+    private static final String TRACKING_PATH = "/v1/public/work-orders/tracking/";
     private static final DateTimeFormatter DEADLINE_FORMAT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm");
 
@@ -69,18 +72,42 @@ public class SmtpNotificationAdapter implements WorkOrderNotificationPort {
     }
 
     @Override
-    public Uni<Void> notifyWorkOrderCompleted(WorkOrder order) {
+    public Uni<Void> notifyWorkOrderProgress(WorkOrder order, WorkOrderTrackingInvitation invitation) {
         String recipient = customerEmail(order);
         if (recipient == null) {
-            return skip(order, "ordem de servico concluida");
+            return skip(order, "andamento da ordem de servico");
         }
         String body = """
                 Ola, %s!
 
-                A ordem de servico %s foi concluida e o veiculo esta disponivel para retirada.
-                """.formatted(customerName(order), order.getId());
+                %s
+
+                Acompanhe a sua ordem de servico %s por este link, valido ate %s:
+                %s
+                """.formatted(
+                        customerName(order),
+                        stage(order),
+                        order.getId(),
+                        invitation.expiresAt().format(DEADLINE_FORMAT),
+                        trackingLink(invitation.trackingToken()));
         return mailer.send(Mail.withText(recipient,
-                "Ordem de servico " + order.getId() + " concluida", body));
+                "Andamento da ordem de servico " + order.getId(), body));
+    }
+
+    /**
+     * O estágio é dito em linguagem de cliente, e não pelo nome do status: é ele quem vai ler.
+     */
+    private String stage(WorkOrder order) {
+        return switch (order.getStatus()) {
+            case RECEIVED -> "Recebemos o seu veiculo e abrimos o atendimento.";
+            case DIAGNOSIS -> "Estamos diagnosticando o seu veiculo.";
+            case WAITING_APPROVAL -> "O orcamento foi enviado e aguarda a sua resposta.";
+            case IN_PROGRESS -> "O orcamento foi aprovado e o servico esta em execucao.";
+            case COMPLETED -> order.wasCancelled()
+                    ? "O orcamento foi recusado, e com isso encerramos o atendimento."
+                    : "O servico foi concluido e o veiculo esta disponivel para retirada.";
+            case DELIVERED -> "O veiculo foi entregue. Obrigado pela confianca!";
+        };
     }
 
     private Uni<Void> skip(WorkOrder order, String subject) {
@@ -91,6 +118,10 @@ public class SmtpNotificationAdapter implements WorkOrderNotificationPort {
 
     private String decisionLink(String signedToken) {
         return publicBaseUrl + DECISION_PATH + signedToken;
+    }
+
+    private String trackingLink(String signedToken) {
+        return publicBaseUrl + TRACKING_PATH + signedToken;
     }
 
     private String customerEmail(WorkOrder order) {

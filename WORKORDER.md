@@ -16,6 +16,7 @@ veículo. Para detalhes de autenticação, portas e como rodar o projeto, veja o
 | `WorkOrderService` | Uma linha de mão de obra executada na ordem (ex.: "Troca de óleo"), com descrição, preço e item do catálogo de serviços de origem. |
 | `WorkOrderHistory` | Registro interno de toda mudança de status da ordem (não exposto via API). |
 | `EstimateDecisionToken` | O direito a uma única decisão do cliente sobre um orçamento. Um token por decisão (aprovar/recusar), assinado, de uso único e válido por sete dias. |
+| `WorkOrderTrackingToken` | O direito de acompanhar uma ordem de serviço. Assinado, sem registro em banco, reemitido a cada aviso e válido por trinta dias. |
 
 ---
 
@@ -81,6 +82,23 @@ por ela:
   a OS avança para `COMPLETED`, recebe `closedAt` e `cancelledAt` e fica bloqueada para novas
   alterações.
 
+### Acompanhamento do cliente por e-mail
+
+A abertura da OS e cada mudança de status posterior enviam ao cliente um e-mail contando em que
+estágio o atendimento está, com um link de acompanhamento
+(`GET /v1/public/work-orders/tracking/{token}`).
+
+- O link carrega um `WorkOrderTrackingToken` assinado com o par RS256 da API — um token **distinto
+  do de decisão**: acompanhar não altera nada, então o link vale por **trinta dias** e por quantas
+  consultas o cliente quiser.
+- Como não há nada a gastar, o token não é registrado no banco: a data de emissão viaja assinada no
+  link e é dela que sai o prazo. Cada aviso reemite o link, então o cliente sempre tem trinta dias
+  pela frente a partir da última novidade.
+- A resposta conta apenas o andamento — `workOrderId`, `status`, `openedAt`, `closedAt` e
+  `cancelledAt`. Valores, peças, descrição e mecânico ficam fora, porque um e-mail é reencaminhado.
+- Não existe consulta por id: sem o link, ou com um link forjado (`TRACKING_TOKEN_INVALID`, 400) ou
+  vencido (`TRACKING_TOKEN_EXPIRED`, 410), nada da OS é revelado.
+
 ### Decisão do cliente por e-mail
 
 Ao entrar em `WAITING_APPROVAL`, a oficina envia por SMTP um e-mail ao cliente com dois links, um
@@ -115,7 +133,7 @@ mailer opera em modo simulado e apenas registra a mensagem em log.
 | `POST` | `/v1/work-orders/{id}/estimate` | Cria um orçamento com itens do catálogo de peças. |
 | `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/approve` | Aprova um orçamento pendente. |
 | `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/reject` | Recusa o orçamento, devolve as peças ao estoque e conclui a OS com `cancelledAt`. |
-| `GET` | `/v1/public/work-orders/{id}` | Canal do cliente: acompanha a OS. |
+| `GET` | `/v1/public/work-orders/tracking/{token}` | Canal do cliente: acompanha a OS pelo link recebido por e-mail. |
 | `POST` | `/v1/public/work-orders/estimate-decisions/{token}` | Canal do cliente: registra a decisão pelo link recebido por e-mail. |
 | `POST` | `/v1/work-orders/{id}/services` | Registra uma linha de mão de obra executada. |
 | `PATCH` | `/v1/work-orders/{id}/close` | Finaliza a ordem (`IN_PROGRESS` → `COMPLETED`). |
@@ -164,6 +182,17 @@ para a nova OS:
 ```
 
 `estimate` vem `null` quando a abertura não traz solicitação inicial.
+
+A abertura também dispara o primeiro e-mail de acompanhamento ao cliente. Ele acompanha a OS pelo
+link recebido, sem autenticação:
+
+```shell
+curl -s http://localhost:8080/v1/public/work-orders/tracking/<tracking-token>
+```
+
+```json
+{"workOrderId": "...", "status": "RECEIVED", "openedAt": "2026-01-10T09:00:00"}
+```
 
 ### 2. Avançar para diagnóstico
 
@@ -262,12 +291,14 @@ As peças reservadas voltam ao estoque, a OS passa para `COMPLETED`, recebe `clo
 | HTTP | Código | Quando acontece |
 |---|---|---|
 | 400 | `DECISION_TOKEN_INVALID` | Link de decisão adulterado, malformado ou não emitido para decidir orçamento. |
+| 400 | `TRACKING_TOKEN_INVALID` | Link de acompanhamento adulterado, malformado ou não emitido para acompanhar uma OS. |
 | 404 | `WORK_ORDER_NOT_FOUND` | Id de ordem inexistente. |
 | 404 | `ESTIMATE_PART_NOT_FOUND` | `partId` informado no orçamento não existe no catálogo. |
 | 404 | `ESTIMATE_NOT_FOUND` | `estimateId` não existe ou não pertence à ordem informada. |
 | 409 | `ESTIMATE_ALREADY_DECIDED` | Tentativa de aprovar um orçamento já aprovado/rejeitado. |
 | 410 | `DECISION_TOKEN_EXPIRED` | Link de decisão apresentado depois dos sete dias. |
 | 410 | `DECISION_TOKEN_ALREADY_USED` | Link de decisão apresentado uma segunda vez. |
+| 410 | `TRACKING_TOKEN_EXPIRED` | Link de acompanhamento apresentado depois dos trinta dias. |
 | 422 | `INSUFFICIENT_PART_STOCK` | Saldo insuficiente para reservar uma peça ao levar a OS a `WAITING_APPROVAL`. |
 | 422 | `WORK_ORDER_LOCKED` | Ordem já `DELIVERED` ou concluída por recusa do orçamento. |
 | 422 | `INVALID_STATUS_TRANSITION` | Transição de status inválida (pular etapa, ir direto para `COMPLETED`, etc.). |
@@ -307,6 +338,10 @@ como `Classe.método`; todas vivem dentro de uma classe `@Nested` com o mesmo no
 | `/close` exige orçamento aprovado e status `IN_PROGRESS` | `Close.shouldReturn422WhenNotInProgress` | `Close.shouldThrow...WhenNotInProgress`, `...WhenThereIsNoApprovedEstimate` |
 | `finalValue` opcional no fechamento — usa `estimatedValue` se omitido | `Close.shouldCloseUsingEstimatedValueWhenOmitted` | `Close.shouldCompleteUsingTheApprovedEstimateValueWhenFinalValueIsOmitted` |
 | `finalValue` pode divergir do orçamento (serviço extra/desconto) | `Close.shouldCloseUsingProvidedFinalValue` | `Close.shouldUseTheProvidedFinalValueWhenPresent`, `...shouldRecordHistoryTransitionToCompletedWhenFinalValueDiffersFromTheEstimate` |
+| Abertura e cada mudança de status enviam e-mail com link de acompanhamento | `PublicChannel.shouldEmailTrackingLinkOnOpeningAndOnEveryStatusChange` | `ProgressNotification.shouldInviteToTrackOnOpening`, `...shouldNotifyOnEveryStatusChange`, `...shouldNotifyOnClosing` |
+| Link de acompanhamento vale trinta dias e não se gasta | `PublicChannel.shouldTrackThroughEmailedLink` | `WorkOrderTrackingTokenTest.Issue.issuesTokenValidForThirtyDays` |
+| Acompanhamento expõe só o andamento do atendimento | `PublicChannel.shouldExposeOnlyTheProgressFields`, `...shouldTrackWorkOrderClosedByRejection` | `Track.shouldReturnTheTrackedWorkOrder` |
+| Sem link, com link forjado (400) ou vencido (410), nada da OS é revelado | `PublicChannel.shouldNotRevealTheWorkOrderWithoutToken`, `...shouldReturn400ForForgedTrackingLink`, `...shouldReturn410WhenTrackingLinkHasExpired` | `Track.shouldRejectForgedTrackingLink`, `...shouldRejectExpiredTrackingLink` |
 | Entrada em `WAITING_APPROVAL` reserva todas as peças do orçamento pendente | `EstimateDecisionAndStock.shouldReserveStockWhenAwaitingApproval` | `SendEstimateToCustomer.shouldReservePartsAndInviteCustomer` |
 | Saldo insuficiente não reserva nada, não envia e-mail e mantém a OS em `DIAGNOSIS` | `EstimateDecisionAndStock.shouldKeepDiagnosisWhenInsufficientStock` | `SendEstimateToCustomer.shouldKeepDiagnosisWhenStockIsInsufficient` |
 | Orçamento criado sobre OS já em `WAITING_APPROVAL` também reserva e é enviado | `PublicChannel.shouldReserveAndEmailReplacementEstimate` | — (exercitado ponta a ponta) |

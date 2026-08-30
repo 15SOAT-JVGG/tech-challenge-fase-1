@@ -32,12 +32,15 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateP
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderNotificationPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderPersistencePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderServicePersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderTrackingInvitation;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderTrackingTokenSignaturePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkshopCatalogPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.OpenWorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderMetricsResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderTrackingResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimatePartNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidEstimateDecisionTokenException;
@@ -47,6 +50,7 @@ import br.com.fiap.postech.soat16.fase1.workorder.domain.model.EstimateDecisionT
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.EstimateItem;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderHistory;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderTrackingToken;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateDecision;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderStatus;
 
@@ -71,6 +75,7 @@ public class WorkOrderService {
     private final WorkOrderServiceMapper serviceMapper;
     private final WorkOrderNotificationPort notificationService;
     private final EstimateDecisionTokenSignaturePort decisionTokenSignature;
+    private final WorkOrderTrackingTokenSignaturePort trackingTokenSignature;
 
     /**
      * A fila operacional da oficina: somente ordens ainda em atendimento, agrupadas pelo estágio de
@@ -109,6 +114,21 @@ public class WorkOrderService {
     }
 
     /**
+     * O acompanhamento do cliente: o link assinado é a única credencial, e ele responde apenas o
+     * andamento do atendimento. Um link forjado ou vencido não conta nada sobre a ordem.
+     */
+    @WithSession
+    public Uni<WorkOrderTrackingResult> track(String signedToken) {
+        LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+        return Uni.createFrom().item(signedToken)
+                .map(trackingTokenSignature::read)
+                .invoke(token -> token.ensureValidAt(now))
+                .flatMap(token -> repository.findByWorkOrderId(token.workOrderId()))
+                .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
+                .map(mapper::toTrackingResult);
+    }
+
+    /**
      * Abre a ordem em RECEIVED e, quando a solicitação inicial traz peças ou serviços, o orçamento
      * pendente correspondente. A transação única garante que uma referência inválida não deixe
      * ordem, linhas de serviço ou orçamento pela metade.
@@ -131,7 +151,8 @@ public class WorkOrderService {
                 .flatMap(order -> openInitialEstimate(order, request, openedAt)
                         .map(estimate -> new OpenWorkOrderResult(
                                 mapper.toResult(order),
-                                estimateMapper.toResult(estimate))));
+                                estimateMapper.toResult(estimate)))
+                        .flatMap(opened -> notifyProgress(order, openedAt).replaceWith(opened)));
     }
 
     private Uni<Estimate> openInitialEstimate(WorkOrder order, OpenWorkOrderCommand request,
@@ -210,6 +231,7 @@ public class WorkOrderService {
                             .flatMap(saved -> request.status() == WorkOrderStatus.WAITING_APPROVAL
                                     ? sendPendingEstimateToCustomer(saved, now).replaceWith(saved)
                                     : Uni.createFrom().item(saved))
+                            .flatMap(saved -> notifyProgress(saved, now).replaceWith(saved))
                             .map(mapper::toResult);
                 });
     }
@@ -348,6 +370,7 @@ public class WorkOrderService {
 
     @WithTransaction
     public Uni<WorkOrderResult> close(UUID id, CloseWorkOrderCommand request) {
+        LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
         return repository.findByWorkOrderId(id)
                 .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
                 .flatMap(order -> {
@@ -358,8 +381,8 @@ public class WorkOrderService {
                                     Optional.of(order.close(
                                             request.finalValue(),
                                             hasApproved,
-                                            LocalDateTime.now(ZoneId.systemDefault())))))
-                            .flatMap(saved -> notificationService.notifyWorkOrderCompleted(saved).replaceWith(saved))
+                                            now))))
+                            .flatMap(saved -> notifyProgress(saved, now).replaceWith(saved))
                             .map(mapper::toResult);
                 });
     }
@@ -370,15 +393,19 @@ public class WorkOrderService {
      */
     private Uni<Estimate> approve(WorkOrder order, Estimate estimate, LocalDateTime now) {
         estimate.approve(now);
-        return persistOrderWithHistory(order, order.registerEstimateApproval(estimate, now))
-                .flatMap(persisted -> estimateRepository.save(estimate));
+        Optional<WorkOrderHistory> statusChange = order.registerEstimateApproval(estimate, now);
+        return persistOrderWithHistory(order, statusChange)
+                .flatMap(persisted -> estimateRepository.save(estimate))
+                .flatMap(saved -> notifyProgressIfStatusChanged(order, statusChange, now).replaceWith(saved));
     }
 
     private Uni<Estimate> reject(WorkOrder order, Estimate estimate, LocalDateTime now) {
         estimate.reject();
+        Optional<WorkOrderHistory> statusChange = order.registerEstimateRejection(now);
         return restoreParts(estimate)
-                .flatMap(ignored -> persistOrderWithHistory(order, order.registerEstimateRejection(now)))
-                .flatMap(persisted -> estimateRepository.save(estimate));
+                .flatMap(ignored -> persistOrderWithHistory(order, statusChange))
+                .flatMap(persisted -> estimateRepository.save(estimate))
+                .flatMap(saved -> notifyProgressIfStatusChanged(order, statusChange, now).replaceWith(saved));
     }
 
     /**
@@ -388,12 +415,30 @@ public class WorkOrderService {
      */
     private Uni<Estimate> finalizeEstimateCreation(WorkOrder order, Estimate estimate) {
         LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
-        Optional<WorkOrderHistory> history = order.registerEstimate(estimate, now);
-        return persistOrderWithHistory(order, history)
+        Optional<WorkOrderHistory> statusChange = order.registerEstimate(estimate, now);
+        return persistOrderWithHistory(order, statusChange)
                 .flatMap(saved -> saved.getStatus() == WorkOrderStatus.WAITING_APPROVAL
                         ? awaitCustomerDecision(saved, estimate, now)
                         : Uni.createFrom().voidItem())
+                .flatMap(ignored -> notifyProgressIfStatusChanged(order, statusChange, now))
                 .replaceWith(estimate);
+    }
+
+    /**
+     * O acompanhamento é reemitido a cada aviso: o cliente sempre recebe um link com trinta dias
+     * pela frente, e a oficina não precisa guardar token nenhum.
+     */
+    private Uni<Void> notifyProgress(WorkOrder order, LocalDateTime now) {
+        var token = WorkOrderTrackingToken.issue(order.getId(), now);
+        return notificationService.notifyWorkOrderProgress(order, new WorkOrderTrackingInvitation(
+                trackingTokenSignature.sign(token), token.expiresAt()));
+    }
+
+    private Uni<Void> notifyProgressIfStatusChanged(WorkOrder order,
+            Optional<WorkOrderHistory> statusChange, LocalDateTime now) {
+        return statusChange.isEmpty()
+                ? Uni.createFrom().voidItem()
+                : notifyProgress(order, now);
     }
 
     private Uni<List<EstimateItem>> buildItems(CreateEstimateCommand request) {

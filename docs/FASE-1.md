@@ -219,9 +219,8 @@ Base local: `http://localhost:8080`. No cluster, o hostname do ELB. Papéis: �
 ### Canal público do cliente — `/v1/public/work-orders`
 | Método | Path | Acesso |
 |---|---|---|
-| GET | `/v1/public/work-orders/{id}` | 🔓 |
-| PATCH | `/v1/public/work-orders/{id}/estimate/{estimateId}/approve` | 🔓 |
-| PATCH | `/v1/public/work-orders/{id}/estimate/{estimateId}/reject` | 🔓 |
+| GET | `/v1/public/work-orders/tracking/{token}` | 🔓 |
+| POST | `/v1/public/work-orders/estimate-decisions/{token}` | 🔓 |
 
 ### Operação — `/q`
 | Método | Path | Acesso |

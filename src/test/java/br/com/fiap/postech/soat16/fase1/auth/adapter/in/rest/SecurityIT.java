@@ -2,8 +2,6 @@ package br.com.fiap.postech.soat16.fase1.auth.adapter.in.rest;
 
 import static io.restassured.RestAssured.given;
 
-import java.util.UUID;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -41,13 +39,15 @@ class SecurityIT {
             .statusCode(400);
     }
 
+    // O 400 é a resposta do recurso ao link forjado: chegar até ela é a prova de que o canal do
+    // cliente não exige token de autenticação.
     @Test
     @DisplayName("deve liberar o canal público do cliente sem token")
     void shouldAllowPublicClientEndpointWithoutToken() {
         given()
         .when()
-            .get("/v1/public/work-orders/" + UUID.randomUUID())
+            .get("/v1/public/work-orders/tracking/nao-e-um-link-valido")
         .then()
-            .statusCode(404);
+            .statusCode(400);
     }
 }

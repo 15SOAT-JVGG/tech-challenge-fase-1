@@ -1,7 +1,5 @@
 package br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.controller;
 
-import java.util.UUID;
-
 import jakarta.annotation.security.PermitAll;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.Consumes;
@@ -14,7 +12,7 @@ import jakarta.ws.rs.core.MediaType;
 
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.WorkOrderRestMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.EstimateResponseDto;
-import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderResponseDto;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderTrackingResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.openapi.PublicWorkOrderControllerDocs;
 import br.com.fiap.postech.soat16.fase1.workorder.application.WorkOrderService;
 
@@ -31,11 +29,15 @@ public class PublicWorkOrderController implements PublicWorkOrderControllerDocs 
 
     private final WorkOrderService service;
 
+    /**
+     * O link de acompanhamento é a única credencial do cliente: não existe rota por id, porque ela
+     * entregaria o andamento a quem apenas conhecesse o identificador da ordem.
+     */
     @GET
-    @Path("/{id}")
+    @Path("/tracking/{token}")
     @Override
-    public Uni<WorkOrderResponseDto> track(@PathParam("id") UUID id) {
-        return service.findById(id).map(WorkOrderRestMapper::toResponse);
+    public Uni<WorkOrderTrackingResponseDto> track(@PathParam("token") String token) {
+        return service.track(token).map(WorkOrderRestMapper::toResponse);
     }
 
     /**

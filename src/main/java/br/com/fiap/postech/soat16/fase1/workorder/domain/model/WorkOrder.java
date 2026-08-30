@@ -123,8 +123,15 @@ public class WorkOrder extends AuditableEntity {
         return status == WorkOrderStatus.IN_PROGRESS;
     }
 
+    /**
+     * Cancelamento aqui é só um: a recusa do orçamento pelo cliente, que conclui a ordem.
+     */
+    public boolean wasCancelled() {
+        return cancelledAt != null;
+    }
+
     public void ensureMutable() {
-        if (status == WorkOrderStatus.DELIVERED || cancelledAt != null) {
+        if (status == WorkOrderStatus.DELIVERED || wasCancelled()) {
             throw new WorkOrderLockedException();
         }
     }

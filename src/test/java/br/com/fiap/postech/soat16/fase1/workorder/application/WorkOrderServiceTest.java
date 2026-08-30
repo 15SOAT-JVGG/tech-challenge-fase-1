@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -50,19 +51,24 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateP
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderNotificationPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderPersistencePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderServicePersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderTrackingInvitation;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderTrackingTokenSignaturePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkshopCatalogPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderTrackingResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateAlreadyDecidedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateDecisionTokenAlreadyUsedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateNotApprovedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimatePartNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.ExpiredEstimateDecisionTokenException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.ExpiredWorkOrderTrackingTokenException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InsufficientPartStockException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidEstimateDecisionTokenException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidWorkOrderStatusTransitionException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidWorkOrderTrackingTokenException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.WorkOrderLockedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.WorkOrderNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.Estimate;
@@ -70,6 +76,7 @@ import br.com.fiap.postech.soat16.fase1.workorder.domain.model.EstimateDecisionT
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.EstimateItem;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderHistory;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderTrackingToken;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateDecision;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderStatus;
@@ -110,6 +117,9 @@ class WorkOrderServiceTest {
     @Mock
     private EstimateDecisionTokenSignaturePort decisionTokenSignature;
 
+    @Mock
+    private WorkOrderTrackingTokenSignaturePort trackingTokenSignature;
+
     private WorkOrderService service;
 
     private static final UUID WORK_ORDER_ID = UUID.randomUUID();
@@ -125,12 +135,14 @@ class WorkOrderServiceTest {
     void setUp() {
         service = new WorkOrderService(repository, estimateRepository, serviceRepository,
                 decisionTokenRepository, catalog, mapper, estimateMapper, serviceMapper,
-                notificationService, decisionTokenSignature);
+                notificationService, decisionTokenSignature, trackingTokenSignature);
 
         lenient().when(notificationService.notifyEstimateAwaitingDecision(any(), any(), any()))
                 .thenReturn(Uni.createFrom().voidItem());
-        lenient().when(notificationService.notifyWorkOrderCompleted(any()))
+        lenient().when(notificationService.notifyWorkOrderProgress(any(), any()))
                 .thenReturn(Uni.createFrom().voidItem());
+        lenient().when(trackingTokenSignature.sign(any(WorkOrderTrackingToken.class)))
+                .thenReturn("signed-tracking-token");
         lenient().when(decisionTokenRepository.save(any(EstimateDecisionToken.class)))
                 .thenAnswer(invocation -> Uni.createFrom().item(
                         (EstimateDecisionToken) invocation.getArgument(0)));
@@ -187,6 +199,143 @@ class WorkOrderServiceTest {
 
             assertThrows(WorkOrderNotFoundException.class,
                     () -> service.findById(WORK_ORDER_ID).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("track")
+    class Track {
+
+        private static final String SIGNED_TOKEN = "signed-tracking-token";
+
+        @Test
+        @DisplayName("deve devolver apenas o andamento da OS do link apresentado")
+        void shouldReturnTheTrackedWorkOrder() {
+            WorkOrderTrackingResult tracking = new WorkOrderTrackingResult(WORK_ORDER_ID,
+                    WorkOrderStatus.RECEIVED, LocalDateTime.now(), null, null);
+            when(trackingTokenSignature.read(SIGNED_TOKEN)).thenReturn(
+                    WorkOrderTrackingToken.issue(WORK_ORDER_ID, LocalDateTime.now()));
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(mapper.toTrackingResult(entity)).thenReturn(tracking);
+
+            WorkOrderTrackingResult result = service.track(SIGNED_TOKEN).await().indefinitely();
+
+            assertEquals(WORK_ORDER_ID, result.workOrderId());
+            assertEquals(WorkOrderStatus.RECEIVED, result.status());
+        }
+
+        @Test
+        @DisplayName("não deve consultar a OS quando o link está fora do prazo de trinta dias")
+        void shouldRejectExpiredTrackingLink() {
+            when(trackingTokenSignature.read(SIGNED_TOKEN)).thenReturn(
+                    WorkOrderTrackingToken.issue(WORK_ORDER_ID, LocalDateTime.now().minusDays(31)));
+
+            assertThrows(ExpiredWorkOrderTrackingTokenException.class,
+                    () -> service.track(SIGNED_TOKEN).await().indefinitely());
+            verify(repository, never()).findByWorkOrderId(WORK_ORDER_ID);
+        }
+
+        @Test
+        @DisplayName("não deve consultar a OS quando o link não foi emitido pela oficina")
+        void shouldRejectForgedTrackingLink() {
+            when(trackingTokenSignature.read(SIGNED_TOKEN))
+                    .thenThrow(new InvalidWorkOrderTrackingTokenException());
+
+            assertThrows(InvalidWorkOrderTrackingTokenException.class,
+                    () -> service.track(SIGNED_TOKEN).await().indefinitely());
+            verify(repository, never()).findByWorkOrderId(WORK_ORDER_ID);
+        }
+
+        @Test
+        @DisplayName("deve lançar WorkOrderNotFoundException quando a OS do link não existe mais")
+        void shouldThrowWhenTrackedWorkOrderMissing() {
+            when(trackingTokenSignature.read(SIGNED_TOKEN)).thenReturn(
+                    WorkOrderTrackingToken.issue(WORK_ORDER_ID, LocalDateTime.now()));
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().nullItem());
+
+            assertThrows(WorkOrderNotFoundException.class,
+                    () -> service.track(SIGNED_TOKEN).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("aviso de acompanhamento ao cliente")
+    class ProgressNotification {
+
+        @Test
+        @DisplayName("deve convidar o cliente a acompanhar a OS na abertura, com link de trinta dias")
+        void shouldInviteToTrackOnOpening() {
+            LocalDateTime beforeOpening = LocalDateTime.now();
+            when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(new Customer()));
+            when(catalog.findVehicleById(VEHICLE_ID)).thenReturn(Uni.createFrom().item(new Vehicle()));
+            when(repository.save(any(WorkOrder.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item((WorkOrder) invocation.getArgument(0)));
+
+            service.create(new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null,
+                    List.of(), List.of())).await().indefinitely();
+
+            WorkOrderTrackingInvitation invitation = captureInvitation();
+            assertEquals("signed-tracking-token", invitation.trackingToken());
+            assertTrue(invitation.expiresAt().isAfter(beforeOpening.plusDays(29)));
+        }
+
+        @Test
+        @DisplayName("deve avisar o cliente a cada mudança de status")
+        void shouldNotifyOnEveryStatusChange() {
+            entity.setStatus(WorkOrderStatus.RECEIVED);
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+
+            service.updateStatus(WORK_ORDER_ID, new ChangeWorkOrderStatusCommand(WorkOrderStatus.DIAGNOSIS))
+                    .await().indefinitely();
+
+            verify(notificationService).notifyWorkOrderProgress(any(), any());
+        }
+
+        @Test
+        @DisplayName("deve avisar o cliente ao concluir a OS")
+        void shouldNotifyOnClosing() {
+            entity.setStatus(WorkOrderStatus.IN_PROGRESS);
+            entity.setEstimatedValue(BigDecimal.valueOf(100));
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(true));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+
+            service.close(WORK_ORDER_ID, new CloseWorkOrderCommand(null)).await().indefinitely();
+
+            verify(notificationService).notifyWorkOrderProgress(any(), any());
+        }
+
+        @Test
+        @DisplayName("não deve avisar quando a decisão do orçamento não muda o status da OS")
+        void shouldNotNotifyWithoutStatusChange() {
+            entity.setStatus(WorkOrderStatus.IN_PROGRESS);
+            UUID estimateId = UUID.randomUUID();
+            Estimate estimate = new Estimate();
+            estimate.setId(estimateId);
+            estimate.setWorkOrder(entity);
+            estimate.setStatus(EstimateStatus.PENDING);
+            estimate.setTotalAmount(BigDecimal.valueOf(50));
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(estimate));
+            when(repository.save(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
+
+            service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
+
+            verify(notificationService, never()).notifyWorkOrderProgress(any(), any());
+        }
+
+        private WorkOrderTrackingInvitation captureInvitation() {
+            ArgumentCaptor<WorkOrderTrackingInvitation> captor =
+                    ArgumentCaptor.forClass(WorkOrderTrackingInvitation.class);
+            verify(notificationService).notifyWorkOrderProgress(any(), captor.capture());
+            return captor.getValue();
         }
     }
 

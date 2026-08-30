@@ -1,6 +1,7 @@
 package br.com.fiap.postech.soat16.fase1.workorder.adapter.out.notification;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -23,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import br.com.fiap.postech.soat16.fase1.customer.domain.model.Customer;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateDecisionInvitation;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderTrackingInvitation;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.Estimate;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
@@ -100,21 +102,64 @@ class SmtpNotificationAdapterTest {
     }
 
     @Nested
-    @DisplayName("notifyWorkOrderCompleted")
-    class NotifyWorkOrderCompleted {
+    @DisplayName("notifyWorkOrderProgress")
+    class NotifyWorkOrderProgress {
 
         @Test
-        @DisplayName("avisa o cliente de que o veículo está disponível para retirada")
+        @DisplayName("envia ao cliente o link de acompanhamento sob o endereço público")
+        void sendsTrackingLink() {
+            when(mailer.send(any(Mail.class))).thenReturn(Uni.createFrom().voidItem());
+            WorkOrder order = workOrder(CUSTOMER_EMAIL);
+            order.setStatus(WorkOrderStatus.RECEIVED);
+
+            adapter.notifyWorkOrderProgress(order, tracking()).await().indefinitely();
+
+            Mail mail = captureMail();
+            assertEquals(List.of(CUSTOMER_EMAIL), mail.getTo());
+            assertTrue(mail.getSubject().contains(WORK_ORDER_ID.toString()));
+            assertTrue(mail.getText().contains(
+                    BASE_URL + "/v1/public/work-orders/tracking/tracking-token"));
+        }
+
+        @Test
+        @DisplayName("informa o estágio do atendimento e o prazo do link de acompanhamento")
+        void statesStageAndDeadline() {
+            when(mailer.send(any(Mail.class))).thenReturn(Uni.createFrom().voidItem());
+            WorkOrder order = workOrder(CUSTOMER_EMAIL);
+            order.setStatus(WorkOrderStatus.IN_PROGRESS);
+
+            adapter.notifyWorkOrderProgress(order, tracking()).await().indefinitely();
+
+            String body = captureMail().getText();
+            assertTrue(body.contains("execucao"));
+            assertTrue(body.contains("09/02/2026"));
+        }
+
+        @Test
+        @DisplayName("avisa o cliente de que o veículo está disponível para retirada ao concluir")
         void announcesVehicleReady() {
             when(mailer.send(any(Mail.class))).thenReturn(Uni.createFrom().voidItem());
             WorkOrder order = workOrder(CUSTOMER_EMAIL);
             order.setStatus(WorkOrderStatus.COMPLETED);
 
-            adapter.notifyWorkOrderCompleted(order).await().indefinitely();
+            adapter.notifyWorkOrderProgress(order, tracking()).await().indefinitely();
 
-            Mail mail = captureMail();
-            assertEquals(List.of(CUSTOMER_EMAIL), mail.getTo());
-            assertTrue(mail.getText().contains("retirada"));
+            assertTrue(captureMail().getText().contains("retirada"));
+        }
+
+        @Test
+        @DisplayName("não promete retirada quando o atendimento foi encerrado pela recusa do orçamento")
+        void announcesAttendanceClosedByRejection() {
+            when(mailer.send(any(Mail.class))).thenReturn(Uni.createFrom().voidItem());
+            WorkOrder order = workOrder(CUSTOMER_EMAIL);
+            order.setStatus(WorkOrderStatus.COMPLETED);
+            order.setCancelledAt(LocalDateTime.of(2026, 1, 10, 9, 30));
+
+            adapter.notifyWorkOrderProgress(order, tracking()).await().indefinitely();
+
+            String body = captureMail().getText();
+            assertTrue(body.contains("recusado"));
+            assertFalse(body.contains("retirada"));
         }
 
         @Test
@@ -123,7 +168,7 @@ class SmtpNotificationAdapterTest {
             WorkOrder order = workOrder(null);
             order.setStatus(WorkOrderStatus.COMPLETED);
 
-            adapter.notifyWorkOrderCompleted(order).await().indefinitely();
+            adapter.notifyWorkOrderProgress(order, tracking()).await().indefinitely();
 
             verify(mailer, never()).send(any(Mail.class));
         }
@@ -138,6 +183,10 @@ class SmtpNotificationAdapterTest {
     private EstimateDecisionInvitation invitation() {
         return new EstimateDecisionInvitation("approve-token", "reject-token",
                 LocalDateTime.of(2026, 1, 17, 9, 30));
+    }
+
+    private WorkOrderTrackingInvitation tracking() {
+        return new WorkOrderTrackingInvitation("tracking-token", LocalDateTime.of(2026, 2, 9, 9, 30));
     }
 
     private WorkOrder workOrder(String customerEmail) {

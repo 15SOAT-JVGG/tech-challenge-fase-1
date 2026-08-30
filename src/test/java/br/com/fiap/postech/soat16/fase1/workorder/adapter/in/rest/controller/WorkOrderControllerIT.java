@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,8 +48,11 @@ import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.O
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderServiceResponseDto;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderTrackingResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.EstimateDecisionTokenRepository;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.WorkOrderRepository;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.out.security.JwtWorkOrderTrackingTokenAdapter;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderTrackingToken;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderStatus;
 
@@ -71,6 +75,7 @@ class WorkOrderControllerIT {
 
     private static final String WORK_ORDERS_PATH = "/v1/work-orders";
     private static final String DECISION_LINK_MARKER = "/v1/public/work-orders/estimate-decisions/";
+    private static final String TRACKING_LINK_MARKER = "/v1/public/work-orders/tracking/";
     private static final AtomicInteger PLATE_COUNTER = new AtomicInteger();
 
     @Inject
@@ -93,6 +98,10 @@ class WorkOrderControllerIT {
 
     @Inject
     EstimateDecisionTokenRepository decisionTokenRepository;
+
+    // Esperar trinta dias não é uma opção, então o link vencido é assinado pelo próprio adaptador.
+    @Inject
+    JwtWorkOrderTrackingTokenAdapter trackingTokenSignature;
 
     @BeforeAll
     static void authenticateAllRequests() {
@@ -146,10 +155,18 @@ class WorkOrderControllerIT {
     // O mailer roda em modo simulado nos testes, então a caixa de entrada é a única forma de
     // observar exatamente o que o cliente recebeu — inclusive os links que ele vai clicar.
     private List<String> decisionLinks(String customerEmail) {
+        return emailedLinks(customerEmail, DECISION_LINK_MARKER);
+    }
+
+    private List<String> trackingLinks(String customerEmail) {
+        return emailedLinks(customerEmail, TRACKING_LINK_MARKER);
+    }
+
+    private List<String> emailedLinks(String customerEmail, String marker) {
         return mailbox.getMailMessagesSentTo(customerEmail).stream()
                 .flatMap(mail -> mail.getText().lines())
                 .map(String::trim)
-                .filter(line -> line.contains(DECISION_LINK_MARKER))
+                .filter(line -> line.contains(marker))
                 .map(line -> line.substring(line.indexOf("http")))
                 .toList();
     }
@@ -1134,22 +1151,101 @@ class WorkOrderControllerIT {
 
         private static final String PUBLIC_PATH = "/v1/public/work-orders";
         private static final String DECISION_PATH = PUBLIC_PATH + "/estimate-decisions/";
+        private static final String TRACKING_PATH = PUBLIC_PATH + "/tracking/";
 
         @Test
-        @DisplayName("cliente deve acompanhar a OS sem autenticação")
-        void shouldTrackAsClient() {
-            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+        @DisplayName("cliente deve acompanhar a OS pelo link recebido, sem autenticação")
+        void shouldTrackThroughEmailedLink() {
+            SeededCustomer customer = seedCustomerWithEmail();
+            UUID workOrderId = createWorkOrder(customer.id(), seedVehicle());
             updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
-            createEstimate(workOrderId, seedPart(new BigDecimal("80.00")), 1);
 
-            WorkOrderResponseDto tracked = given()
+            WorkOrderTrackingResponseDto tracked = track(latestTrackingToken(customer.email()), 200)
+                    .as(WorkOrderTrackingResponseDto.class);
+
+            assertEquals(workOrderId, tracked.workOrderId());
+            assertEquals(WorkOrderStatus.DIAGNOSIS, tracked.status());
+            assertNotNull(tracked.openedAt());
+        }
+
+        @Test
+        @DisplayName("o acompanhamento deve expor apenas o andamento do atendimento")
+        void shouldExposeOnlyTheProgressFields() {
+            SeededCustomer customer = seedCustomerWithEmail();
+            createWorkOrder(customer.id(), seedVehicle());
+
+            Map<String, Object> payload = track(latestTrackingToken(customer.email()), 200)
+                    .as(new TypeRef<>() {
+                    });
+
+            assertEquals(Set.of("workOrderId", "status", "openedAt"), payload.keySet());
+        }
+
+        @Test
+        @DisplayName("deve enviar um link de acompanhamento na abertura e em cada mudança de status")
+        void shouldEmailTrackingLinkOnOpeningAndOnEveryStatusChange() {
+            SeededCustomer customer = seedCustomerWithEmail();
+
+            UUID workOrderId = createWorkOrder(customer.id(), seedVehicle());
+            assertEquals(1, trackingLinks(customer.email()).size());
+
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            assertEquals(2, trackingLinks(customer.email()).size());
+
+            createEstimate(workOrderId, seedPart(new BigDecimal("80.00")), 1);
+            assertEquals(3, trackingLinks(customer.email()).size());
+        }
+
+        @Test
+        @DisplayName("o acompanhamento de uma OS recusada deve mostrar a conclusão e o cancelamento")
+        void shouldTrackWorkOrderClosedByRejection() {
+            SeededCustomer customer = seedCustomerWithEmail();
+            UUID workOrderId = createWorkOrder(customer.id(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            EstimateResponseDto estimate = createEstimate(workOrderId, seedPart(new BigDecimal("80.00")), 1);
+            rejectEstimate(workOrderId, estimate.estimateId());
+
+            WorkOrderTrackingResponseDto tracked = track(latestTrackingToken(customer.email()), 200)
+                    .as(WorkOrderTrackingResponseDto.class);
+
+            assertEquals(WorkOrderStatus.COMPLETED, tracked.status());
+            assertNotNull(tracked.closedAt());
+            assertNotNull(tracked.cancelledAt());
+        }
+
+        @Test
+        @DisplayName("não deve existir acompanhamento por id, sem o link enviado ao cliente")
+        void shouldNotRevealTheWorkOrderWithoutToken() {
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+
+            String body = given()
             .when()
                     .get(PUBLIC_PATH + "/" + workOrderId)
             .then()
-                    .statusCode(200)
-                    .extract().as(WorkOrderResponseDto.class);
+                    .statusCode(404)
+                    .extract().asString();
 
-            assertEquals(WorkOrderStatus.WAITING_APPROVAL, tracked.status());
+            assertFalse(body.contains(workOrderId.toString()));
+        }
+
+        @Test
+        @DisplayName("deve retornar 400 para um link de acompanhamento que não foi emitido pela oficina")
+        void shouldReturn400ForForgedTrackingLink() {
+            ApiErrorResponseDto error = extractError(track("nao-e-um-link-valido", 400));
+
+            assertEquals("TRACKING_TOKEN_INVALID", error.code());
+        }
+
+        @Test
+        @DisplayName("deve retornar 410 para um link de acompanhamento apresentado depois dos trinta dias")
+        void shouldReturn410WhenTrackingLinkHasExpired() {
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            String expiredToken = trackingTokenSignature.sign(WorkOrderTrackingToken.issue(
+                    workOrderId, LocalDateTime.now(ZoneId.systemDefault()).minusDays(31)));
+
+            ApiErrorResponseDto error = extractError(track(expiredToken, 410));
+
+            assertEquals("TRACKING_TOKEN_EXPIRED", error.code());
         }
 
         @Test
@@ -1259,6 +1355,21 @@ class WorkOrderControllerIT {
             ApiErrorResponseDto error = extractError(decide("nao-e-um-link-valido", 400));
 
             assertEquals("DECISION_TOKEN_INVALID", error.code());
+        }
+
+        private Response track(String token, int expectedStatus) {
+            return given()
+            .when()
+                    .get(TRACKING_PATH + token)
+            .then()
+                    .statusCode(expectedStatus)
+                    .extract().response();
+        }
+
+        // O cliente clica no link do e-mail mais recente, que é o que reflete o estágio atual.
+        private String latestTrackingToken(String customerEmail) {
+            List<String> links = trackingLinks(customerEmail);
+            return tokenOf(links.get(links.size() - 1));
         }
 
         private Response decide(String token, int expectedStatus) {

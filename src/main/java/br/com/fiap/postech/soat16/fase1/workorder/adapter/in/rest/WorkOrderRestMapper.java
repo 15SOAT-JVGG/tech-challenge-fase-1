@@ -17,6 +17,7 @@ import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.O
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderServiceResponseDto;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderTrackingResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.AddWorkOrderServiceCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.ChangeWorkOrderStatusCommand;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.CloseWorkOrderCommand;
@@ -27,6 +28,7 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.result.OpenWorkOrd
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderMetricsResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderTrackingResult;
 
 public final class WorkOrderRestMapper {
 
@@ -107,6 +109,15 @@ public final class WorkOrderRestMapper {
                 result.estimatedValue(),
                 result.finalValue(),
                 result.assignedWorkerId());
+    }
+
+    public static WorkOrderTrackingResponseDto toResponse(WorkOrderTrackingResult result) {
+        return new WorkOrderTrackingResponseDto(
+                result.workOrderId(),
+                result.status(),
+                result.openedAt(),
+                result.closedAt(),
+                result.cancelledAt());
     }
 
     public static EstimateResponseDto toResponse(EstimateResult result) {
