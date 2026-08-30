@@ -1,0 +1,205 @@
+name: Workflow Deploy
+
+# Caminho de entrega da Fase 2: um merge na `main` leva a aplicação ao cluster sem
+# nenhum passo manual. Testa, constrói a imagem, publica no ECR com a identificação do
+# commit, entrega os segredos, aplica os manifestos de /k8s, espera o rollout convergir e
+# fecha com o smoke test contra o endereço público.
+#
+# Os três jobs são encadeados por `needs`, então uma etapa que falha interrompe a
+# entrega: teste vermelho não gera imagem, e imagem que não publicou não chega ao
+# cluster.
+#
+# As migrations não têm passo próprio: `flyway.migrate-at-start` as aplica na
+# inicialização do pod, e por isso quem as espera é o `rollout status` — um pod só fica
+# pronto depois de migrar o banco (ADR-0003). Quem afirma que elas rodaram é o smoke test,
+# que escreve no banco: schema atrás da imagem reprova a entrega ali.
+#
+# O provisionamento da infraestrutura não está aqui: é manual, no Workflow Infra
+# (.github/workflows/infra.yml).
+
+on:
+  push:
+    branches: [main]
+    # Merge só de documentação não muda imagem nem manifesto: não há o que entregar, e
+    # gastar a sessão do lab nele é o que faria o caminho de entrega parecer instável.
+    paths-ignore:
+      - "**/*.md"
+  # O disparo manual reentrega o commit que já está na main — é o caminho de voltar ao ar
+  # depois de um reset do lab ou de uma troca de segredo, sem commit vazio.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Duas entregas ao mesmo tempo disputariam o mesmo Deployment, e a segunda veria o
+# rollout da primeira. Sem cancelamento: interromper no meio deixaria o cluster com a
+# imagem nova e os segredos antigos.
+concurrency:
+  group: deploy-fase2
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+
+  # ── 1. Gate de qualidade: build e testes da aplicação ────────────────────────
+  build:
+    name: Build & Tests (Quarkus JVM)
+    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/build-java-quarkus-jvm.yml@main
+    with:
+      java_version: "21"
+      use_tailscale: false
+      # Nada consome o relatório nem o jar: o que vai ao cluster é a imagem, construída
+      # no job seguinte a partir do mesmo commit.
+      upload_coverage: false
+      upload_artifacts: false
+      maven_goals: "verify"
+      maven_args: "-Dstyle.color=always"
+
+  # ── 2. Imagem no registry, identificada pelo commit ──────────────────────────
+  #
+  # É o único job que usa credencial da AWS, e por isso está separado do deploy: a sessão
+  # do Learner Lab expira em cerca de quatro horas, e o acesso ao cluster não pode
+  # depender dela (ADR-0002).
+  image:
+    name: Imagem no ECR
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      repository_url: ${{ steps.registry.outputs.repository_url }}
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sessão do lab vencida é o modo de falha mais comum deste job. Falhar em segundos
+      # custa menos que descobrir isso no meio do push da imagem.
+      - name: Confere a sessão do lab
+        run: aws sts get-caller-identity
+
+      # O repositório do ECR sai de k8s/kustomization.yaml, que já precisa apontar para
+      # ele para que o deploy funcione. Ler daí é o que garante que a imagem publicada e a
+      # imagem aplicada no cluster são a mesma, sem um segundo lugar para manter em dia.
+      - name: Descobre o repositório de imagem
+        id: registry
+        run: |
+          repository_url="$(sed -n 's/^ *newName: *//p' k8s/kustomization.yaml)"
+          if [[ -z "$repository_url" ]]; then
+            echo "k8s/kustomization.yaml não declara images[0].newName." >&2
+            exit 1
+          fi
+          echo "repository_url=$repository_url" >> "$GITHUB_OUTPUT"
+          echo "Repositório: $repository_url"
+
+      - name: Prepara o buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Constrói e publica a imagem
+        env:
+          ECR_REPOSITORY_URL: ${{ steps.registry.outputs.repository_url }}
+        run: infra/scripts/publish-image.sh "$GITHUB_SHA"
+
+  # ── 3. Entrega no cluster ────────────────────────────────────────────────────
+  #
+  # Nenhuma credencial da AWS aqui: o acesso é o token da ServiceAccount github-deployer,
+  # criada por infra/scripts/create-deploy-kubeconfig.sh (ADR-0002).
+  deploy:
+    name: Deploy no cluster
+    needs: [image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Acompanha o `kubernetes_version` do control plane em infra/terraform/variables.tf.
+      KUBERNETES_VERSION: "1.33.4"
+      KUSTOMIZE_VERSION: "5.7.1"
+      IMAGE_TAG: ${{ github.sha }}
+      ECR_REPOSITORY_URL: ${{ needs.image.outputs.repository_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala o kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v${{ env.KUBERNETES_VERSION }}
+
+      # `kubectl apply -k` aplica o kustomization, mas não escreve nele: trocar a tag da
+      # imagem pede o CLI do kustomize.
+      - name: Instala o kustomize
+        run: |
+          curl -fsSL \
+            "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv$KUSTOMIZE_VERSION/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin kustomize
+          kustomize version
+
+      # O kubeconfig vai para um arquivo fora da árvore do repositório, com permissão
+      # restrita: ele carrega o token de acesso ao cluster.
+      - name: Autentica no cluster
+        env:
+          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
+        run: |
+          if [[ -z "$KUBE_CONFIG_B64" ]]; then
+            echo "O secret KUBE_CONFIG_B64 não está definido." >&2
+            echo "Gere o acesso da pipeline com infra/scripts/create-deploy-kubeconfig.sh." >&2
+            exit 1
+          fi
+          kubeconfig="$RUNNER_TEMP/kubeconfig"
+          (umask 077 && base64 --decode <<<"$KUBE_CONFIG_B64" >"$kubeconfig")
+          echo "KUBECONFIG=$kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Confere o acesso ao cluster
+        run: kubectl get deploy
+
+      # Os dois Secrets não estão em k8s/ de propósito — senha do banco, credenciais de
+      # seed e chave privada RS256 não entram no repositório. Eles são montados aqui a
+      # partir dos secrets do repositório, e o script não imprime nenhum dos valores.
+      - name: Entrega os segredos ao cluster
+        env:
+          POSTGRES_USERNAME: ${{ secrets.POSTGRES_USERNAME }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          APP_SEED_ADMIN_PASSWORD: ${{ secrets.APP_SEED_ADMIN_PASSWORD }}
+          APP_SEED_MECHANIC_PASSWORD: ${{ secrets.APP_SEED_MECHANIC_PASSWORD }}
+          JWT_PRIVATE_KEY_B64: ${{ secrets.JWT_PRIVATE_KEY_B64 }}
+          JWT_PUBLIC_KEY_B64: ${{ secrets.JWT_PUBLIC_KEY_B64 }}
+        run: infra/scripts/create-app-credentials.sh
+
+      # A tag do commit é o que faz do apply um rollout de verdade: com `latest`, o objeto
+      # no cluster não muda e o Kubernetes não substitui pod algum.
+      #
+      # Reentregar o mesmo commit — um disparo manual depois de trocar um segredo — cai
+      # justamente nesse caso: o Deployment já está na imagem alvo, o apply não muda nada,
+      # e os pods continuariam com os segredos antigos. O restart é o que faz a reentrega
+      # significar a mesma coisa que a primeira.
+      - name: Aplica os manifestos
+        run: |
+          deployed_image="$(kubectl get deploy/oficina-mecanica \
+            -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+          kustomize edit set image "oficina-mecanica=$ECR_REPOSITORY_URL:$IMAGE_TAG"
+          kubectl apply -k .
+          if [[ "$deployed_image" == "$ECR_REPOSITORY_URL:$IMAGE_TAG" ]]; then
+            echo "O cluster já roda esta imagem; reiniciando para os pods lerem os segredos atuais."
+            kubectl rollout restart deploy/oficina-mecanica
+          fi
+        working-directory: k8s
+
+      # Só depois disto a entrega pode ser declarada boa: o pod novo passou pelas probes,
+      # o que inclui migrar o banco e conectar no RDS.
+      - name: Aguarda o rollout
+        run: kubectl rollout status deploy/oficina-mecanica --timeout=10m
+
+      - name: Smoke test do ambiente
+        env:
+          APP_SEED_ADMIN_PASSWORD: ${{ secrets.APP_SEED_ADMIN_PASSWORD }}
+        run: infra/scripts/smoke-test.sh
+
+      # Rollout que não converge e smoke test vermelho quase sempre se explicam pelo
+      # estado dos pods. Colher isto aqui evita uma sessão de kubectl à mão depois.
+      - name: Diagnóstico da falha
+        if: failure()
+        run: |
+          kubectl get pods -o wide || true
+          kubectl describe deploy/oficina-mecanica || true
+          kubectl logs -l app.kubernetes.io/name=oficina-mecanica --tail=100 --all-containers || true

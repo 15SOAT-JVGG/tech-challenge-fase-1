@@ -49,6 +49,10 @@ nb-configuration.xml
 # Par RS256 do ambiente local, gerado por infra/scripts/generate-jwt-pair.sh
 .local-jwt/
 
+# Kubeconfig da ServiceAccount de deploy, gerado por
+# infra/scripts/create-deploy-kubeconfig.sh: carrega um token de acesso ao cluster
+.local-kube/
+
 # Terraform: plugins baixados, state local e planos salvos. O state real vive no S3,
 # e o .terraform.lock.hcl é versionado de propósito.
 **/.terraform/

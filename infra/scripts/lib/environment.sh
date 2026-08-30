@@ -15,6 +15,8 @@
 
 SERVICE_NAME="oficina-mecanica"
 ADMIN_USERNAME="${APP_SEED_ADMIN_USERNAME:-admin}"
+BALANCER_TIMEOUT_SECONDS="${BALANCER_TIMEOUT_SECONDS:-180}"
+BALANCER_RETRY_SECONDS=5
 
 require_tools() {
     local tool
@@ -35,9 +37,15 @@ require_seed_admin_password() {
 # Com um endereço explícito, é ele. Sem, o endereço sai do balanceador do Service — o
 # que dispensa o operador de copiar à mão um hostname de ELB a cada ambiente novo.
 # BASE_URL é o resultado, lido por quem incluiu este arquivo.
+#
+# O endereço não existe no instante em que o Service nasce: o EKS leva cerca de um minuto
+# para materializar o ELB e escrever o hostname no status. Esperar aqui é o que faz o
+# primeiro deploy num cluster novo terminar em smoke test, e não em "ainda não tem
+# endereço" — que é o que o caminho de entrega veria, aplicando os manifestos e chamando
+# o smoke test em seguida.
 # shellcheck disable=SC2034
 resolve_base_url() {
-    local given_url="${1:-}" elb_hostname
+    local given_url="${1:-}" elb_hostname deadline
 
     if [[ -n "$given_url" ]]; then
         BASE_URL="${given_url%/}"
@@ -45,14 +53,22 @@ resolve_base_url() {
     fi
 
     require_tools kubectl
-    elb_hostname="$(kubectl get svc "$SERVICE_NAME" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
-    if [[ -z "$elb_hostname" ]]; then
-        echo "O Service $SERVICE_NAME ainda não tem endereço de balanceador." >&2
-        echo "Aguarde o provisionamento do ELB (cerca de um minuto) ou informe o endereço:" >&2
-        echo "  $0 http://meu-endereco" >&2
-        exit 1
-    fi
-    BASE_URL="http://$elb_hostname"
+    deadline=$((SECONDS + BALANCER_TIMEOUT_SECONDS))
+    while :; do
+        elb_hostname="$(kubectl get svc "$SERVICE_NAME" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+        if [[ -n "$elb_hostname" ]]; then
+            BASE_URL="http://$elb_hostname"
+            return
+        fi
+        if ((SECONDS >= deadline)); then
+            echo "O Service $SERVICE_NAME não ganhou endereço de balanceador em ${BALANCER_TIMEOUT_SECONDS}s." >&2
+            echo "Confira o Service (kubectl describe svc $SERVICE_NAME) ou informe o endereço:" >&2
+            echo "  $0 http://meu-endereco" >&2
+            exit 1
+        fi
+        echo "Aguardando o endereço do balanceador do Service $SERVICE_NAME..."
+        sleep "$BALANCER_RETRY_SECONDS"
+    done
 }
 
 login_payload() {

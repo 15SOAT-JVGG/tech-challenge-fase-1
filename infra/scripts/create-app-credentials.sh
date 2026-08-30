@@ -6,9 +6,14 @@
 #   oficina-mecanica-env  variáveis sensíveis, injetadas por envFrom
 #   oficina-mecanica-jwt  o par RS256, montado como arquivo em /etc/jwt
 #
-# A senha e o endereço do banco vêm dos outputs do Terraform. O par RS256 vem de
-# JWT_PRIVATE_KEY_B64 / JWT_PUBLIC_KEY_B64 quando definidos (é assim que a pipeline
-# entrega), ou de um diretório local gerado por infra/scripts/generate-jwt-pair.sh.
+# Cada valor tem duas origens, e é o que permite o mesmo script servir ao operador e à
+# pipeline — que não tem credencial da AWS para ler o state do Terraform (ADR-0002):
+#
+#   usuário e senha do banco  POSTGRES_USERNAME / POSTGRES_PASSWORD quando definidos,
+#                             senão os outputs do Terraform
+#   par RS256                 JWT_PRIVATE_KEY_B64 / JWT_PUBLIC_KEY_B64 quando definidos,
+#                             senão um diretório local gerado por
+#                             infra/scripts/generate-jwt-pair.sh
 #
 # Idempotente: reescreve os dois a cada execução. Reiniciar os pods depois é de quem
 # chama (`kubectl rollout restart deploy/oficina-mecanica`).
@@ -26,9 +31,7 @@ JWT_SECRET="oficina-mecanica-jwt"
 PRIVATE_PEM="privateKey.pem"
 PUBLIC_PEM="publicKey.pem"
 
-for tool in kubectl terraform; do
-    command -v "$tool" >/dev/null || { echo "$tool não encontrado" >&2; exit 1; }
-done
+command -v kubectl >/dev/null || { echo "kubectl não encontrado" >&2; exit 1; }
 
 for required in APP_SEED_ADMIN_PASSWORD APP_SEED_MECHANIC_PASSWORD; do
     if [[ -z "${!required:-}" ]]; then
@@ -39,20 +42,40 @@ for required in APP_SEED_ADMIN_PASSWORD APP_SEED_MECHANIC_PASSWORD; do
     fi
 done
 
-DATABASE_HOST="$(terraform -chdir="$TERRAFORM_DIR" output -raw database_host)"
-DATABASE_USERNAME="$(terraform -chdir="$TERRAFORM_DIR" output -raw database_username)"
-DATABASE_PASSWORD="$(terraform -chdir="$TERRAFORM_DIR" output -raw database_password)"
+# Uma das duas definida é sempre engano — secret do repositório que ficou de fora, ou
+# variável com nome errado. Sem este guarda, o caso cairia no Terraform e morreria com
+# "terraform não encontrado", que não diz nada sobre a causa.
+if [[ -n "${POSTGRES_USERNAME:-}" || -n "${POSTGRES_PASSWORD:-}" ]]; then
+    for required in POSTGRES_USERNAME POSTGRES_PASSWORD; do
+        if [[ -z "${!required:-}" ]]; then
+            echo "$required não definida, e a outra credencial do banco está." >&2
+            echo "As duas andam juntas: defina as duas, ou nenhuma para ler do Terraform." >&2
+            exit 1
+        fi
+    done
+    DATABASE_USERNAME="$POSTGRES_USERNAME"
+    DATABASE_PASSWORD="$POSTGRES_PASSWORD"
+    echo "Credenciais do banco lidas das variáveis de ambiente."
+else
+    command -v terraform >/dev/null || { echo "terraform não encontrado" >&2; exit 1; }
+    DATABASE_HOST="$(terraform -chdir="$TERRAFORM_DIR" output -raw database_host)"
+    DATABASE_USERNAME="$(terraform -chdir="$TERRAFORM_DIR" output -raw database_username)"
+    DATABASE_PASSWORD="$(terraform -chdir="$TERRAFORM_DIR" output -raw database_password)"
 
-# O endereço do banco é configuração não sensível e por isso mora no ConfigMap, que é
-# versionado. Recriar a instância troca esse endereço, e o sintoma seria um pod que
-# nunca fica pronto — comparar aqui transforma isso numa mensagem de erro.
-CONFIGURED_HOST="$(sed -n 's/^ *INFRA_HOST_POSTGRES: *//p' "$CONFIGMAP_FILE")"
-if [[ "$CONFIGURED_HOST" != "$DATABASE_HOST" ]]; then
-    echo "O ConfigMap não aponta para o banco atual." >&2
-    echo "  Terraform: $DATABASE_HOST" >&2
-    echo "  ConfigMap: $CONFIGURED_HOST" >&2
-    echo "Atualize INFRA_HOST_POSTGRES em k8s/configmap.yaml e rode de novo." >&2
-    exit 1
+    # O endereço do banco é configuração não sensível e por isso mora no ConfigMap, que é
+    # versionado. Recriar a instância troca esse endereço, e o sintoma seria um pod que
+    # nunca fica pronto — comparar aqui transforma isso numa mensagem de erro. A
+    # comparação só é possível com o Terraform à mão; no caminho de entrega, quem acusa
+    # ConfigMap desatualizado é o `rollout status`, que não converge porque o pod não
+    # alcança o banco.
+    CONFIGURED_HOST="$(sed -n 's/^ *INFRA_HOST_POSTGRES: *//p' "$CONFIGMAP_FILE")"
+    if [[ "$CONFIGURED_HOST" != "$DATABASE_HOST" ]]; then
+        echo "O ConfigMap não aponta para o banco atual." >&2
+        echo "  Terraform: $DATABASE_HOST" >&2
+        echo "  ConfigMap: $CONFIGURED_HOST" >&2
+        echo "Atualize INFRA_HOST_POSTGRES em k8s/configmap.yaml e rode de novo." >&2
+        exit 1
+    fi
 fi
 
 # Em CI o par chega por variável de ambiente; localmente, por arquivo.

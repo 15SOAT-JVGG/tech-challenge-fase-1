@@ -23,6 +23,7 @@ images:
     # `latest` é o que faz `kubectl apply -k k8s/` funcionar num checkout limpo, e é
     # por isso que o Deployment pede imagePullPolicy: Always. Como a tag não muda, o
     # apply sozinho não dispara rollout — o caminho manual fecha com um
-    # `kubectl rollout restart`. A pipeline (#36) troca por `:$SHA`, e aí o rollout
-    # vem do próprio apply.
+    # `kubectl rollout restart`. O caminho de entrega troca esta tag pelo SHA do commit
+    # (`kustomize edit set image`, em .github/workflows/deploy.yml), e aí o rollout vem
+    # do próprio apply.
     newTag: latest

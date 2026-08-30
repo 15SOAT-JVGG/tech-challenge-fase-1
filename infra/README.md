@@ -10,7 +10,7 @@ que decorrem disso estão em [ADR-0001](../docs/adr/0001-eks-provisionado-com-ro
 ```
 infra/
 ├── docker/     Dockerfile da aplicação
-├── scripts/    bootstrap do state, verificação do lab, publicação da imagem, chaves, credenciais, smoke test e carga
+├── scripts/    bootstrap do state, verificação do lab, publicação da imagem, chaves, credenciais, acesso da pipeline, smoke test e carga
 │   └── lib/    o que smoke test e carga compartilham: ferramentas, credencial e endereço do ambiente
 └── terraform/  a IaC propriamente dita
 k8s/            os manifestos da aplicação, no diretório que o enunciado exige
@@ -55,6 +55,10 @@ kubectl rollout status deploy/oficina-mecanica
 # 8. Prova de que funcionou.
 infra/scripts/smoke-test.sh
 ```
+
+Do passo 5 ao 8 é o que a pipeline de entrega passa a fazer a cada merge na `main`. Habilitá-la é um
+passo extra, uma vez por cluster — está na seção "Implantando a aplicação", em "Pelo caminho de
+entrega".
 
 **Reiniciar o lab não é a mesma coisa que reconstruir o ambiente.** Um `terraform destroy` leva tudo
 junto, e aí o roteiro acima vale inteiro. Já um reset de sessão do Learner Lab só cancela as
@@ -235,9 +239,11 @@ Os manifestos vivem em `k8s/`, fora de `infra/`, porque é onde o enunciado da f
 | `HorizontalPodAutoscaler` `oficina-mecanica` | `k8s/hpa.yaml` | De 1 a 6 réplicas, por CPU e memória |
 
 Os dois `Secret` não estão em `k8s/` de propósito — senha do banco, credenciais de seed e chave
-privada não entram no repositório. `infra/scripts/create-app-credentials.sh` os monta a partir dos
-outputs do Terraform e do par RS256, e recusa a execução se o `ConfigMap` apontar para um banco
-diferente do que o Terraform conhece.
+privada não entram no repositório. `infra/scripts/create-app-credentials.sh` os monta a partir do par
+RS256 e das credenciais do banco: dos outputs do Terraform quando ele está à mão, ou de
+`POSTGRES_USERNAME` e `POSTGRES_PASSWORD` quando não — é assim que a pipeline, que não tem credencial
+da AWS, entrega os mesmos valores. Com o Terraform, o script recusa a execução se o `ConfigMap`
+apontar para um banco diferente do que ele conhece.
 
 Dois valores nos manifestos dependem da conta e do apply, e precisam bater com o que o Terraform
 produziu. Numa conta nova, ajuste os dois antes do primeiro deploy:
@@ -246,6 +252,8 @@ produziu. Numa conta nova, ajuste os dois antes do primeiro deploy:
 |---|---|---|
 | `k8s/configmap.yaml` | `INFRA_HOST_POSTGRES` | `terraform -chdir=infra/terraform output -raw database_host` |
 | `k8s/kustomization.yaml` | `images[0].newName` | `terraform -chdir=infra/terraform output -raw ecr_repository_url` |
+
+### Da máquina do operador
 
 ```bash
 # Uma vez: gera o par RS256 fora do build da imagem.
@@ -269,10 +277,67 @@ ELB="$(kubectl get svc oficina-mecanica -o jsonpath='{.status.loadBalancer.ingre
 curl "http://$ELB/q/health/ready"
 ```
 
+### Pelo caminho de entrega
+
+O mesmo deploy acima, sem nenhum passo manual: o workflow **Workflow Deploy**
+(`.github/workflows/deploy.yml`) roda a cada merge na `main` e leva a aplicação ao cluster. São três
+jobs encadeados, e a etapa que falha interrompe a entrega — teste vermelho não gera imagem, e imagem
+que não publicou não chega ao cluster.
+
+| Job | O que faz | Credencial |
+|---|---|---|
+| Build & Tests | `./mvnw verify`: build, testes, qualidade estática e o gate de cobertura | nenhuma |
+| Imagem no ECR | Publica a imagem com a tag do SHA do commit | sessão do lab |
+| Deploy no cluster | Entrega os `Secret`, aplica `k8s/` com a tag do commit, aguarda o rollout e roda o smoke test | token da `ServiceAccount` |
+
+A tag da imagem é o SHA do commit, e é ela que faz do `kubectl apply` um rollout de verdade: com
+`latest`, o objeto no cluster não mudaria e nenhum pod seria substituído. Por isso o job troca a tag
+com `kustomize edit set image` antes de aplicar, e o caminho manual precisa do `rollout restart` que
+ele dispensa.
+
+As migrations não têm passo próprio. `flyway.migrate-at-start` as aplica na inicialização, então quem
+as espera é o `kubectl rollout status`: um pod só fica pronto depois de migrar o banco (ADR-0003). E o
+último passo é o smoke test — se ele passa, o que subiu está operacional de fora para dentro.
+
+**O acesso ao cluster não usa credencial da AWS** (ADR-0002). A sessão do Learner Lab expira em cerca
+de quatro horas, e o deploy ficaria vermelho por motivo alheio ao código. Ele autentica com o token de
+uma `ServiceAccount` dedicada, criada uma vez por cluster:
+
+```bash
+# Com o kubeconfig de administrador ativo. Cria a ServiceAccount github-deployer, uma
+# Role com só o que o deploy faz, e grava o kubeconfig em .local-kube/.
+infra/scripts/create-deploy-kubeconfig.sh
+```
+
+O comando imprime, ao fim, o `gh secret set` que guarda esse kubeconfig no repositório. O token é de
+longa duração e concede acesso ao cluster: se vazar, não expira sozinho, e a mitigação é
+`kubectl delete serviceaccount github-deployer` e gerar outro.
+
+Os secrets do repositório que a entrega consome:
+
+| Secret | De onde vem |
+|---|---|
+| `KUBE_CONFIG_B64` | `infra/scripts/create-deploy-kubeconfig.sh` |
+| `POSTGRES_USERNAME` / `POSTGRES_PASSWORD` | `terraform -chdir=infra/terraform output -raw database_username` / `database_password` |
+| `APP_SEED_ADMIN_PASSWORD` / `APP_SEED_MECHANIC_PASSWORD` | escolhidas pelo operador; são as credenciais de acesso à API |
+| `JWT_PRIVATE_KEY_B64` / `JWT_PUBLIC_KEY_B64` | `infra/scripts/generate-jwt-pair.sh` |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | painel *AWS Details* do lab; só o job da imagem os usa |
+
+Nenhum deles aparece em log: o GitHub redige valor de secret na saída, e nem o workflow nem os
+scripts imprimem credencial — `create-app-credentials.sh` monta os `Secret` por
+`kubectl create ... --dry-run=client -o yaml | kubectl apply -f -`, sem echo pelo caminho.
+
+Um `apply` do Terraform que recrie o banco troca a senha e o endereço: regrave `POSTGRES_PASSWORD` e
+atualize `INFRA_HOST_POSTGRES` no `ConfigMap` antes do próximo merge, ou o pod novo não fica pronto.
+
+Se o rollout ou o smoke test falharem, o job colhe `kubectl get pods`, `describe` do `Deployment` e as
+últimas cem linhas de log da aplicação — quase sempre é o suficiente para saber o motivo sem abrir o
+`kubectl`.
+
 ## Smoke test
 
-Um comando responde se o deploy funcionou. Ele descobre o endereço do `Service` sozinho, espera o
-readiness, autentica com o usuário de seed, abre uma ordem de serviço e a recupera na listagem — o que
+Um comando responde se o deploy funcionou. Ele descobre o endereço do `Service` sozinho — esperando o
+ELB nascer, se for o caso —, espera o readiness, autentica com o usuário de seed, abre uma ordem de serviço e a recupera na listagem — o que
 exercita de uma vez o ELB, o pod, o `ConfigMap`, os dois `Secret`, a conectividade com o RDS e as
 migrations. Sai com código diferente de zero na primeira verificação que falhar.
 
