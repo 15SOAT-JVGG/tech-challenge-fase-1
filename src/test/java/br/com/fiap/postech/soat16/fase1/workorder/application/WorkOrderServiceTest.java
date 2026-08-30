@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -32,7 +33,6 @@ import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
 import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.exception.ServiceItemNotFoundException;
 import br.com.fiap.postech.soat16.fase1.servicecatalog.domain.model.ServiceItem;
 import br.com.fiap.postech.soat16.fase1.shared.application.result.PagedResult;
-import br.com.fiap.postech.soat16.fase1.shared.domain.exception.BusinessException;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.exception.VehicleNotFoundException;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.workorder.application.command.AddWorkOrderServiceCommand;
@@ -44,25 +44,40 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.command.OpenWorkOr
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.EstimateMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.WorkOrderMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.WorkOrderServiceMapper;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateDecisionInvitation;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateDecisionTokenPersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateDecisionTokenSignaturePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimatePersistencePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderNotificationPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderPersistencePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderServicePersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderTrackingInvitation;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderTrackingTokenSignaturePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkshopCatalogPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderTrackingResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateAlreadyDecidedException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateDecisionTokenAlreadyUsedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateNotApprovedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimatePartNotFoundException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.ExpiredEstimateDecisionTokenException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.ExpiredWorkOrderTrackingTokenException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InsufficientPartStockException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidEstimateDecisionTokenException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidWorkOrderStatusTransitionException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidWorkOrderTrackingTokenException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.WorkOrderLockedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.WorkOrderNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.Estimate;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.model.EstimateDecisionToken;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.EstimateItem;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderHistory;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderTrackingToken;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateDecision;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderStatus;
 
@@ -96,45 +111,65 @@ class WorkOrderServiceTest {
     @Mock
     private WorkOrderNotificationPort notificationService;
 
+    @Mock
+    private EstimateDecisionTokenPersistencePort decisionTokenRepository;
+
+    @Mock
+    private EstimateDecisionTokenSignaturePort decisionTokenSignature;
+
+    @Mock
+    private WorkOrderTrackingTokenSignaturePort trackingTokenSignature;
+
     private WorkOrderService service;
 
     private static final UUID WORK_ORDER_ID = UUID.randomUUID();
     private static final UUID CUSTOMER_ID = UUID.randomUUID();
     private static final UUID VEHICLE_ID = UUID.randomUUID();
+    private static final UUID SERVICE_ITEM_ID = UUID.randomUUID();
+    private static final UUID PART_ID = UUID.randomUUID();
 
     private WorkOrder entity;
     private WorkOrderResult response;
 
     @BeforeEach
     void setUp() {
-        service = new WorkOrderService(repository, estimateRepository, serviceRepository, catalog,
-                mapper, estimateMapper, serviceMapper, notificationService);
+        service = new WorkOrderService(repository, estimateRepository, serviceRepository,
+                decisionTokenRepository, catalog, mapper, estimateMapper, serviceMapper,
+                notificationService, decisionTokenSignature, trackingTokenSignature);
 
-        lenient().when(notificationService.notifyEstimateReady(any(), any()))
+        lenient().when(notificationService.notifyEstimateAwaitingDecision(any(), any(), any()))
                 .thenReturn(Uni.createFrom().voidItem());
-        lenient().when(notificationService.notifyWorkOrderCompleted(any()))
+        lenient().when(notificationService.notifyWorkOrderProgress(any(), any()))
                 .thenReturn(Uni.createFrom().voidItem());
+        lenient().when(trackingTokenSignature.sign(any(WorkOrderTrackingToken.class)))
+                .thenReturn("signed-tracking-token");
+        lenient().when(decisionTokenRepository.save(any(EstimateDecisionToken.class)))
+                .thenAnswer(invocation -> Uni.createFrom().item(
+                        (EstimateDecisionToken) invocation.getArgument(0)));
+        lenient().when(decisionTokenSignature.sign(any(EstimateDecisionToken.class)))
+                .thenAnswer(invocation -> "signed-"
+                        + ((EstimateDecisionToken) invocation.getArgument(0)).getDecision());
 
         entity = new WorkOrder();
         entity.setId(WORK_ORDER_ID);
         entity.setStatus(WorkOrderStatus.RECEIVED);
 
         response = new WorkOrderResult(WORK_ORDER_ID, CUSTOMER_ID, VEHICLE_ID, "desc", null,
-                WorkOrderStatus.RECEIVED, null, null, null, null, null);
+                WorkOrderStatus.RECEIVED, null, null, null, null, null, null);
     }
 
     @Nested
-    @DisplayName("findAll")
-    class FindAll {
+    @DisplayName("findOperationalQueue")
+    class FindOperationalQueue {
 
         @Test
-        @DisplayName("should return paginated response")
+        @DisplayName("deve paginar a fila operacional pelo total de ordens ainda em atendimento")
         void shouldReturnPaginatedResponse() {
-            when(repository.findPage(0, 10)).thenReturn(Uni.createFrom().item(List.of(entity)));
-            when(repository.countWorkOrders()).thenReturn(Uni.createFrom().item(1L));
+            when(repository.findOperationalQueuePage(0, 10)).thenReturn(Uni.createFrom().item(List.of(entity)));
+            when(repository.countOperationalQueue()).thenReturn(Uni.createFrom().item(1L));
             when(mapper.toResult(entity)).thenReturn(response);
 
-            PagedResult<WorkOrderResult> result = service.findAll(null, 0, 10).await().indefinitely();
+            PagedResult<WorkOrderResult> result = service.findOperationalQueue(0, 10).await().indefinitely();
 
             assertNotNull(result);
             assertEquals(1, result.content().size());
@@ -168,15 +203,166 @@ class WorkOrderServiceTest {
     }
 
     @Nested
+    @DisplayName("track")
+    class Track {
+
+        private static final String SIGNED_TOKEN = "signed-tracking-token";
+
+        @Test
+        @DisplayName("deve devolver apenas o andamento da OS do link apresentado")
+        void shouldReturnTheTrackedWorkOrder() {
+            WorkOrderTrackingResult tracking = new WorkOrderTrackingResult(WORK_ORDER_ID,
+                    WorkOrderStatus.RECEIVED, LocalDateTime.now(), null, null);
+            when(trackingTokenSignature.read(SIGNED_TOKEN)).thenReturn(
+                    WorkOrderTrackingToken.issue(WORK_ORDER_ID, LocalDateTime.now()));
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(mapper.toTrackingResult(entity)).thenReturn(tracking);
+
+            WorkOrderTrackingResult result = service.track(SIGNED_TOKEN).await().indefinitely();
+
+            assertEquals(WORK_ORDER_ID, result.workOrderId());
+            assertEquals(WorkOrderStatus.RECEIVED, result.status());
+        }
+
+        @Test
+        @DisplayName("não deve consultar a OS quando o link está fora do prazo de trinta dias")
+        void shouldRejectExpiredTrackingLink() {
+            when(trackingTokenSignature.read(SIGNED_TOKEN)).thenReturn(
+                    WorkOrderTrackingToken.issue(WORK_ORDER_ID, LocalDateTime.now().minusDays(31)));
+
+            assertThrows(ExpiredWorkOrderTrackingTokenException.class,
+                    () -> service.track(SIGNED_TOKEN).await().indefinitely());
+            verify(repository, never()).findByWorkOrderId(WORK_ORDER_ID);
+        }
+
+        @Test
+        @DisplayName("não deve consultar a OS quando o link não foi emitido pela oficina")
+        void shouldRejectForgedTrackingLink() {
+            when(trackingTokenSignature.read(SIGNED_TOKEN))
+                    .thenThrow(new InvalidWorkOrderTrackingTokenException());
+
+            assertThrows(InvalidWorkOrderTrackingTokenException.class,
+                    () -> service.track(SIGNED_TOKEN).await().indefinitely());
+            verify(repository, never()).findByWorkOrderId(WORK_ORDER_ID);
+        }
+
+        @Test
+        @DisplayName("deve lançar WorkOrderNotFoundException quando a OS do link não existe mais")
+        void shouldThrowWhenTrackedWorkOrderMissing() {
+            when(trackingTokenSignature.read(SIGNED_TOKEN)).thenReturn(
+                    WorkOrderTrackingToken.issue(WORK_ORDER_ID, LocalDateTime.now()));
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().nullItem());
+
+            assertThrows(WorkOrderNotFoundException.class,
+                    () -> service.track(SIGNED_TOKEN).await().indefinitely());
+        }
+    }
+
+    @Nested
+    @DisplayName("aviso de acompanhamento ao cliente")
+    class ProgressNotification {
+
+        @Test
+        @DisplayName("deve convidar o cliente a acompanhar a OS na abertura, com link de trinta dias")
+        void shouldInviteToTrackOnOpening() {
+            LocalDateTime beforeOpening = LocalDateTime.now();
+            when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(new Customer()));
+            when(catalog.findVehicleById(VEHICLE_ID)).thenReturn(Uni.createFrom().item(new Vehicle()));
+            when(repository.save(any(WorkOrder.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item((WorkOrder) invocation.getArgument(0)));
+
+            service.create(new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null,
+                    List.of(), List.of())).await().indefinitely();
+
+            WorkOrderTrackingInvitation invitation = captureInvitation();
+            assertEquals("signed-tracking-token", invitation.trackingToken());
+            assertTrue(invitation.expiresAt().isAfter(beforeOpening.plusDays(29)));
+        }
+
+        @Test
+        @DisplayName("deve avisar o cliente a cada mudança de status")
+        void shouldNotifyOnEveryStatusChange() {
+            entity.setStatus(WorkOrderStatus.RECEIVED);
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+
+            service.updateStatus(WORK_ORDER_ID, new ChangeWorkOrderStatusCommand(WorkOrderStatus.DIAGNOSIS))
+                    .await().indefinitely();
+
+            verify(notificationService).notifyWorkOrderProgress(any(), any());
+        }
+
+        @Test
+        @DisplayName("deve avisar o cliente ao concluir a OS")
+        void shouldNotifyOnClosing() {
+            entity.setStatus(WorkOrderStatus.IN_PROGRESS);
+            entity.setEstimatedValue(BigDecimal.valueOf(100));
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(true));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+
+            service.close(WORK_ORDER_ID, new CloseWorkOrderCommand(null)).await().indefinitely();
+
+            verify(notificationService).notifyWorkOrderProgress(any(), any());
+        }
+
+        @Test
+        @DisplayName("não deve avisar quando a decisão do orçamento não muda o status da OS")
+        void shouldNotNotifyWithoutStatusChange() {
+            entity.setStatus(WorkOrderStatus.IN_PROGRESS);
+            UUID estimateId = UUID.randomUUID();
+            Estimate estimate = new Estimate();
+            estimate.setId(estimateId);
+            estimate.setWorkOrder(entity);
+            estimate.setStatus(EstimateStatus.PENDING);
+            estimate.setTotalAmount(BigDecimal.valueOf(50));
+
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(estimate));
+            when(repository.save(entity)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
+
+            service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
+
+            verify(notificationService, never()).notifyWorkOrderProgress(any(), any());
+        }
+
+        private WorkOrderTrackingInvitation captureInvitation() {
+            ArgumentCaptor<WorkOrderTrackingInvitation> captor =
+                    ArgumentCaptor.forClass(WorkOrderTrackingInvitation.class);
+            verify(notificationService).notifyWorkOrderProgress(any(), captor.capture());
+            return captor.getValue();
+        }
+    }
+
+    @Nested
     @DisplayName("create")
     class Create {
+
+        private OpenWorkOrderCommand openCommand(
+                List<OpenWorkOrderCommand.RequestedService> services,
+                List<OpenWorkOrderCommand.RequestedPart> parts) {
+            return new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null, services, parts);
+        }
+
+        private void givenCustomerAndVehicleExist() {
+            when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(new Customer()));
+            when(catalog.findVehicleById(VEHICLE_ID)).thenReturn(Uni.createFrom().item(new Vehicle()));
+            when(repository.save(any(WorkOrder.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item(
+                            (WorkOrder) invocation.getArgument(0)));
+        }
 
         @Test
         @DisplayName("should persist work order when customer and vehicle exist")
         void shouldPersistWhenCustomerAndVehicleExist() {
             Customer customer = new Customer();
             Vehicle vehicle = new Vehicle();
-            OpenWorkOrderCommand request = new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
+            OpenWorkOrderCommand request = openCommand(List.of(), List.of());
 
             when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
             when(catalog.findVehicleById(VEHICLE_ID)).thenReturn(Uni.createFrom().item(vehicle));
@@ -190,12 +376,112 @@ class WorkOrderServiceTest {
             assertEquals(WorkOrderStatus.RECEIVED, orderCaptor.getValue().getStatus());
             assertEquals(customer, orderCaptor.getValue().getCustomer());
             assertEquals(vehicle, orderCaptor.getValue().getVehicle());
+            verify(estimateRepository, never()).save(any(Estimate.class));
+        }
+
+        @Test
+        @DisplayName("should create the pending estimate from the initial service and part request")
+        void shouldCreatePendingEstimateFromInitialRequest() {
+            givenCustomerAndVehicleExist();
+
+            ServiceItem serviceItem = new ServiceItem();
+            serviceItem.setId(SERVICE_ITEM_ID);
+            serviceItem.setName("Alinhamento");
+            serviceItem.setBasePrice(new BigDecimal("120.00"));
+            Part part = new Part("Filtro", "Filtro", new BigDecimal("50.00"), 10, "UN");
+
+            when(catalog.findServiceItemById(SERVICE_ITEM_ID)).thenReturn(Uni.createFrom().item(serviceItem));
+            when(catalog.findPartById(PART_ID)).thenReturn(Uni.createFrom().item(part));
+            when(serviceRepository.save(any(
+                    br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item(
+                            (br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService)
+                                    invocation.getArgument(0)));
+            when(estimateRepository.save(any(Estimate.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item(
+                            (Estimate) invocation.getArgument(0)));
+
+            OpenWorkOrderCommand request = openCommand(
+                    List.of(new OpenWorkOrderCommand.RequestedService(SERVICE_ITEM_ID)),
+                    List.of(new OpenWorkOrderCommand.RequestedPart(PART_ID, 3)));
+
+            service.create(request).await().indefinitely();
+
+            ArgumentCaptor<Estimate> estimateCaptor = ArgumentCaptor.forClass(Estimate.class);
+            verify(estimateRepository).save(estimateCaptor.capture());
+            Estimate estimate = estimateCaptor.getValue();
+            assertEquals(EstimateStatus.PENDING, estimate.getStatus());
+            assertEquals(0, new BigDecimal("150.00").compareTo(estimate.getPartsAmount()));
+            assertEquals(0, new BigDecimal("120.00").compareTo(estimate.getLaborAmount()));
+            assertEquals(0, new BigDecimal("270.00").compareTo(estimate.getTotalAmount()));
+            assertEquals(0, new BigDecimal("270.00").compareTo(estimate.getWorkOrder().getEstimatedValue()));
+            assertEquals(WorkOrderStatus.RECEIVED, estimate.getWorkOrder().getStatus());
+        }
+
+        @Test
+        @DisplayName("should snapshot the catalog base price on the requested service line")
+        void shouldSnapshotServicePrice() {
+            givenCustomerAndVehicleExist();
+
+            ServiceItem serviceItem = new ServiceItem();
+            serviceItem.setId(SERVICE_ITEM_ID);
+            serviceItem.setName("Alinhamento");
+            serviceItem.setBasePrice(new BigDecimal("120.00"));
+
+            when(catalog.findServiceItemById(SERVICE_ITEM_ID)).thenReturn(Uni.createFrom().item(serviceItem));
+            when(serviceRepository.save(any(
+                    br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item(
+                            (br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService)
+                                    invocation.getArgument(0)));
+            when(estimateRepository.save(any(Estimate.class)))
+                    .thenAnswer(invocation -> Uni.createFrom().item(
+                            (Estimate) invocation.getArgument(0)));
+
+            service.create(openCommand(
+                    List.of(new OpenWorkOrderCommand.RequestedService(SERVICE_ITEM_ID)), List.of()))
+                    .await().indefinitely();
+
+            var serviceCaptor = ArgumentCaptor.forClass(
+                    br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService.class);
+            verify(serviceRepository).save(serviceCaptor.capture());
+            assertEquals("Alinhamento", serviceCaptor.getValue().getDescription());
+            assertEquals(0, new BigDecimal("120.00").compareTo(serviceCaptor.getValue().getPrice()));
+            assertEquals(serviceItem, serviceCaptor.getValue().getServiceItem());
+        }
+
+        @Test
+        @DisplayName("should throw ServiceItemNotFoundException and skip the estimate when the item is unknown")
+        void shouldThrowWhenRequestedServiceItemMissing() {
+            givenCustomerAndVehicleExist();
+            when(catalog.findServiceItemById(SERVICE_ITEM_ID)).thenReturn(Uni.createFrom().nullItem());
+
+            OpenWorkOrderCommand request = openCommand(
+                    List.of(new OpenWorkOrderCommand.RequestedService(SERVICE_ITEM_ID)), List.of());
+
+            assertThrows(ServiceItemNotFoundException.class,
+                    () -> service.create(request).await().indefinitely());
+            verify(estimateRepository, never()).save(any(Estimate.class));
+        }
+
+        @Test
+        @DisplayName("should throw EstimatePartNotFoundException and skip the estimate when the part is unknown")
+        void shouldThrowWhenRequestedPartMissing() {
+            givenCustomerAndVehicleExist();
+            when(catalog.findPartById(PART_ID)).thenReturn(Uni.createFrom().nullItem());
+
+            OpenWorkOrderCommand request = openCommand(
+                    List.of(), List.of(new OpenWorkOrderCommand.RequestedPart(PART_ID, 1)));
+
+            assertThrows(EstimatePartNotFoundException.class,
+                    () -> service.create(request).await().indefinitely());
+            verify(estimateRepository, never()).save(any(Estimate.class));
         }
 
         @Test
         @DisplayName("should throw CustomerNotFoundException when customer does not exist")
         void shouldThrowWhenCustomerMissing() {
-            OpenWorkOrderCommand request = new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
+            OpenWorkOrderCommand request = openCommand(List.of(), List.of());
             when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().nullItem());
 
             assertThrows(CustomerNotFoundException.class,
@@ -207,7 +493,7 @@ class WorkOrderServiceTest {
         @DisplayName("should throw VehicleNotFoundException when vehicle does not exist")
         void shouldThrowWhenVehicleMissing() {
             Customer customer = new Customer();
-            OpenWorkOrderCommand request = new OpenWorkOrderCommand(CUSTOMER_ID, VEHICLE_ID, "desc", null, null);
+            OpenWorkOrderCommand request = openCommand(List.of(), List.of());
 
             when(catalog.findCustomerById(CUSTOMER_ID)).thenReturn(Uni.createFrom().item(customer));
             when(catalog.findVehicleById(VEHICLE_ID)).thenReturn(Uni.createFrom().nullItem());
@@ -254,27 +540,11 @@ class WorkOrderServiceTest {
         @DisplayName("should reject skipping stages")
         void shouldRejectSkippingStages() {
             entity.setStatus(WorkOrderStatus.RECEIVED);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.APPROVED);
+            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.IN_PROGRESS);
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
 
             assertThrows(InvalidWorkOrderStatusTransitionException.class,
                     () -> service.updateStatus(WORK_ORDER_ID, request).await().indefinitely());
-        }
-
-        @Test
-        @DisplayName("should allow CANCELLED from any non-terminal status")
-        void shouldAllowCancelledFromAnyNonTerminalStatus() {
-            entity.setStatus(WorkOrderStatus.DIAGNOSIS);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.CANCELLED);
-
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(entity));
-            when(mapper.toResult(entity)).thenReturn(response);
-
-            service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
-
-            assertEquals(WorkOrderStatus.CANCELLED, entity.getStatus());
         }
 
         @Test
@@ -308,17 +578,6 @@ class WorkOrderServiceTest {
         @DisplayName("should throw WorkOrderLockedException when current status is DELIVERED")
         void shouldThrowLockedWhenDelivered() {
             entity.setStatus(WorkOrderStatus.DELIVERED);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.CANCELLED);
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-
-            assertThrows(WorkOrderLockedException.class,
-                    () -> service.updateStatus(WORK_ORDER_ID, request).await().indefinitely());
-        }
-
-        @Test
-        @DisplayName("should throw WorkOrderLockedException when current status is CANCELLED")
-        void shouldThrowLockedWhenCancelled() {
-            entity.setStatus(WorkOrderStatus.CANCELLED);
             ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.DIAGNOSIS);
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
 
@@ -329,7 +588,7 @@ class WorkOrderServiceTest {
         @Test
         @DisplayName("should throw EstimateNotApprovedException when starting execution without approved estimate")
         void shouldThrowWhenStartingWithoutApprovedEstimate() {
-            entity.setStatus(WorkOrderStatus.APPROVED);
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
             ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.IN_PROGRESS);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
@@ -343,7 +602,7 @@ class WorkOrderServiceTest {
         @Test
         @DisplayName("should allow starting execution when an approved estimate exists")
         void shouldAllowStartingWithApprovedEstimate() {
-            entity.setStatus(WorkOrderStatus.APPROVED);
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
             ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.IN_PROGRESS);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
@@ -356,38 +615,6 @@ class WorkOrderServiceTest {
             service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
 
             assertEquals(WorkOrderStatus.IN_PROGRESS, entity.getStatus());
-        }
-
-        @Test
-        @DisplayName("should throw EstimateNotApprovedException when approving without an approved estimate")
-        void shouldThrowWhenApprovingWithoutApprovedEstimate() {
-            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.APPROVED);
-
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
-                    .thenReturn(Uni.createFrom().item(false));
-
-            assertThrows(EstimateNotApprovedException.class,
-                    () -> service.updateStatus(WORK_ORDER_ID, request).await().indefinitely());
-        }
-
-        @Test
-        @DisplayName("should allow approving when an approved estimate exists")
-        void shouldAllowApprovingWithApprovedEstimate() {
-            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.APPROVED);
-
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.existsApprovedByWorkOrderId(WORK_ORDER_ID))
-                    .thenReturn(Uni.createFrom().item(true));
-            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
-                    .thenReturn(Uni.createFrom().item(entity));
-            when(mapper.toResult(entity)).thenReturn(response);
-
-            service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
-
-            assertEquals(WorkOrderStatus.APPROVED, entity.getStatus());
         }
 
         @Test
@@ -447,9 +674,9 @@ class WorkOrderServiceTest {
         }
 
         @Test
-        @DisplayName("should throw WorkOrderLockedException when work order is delivered or cancelled")
+        @DisplayName("should throw WorkOrderLockedException when work order is delivered")
         void shouldThrowWhenLocked() {
-            entity.setStatus(WorkOrderStatus.CANCELLED);
+            entity.setStatus(WorkOrderStatus.DELIVERED);
             CreateEstimateCommand request = new CreateEstimateCommand(
                     List.of(new Item(UUID.randomUUID(), 1, BigDecimal.ONE)));
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
@@ -464,7 +691,7 @@ class WorkOrderServiceTest {
     class ApproveEstimate {
 
         @Test
-        @DisplayName("should approve estimate, set estimatedValue and advance WAITING_APPROVAL to APPROVED")
+        @DisplayName("deve aprovar o orçamento, atualizar o valor estimado e iniciar a execução")
         void shouldApproveAndAdvanceStatus() {
             entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
             UUID estimateId = UUID.randomUUID();
@@ -487,7 +714,7 @@ class WorkOrderServiceTest {
             service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
 
             assertEquals(EstimateStatus.APPROVED, estimate.getStatus());
-            assertEquals(WorkOrderStatus.APPROVED, entity.getStatus());
+            assertEquals(WorkOrderStatus.IN_PROGRESS, entity.getStatus());
             assertEquals(BigDecimal.valueOf(100), entity.getEstimatedValue());
         }
 
@@ -550,8 +777,8 @@ class WorkOrderServiceTest {
     class RejectEstimate {
 
         @Test
-        @DisplayName("should reject a pending estimate and move WAITING_APPROVAL back to DIAGNOSIS")
-        void shouldRejectAndReturnToDiagnosis() {
+        @DisplayName("deve recusar o orçamento, concluir a OS e persistir o histórico")
+        void shouldRejectAndCompleteWorkOrder() {
             entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
             UUID estimateId = UUID.randomUUID();
             Estimate estimate = new Estimate();
@@ -573,7 +800,14 @@ class WorkOrderServiceTest {
             service.rejectEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
 
             assertEquals(EstimateStatus.REJECTED, estimate.getStatus());
-            assertEquals(WorkOrderStatus.DIAGNOSIS, entity.getStatus());
+            assertEquals(WorkOrderStatus.COMPLETED, entity.getStatus());
+            assertNotNull(entity.getClosedAt());
+            assertNotNull(entity.getCancelledAt());
+
+            ArgumentCaptor<WorkOrderHistory> historyCaptor = ArgumentCaptor.forClass(WorkOrderHistory.class);
+            verify(repository).saveWithHistory(any(WorkOrder.class), historyCaptor.capture());
+            assertEquals(WorkOrderStatus.WAITING_APPROVAL, historyCaptor.getValue().getPreviousStatus());
+            assertEquals(WorkOrderStatus.COMPLETED, historyCaptor.getValue().getNewStatus());
         }
 
         @Test
@@ -593,86 +827,281 @@ class WorkOrderServiceTest {
     }
 
     @Nested
-    @DisplayName("stock management")
-    class StockManagement {
+    @DisplayName("envio do orçamento ao entrar em WAITING_APPROVAL")
+    class SendEstimateToCustomer {
 
-        private Estimate estimateWithItem(Part part, int quantity) {
-            EstimateItem item = new EstimateItem();
-            item.setPart(part);
-            item.setQuantity(quantity);
-            item.setUnitPrice(part.getUnitPrice());
-            item.setTotalPrice(part.getUnitPrice().multiply(BigDecimal.valueOf(quantity)));
-            Estimate estimate = new Estimate();
-            estimate.setWorkOrder(entity);
-            estimate.setStatus(EstimateStatus.PENDING);
-            estimate.setTotalAmount(item.getTotalPrice());
-            estimate.setItems(new java.util.ArrayList<>(List.of(item)));
-            return estimate;
+        private static final UUID ESTIMATE_ID = UUID.randomUUID();
+
+        @Test
+        @DisplayName("deve reservar as peças, marcar o envio e convidar o cliente a decidir")
+        void shouldReservePartsAndInviteCustomer() {
+            entity.setStatus(WorkOrderStatus.DIAGNOSIS);
+            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN");
+            Estimate estimate = pendingEstimate(part, 2);
+
+            givenWaitingApprovalTransition(estimate);
+            when(catalog.saveParts(List.of(part))).thenReturn(Uni.createFrom().voidItem());
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
+
+            service.updateStatus(WORK_ORDER_ID,
+                    new ChangeWorkOrderStatusCommand(WorkOrderStatus.WAITING_APPROVAL)).await().indefinitely();
+
+            assertEquals(WorkOrderStatus.WAITING_APPROVAL, entity.getStatus());
+            assertEquals(3, part.getStockQuantity());
+            assertNotNull(estimate.getSentAt());
+            verify(notificationService).notifyEstimateAwaitingDecision(any(), any(), any());
         }
 
         @Test
-        @DisplayName("should decrease part stock when approving the estimate")
-        void shouldDecreaseStockOnApproval() {
-            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
-            UUID estimateId = UUID.randomUUID();
+        @DisplayName("deve emitir um token de aprovação e um de recusa, ambos válidos por sete dias")
+        void shouldIssueOneTokenPerDecision() {
+            entity.setStatus(WorkOrderStatus.DIAGNOSIS);
             Part part = new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN");
-            Estimate estimate = estimateWithItem(part, 2);
-            estimate.setId(estimateId);
+            Estimate estimate = pendingEstimate(part, 2);
+
+            givenWaitingApprovalTransition(estimate);
+            when(catalog.saveParts(List.of(part))).thenReturn(Uni.createFrom().voidItem());
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
+
+            service.updateStatus(WORK_ORDER_ID,
+                    new ChangeWorkOrderStatusCommand(WorkOrderStatus.WAITING_APPROVAL)).await().indefinitely();
+
+            ArgumentCaptor<EstimateDecisionToken> tokenCaptor =
+                    ArgumentCaptor.forClass(EstimateDecisionToken.class);
+            verify(decisionTokenRepository, times(2)).save(tokenCaptor.capture());
+            List<EstimateDecisionToken> tokens = tokenCaptor.getAllValues();
+            assertEquals(List.of(EstimateDecision.APPROVE, EstimateDecision.REJECT),
+                    tokens.stream().map(EstimateDecisionToken::getDecision).toList());
+            tokens.forEach(token -> {
+                assertEquals(ESTIMATE_ID, token.getEstimateId());
+                assertEquals(WORK_ORDER_ID, token.getWorkOrderId());
+                assertEquals(token.getIssuedAt().plusDays(7), token.getExpiresAt());
+            });
+
+            ArgumentCaptor<EstimateDecisionInvitation> invitationCaptor =
+                    ArgumentCaptor.forClass(EstimateDecisionInvitation.class);
+            verify(notificationService)
+                    .notifyEstimateAwaitingDecision(any(), any(), invitationCaptor.capture());
+            assertEquals("signed-APPROVE", invitationCaptor.getValue().approveToken());
+            assertEquals("signed-REJECT", invitationCaptor.getValue().rejectToken());
+        }
+
+        @Test
+        @DisplayName("deve manter a OS em DIAGNOSIS e não notificar quando faltar saldo de peça")
+        void shouldKeepDiagnosisWhenStockIsInsufficient() {
+            entity.setStatus(WorkOrderStatus.DIAGNOSIS);
+            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 1, "UN");
+            Estimate estimate = pendingEstimate(part, 5);
+
+            givenWaitingApprovalTransition(estimate);
+
+            assertThrows(InsufficientPartStockException.class,
+                    () -> service.updateStatus(WORK_ORDER_ID,
+                            new ChangeWorkOrderStatusCommand(WorkOrderStatus.WAITING_APPROVAL))
+                            .await().indefinitely());
+
+            assertEquals(1, part.getStockQuantity());
+            assertNull(estimate.getSentAt());
+            verify(notificationService, never()).notifyEstimateAwaitingDecision(any(), any(), any());
+            verify(catalog, never()).saveParts(any());
+        }
+
+        @Test
+        @DisplayName("deve falhar quando a ordem não tem orçamento pendente para enviar")
+        void shouldFailWithoutPendingEstimate() {
+            entity.setStatus(WorkOrderStatus.DIAGNOSIS);
 
             when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findPendingByWorkOrderId(WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().nullItem());
+
+            assertThrows(EstimateNotFoundException.class,
+                    () -> service.updateStatus(WORK_ORDER_ID,
+                            new ChangeWorkOrderStatusCommand(WorkOrderStatus.WAITING_APPROVAL))
+                            .await().indefinitely());
+        }
+
+        private void givenWaitingApprovalTransition(Estimate estimate) {
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findPendingByWorkOrderId(WORK_ORDER_ID))
                     .thenReturn(Uni.createFrom().item(estimate));
+            lenient().when(mapper.toResult(entity)).thenReturn(response);
+        }
+
+        private Estimate pendingEstimate(Part part, int quantity) {
+            Estimate estimate = Estimate.create(entity, List.of(EstimateItem.create(part, quantity, null)),
+                    List.of());
+            estimate.setId(ESTIMATE_ID);
+            return estimate;
+        }
+    }
+
+    @Nested
+    @DisplayName("decideEstimate")
+    class DecideEstimate {
+
+        private static final String SIGNED_TOKEN = "signed-token";
+        private static final UUID TOKEN_ID = UUID.randomUUID();
+        private static final UUID ESTIMATE_ID = UUID.randomUUID();
+
+        @Test
+        @DisplayName("deve aprovar o orçamento, iniciar a execução e manter a reserva de estoque")
+        void shouldApproveAndKeepReservation() {
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
+            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN");
+            Estimate estimate = reservedEstimate(part, 2);
+
+            givenDecisionToken(EstimateDecision.APPROVE);
+            givenWorkOrderAndEstimate(estimate);
             when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
                     .thenReturn(Uni.createFrom().item(entity));
             when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
-            when(estimateMapper.toResult(estimate)).thenReturn(new EstimateResult(
-                    estimateId, WORK_ORDER_ID, EstimateStatus.APPROVED, BigDecimal.valueOf(20), BigDecimal.ZERO,
-                    BigDecimal.valueOf(20), null, null, List.of()));
+            when(estimateMapper.toResult(estimate)).thenReturn(estimateResult(EstimateStatus.APPROVED));
 
-            service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely();
+            service.decideEstimate(SIGNED_TOKEN).await().indefinitely();
 
+            assertEquals(EstimateStatus.APPROVED, estimate.getStatus());
+            assertEquals(WorkOrderStatus.IN_PROGRESS, entity.getStatus());
             assertEquals(3, part.getStockQuantity());
+            verify(catalog, never()).saveParts(any());
         }
 
         @Test
-        @DisplayName("should fail approval with insufficient stock and not change status")
-        void shouldFailApprovalWhenInsufficientStock() {
+        @DisplayName("deve recusar o orçamento, devolver as peças ao estoque e concluir a OS")
+        void shouldRejectAndRestoreStock() {
             entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
-            UUID estimateId = UUID.randomUUID();
-            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 1, "UN");
-            Estimate estimate = estimateWithItem(part, 5);
-            estimate.setId(estimateId);
+            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN");
+            Estimate estimate = reservedEstimate(part, 2);
 
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, WORK_ORDER_ID))
-                    .thenReturn(Uni.createFrom().item(estimate));
-
-            assertThrows(BusinessException.class,
-                    () -> service.approveEstimate(WORK_ORDER_ID, estimateId).await().indefinitely());
-            assertEquals(WorkOrderStatus.WAITING_APPROVAL, entity.getStatus());
-            assertEquals(1, part.getStockQuantity());
-        }
-
-        @Test
-        @DisplayName("should restore part stock when cancelling an APPROVED work order")
-        void shouldRestoreStockOnCancel() {
-            entity.setStatus(WorkOrderStatus.APPROVED);
-            ChangeWorkOrderStatusCommand request = new ChangeWorkOrderStatusCommand(WorkOrderStatus.CANCELLED);
-            Part part = new Part("Filtro", "desc", BigDecimal.TEN, 3, "UN");
-            Estimate approvedEstimate = estimateWithItem(part, 2);
-            approvedEstimate.setStatus(EstimateStatus.APPROVED);
-
-            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
-            when(estimateRepository.findApprovedByWorkOrderId(WORK_ORDER_ID))
-                    .thenReturn(Uni.createFrom().item(approvedEstimate));
+            givenDecisionToken(EstimateDecision.REJECT);
+            givenWorkOrderAndEstimate(estimate);
+            when(catalog.saveParts(List.of(part))).thenReturn(Uni.createFrom().voidItem());
             when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
                     .thenReturn(Uni.createFrom().item(entity));
-            when(mapper.toResult(entity)).thenReturn(response);
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
+            when(estimateMapper.toResult(estimate)).thenReturn(estimateResult(EstimateStatus.REJECTED));
 
-            service.updateStatus(WORK_ORDER_ID, request).await().indefinitely();
+            service.decideEstimate(SIGNED_TOKEN).await().indefinitely();
 
-            assertEquals(WorkOrderStatus.CANCELLED, entity.getStatus());
+            assertEquals(EstimateStatus.REJECTED, estimate.getStatus());
+            assertEquals(WorkOrderStatus.COMPLETED, entity.getStatus());
+            assertNotNull(entity.getCancelledAt());
             assertEquals(5, part.getStockQuantity());
+        }
+
+        @Test
+        @DisplayName("deve marcar o token como consumido ao registrar a decisão")
+        void shouldConsumeTokenOnce() {
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
+            Estimate estimate = reservedEstimate(new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN"), 2);
+
+            EstimateDecisionToken token = givenDecisionToken(EstimateDecision.APPROVE);
+            givenWorkOrderAndEstimate(estimate);
+            when(repository.saveWithHistory(any(WorkOrder.class), any(WorkOrderHistory.class)))
+                    .thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.save(estimate)).thenReturn(Uni.createFrom().item(estimate));
+            when(estimateMapper.toResult(estimate)).thenReturn(estimateResult(EstimateStatus.APPROVED));
+
+            service.decideEstimate(SIGNED_TOKEN).await().indefinitely();
+
+            assertNotNull(token.getConsumedAt());
+            verify(decisionTokenRepository).save(token);
+        }
+
+        @Test
+        @DisplayName("deve recusar um link já utilizado sem tocar na OS nem no estoque")
+        void shouldRejectReusedToken() {
+            EstimateDecisionToken token = givenDecisionToken(EstimateDecision.APPROVE);
+            token.consume(LocalDateTime.now().minusDays(1));
+
+            assertThrows(EstimateDecisionTokenAlreadyUsedException.class,
+                    () -> service.decideEstimate(SIGNED_TOKEN).await().indefinitely());
+
+            verify(repository, never()).findByWorkOrderId(any());
+            verify(catalog, never()).saveParts(any());
+        }
+
+        @Test
+        @DisplayName("deve recusar um link expirado sem tocar na OS nem no estoque")
+        void shouldRejectExpiredToken() {
+            EstimateDecisionToken token = givenDecisionToken(EstimateDecision.REJECT);
+            token.setExpiresAt(LocalDateTime.now().minusDays(1));
+
+            assertThrows(ExpiredEstimateDecisionTokenException.class,
+                    () -> service.decideEstimate(SIGNED_TOKEN).await().indefinitely());
+
+            verify(repository, never()).findByWorkOrderId(any());
+            verify(catalog, never()).saveParts(any());
+        }
+
+        @Test
+        @DisplayName("deve recusar um link assinado cujo token não existe mais")
+        void shouldRejectUnknownToken() {
+            when(decisionTokenSignature.readTokenId(SIGNED_TOKEN)).thenReturn(TOKEN_ID);
+            when(decisionTokenRepository.findByTokenId(TOKEN_ID)).thenReturn(Uni.createFrom().nullItem());
+
+            assertThrows(InvalidEstimateDecisionTokenException.class,
+                    () -> service.decideEstimate(SIGNED_TOKEN).await().indefinitely());
+        }
+
+        @Test
+        @DisplayName("deve propagar a assinatura inválida como link inválido")
+        void shouldRejectTamperedToken() {
+            when(decisionTokenSignature.readTokenId(SIGNED_TOKEN))
+                    .thenThrow(new InvalidEstimateDecisionTokenException());
+
+            assertThrows(InvalidEstimateDecisionTokenException.class,
+                    () -> service.decideEstimate(SIGNED_TOKEN).await().indefinitely());
+
+            verify(decisionTokenRepository, never()).findByTokenId(any());
+        }
+
+        @Test
+        @DisplayName("deve recusar a segunda decisão sobre um orçamento já decidido")
+        void shouldRejectSecondDecision() {
+            entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
+            Estimate estimate = reservedEstimate(new Part("Filtro", "desc", BigDecimal.TEN, 5, "UN"), 2);
+            estimate.approve(LocalDateTime.now());
+
+            givenDecisionToken(EstimateDecision.REJECT);
+            givenWorkOrderAndEstimate(estimate);
+
+            assertThrows(EstimateAlreadyDecidedException.class,
+                    () -> service.decideEstimate(SIGNED_TOKEN).await().indefinitely());
+
+            verify(catalog, never()).saveParts(any());
+        }
+
+        private EstimateDecisionToken givenDecisionToken(EstimateDecision decision) {
+            EstimateDecisionToken token = EstimateDecisionToken.issue(
+                    WORK_ORDER_ID, ESTIMATE_ID, decision, LocalDateTime.now());
+            token.setId(TOKEN_ID);
+            when(decisionTokenSignature.readTokenId(SIGNED_TOKEN)).thenReturn(TOKEN_ID);
+            when(decisionTokenRepository.findByTokenId(TOKEN_ID)).thenReturn(Uni.createFrom().item(token));
+            return token;
+        }
+
+        private void givenWorkOrderAndEstimate(Estimate estimate) {
+            when(repository.findByWorkOrderId(WORK_ORDER_ID)).thenReturn(Uni.createFrom().item(entity));
+            when(estimateRepository.findByEstimateIdAndWorkOrderId(ESTIMATE_ID, WORK_ORDER_ID))
+                    .thenReturn(Uni.createFrom().item(estimate));
+        }
+
+        private Estimate reservedEstimate(Part part, int quantity) {
+            Estimate estimate = Estimate.create(entity, List.of(EstimateItem.create(part, quantity, null)),
+                    List.of());
+            estimate.setId(ESTIMATE_ID);
+            estimate.reserveParts(LocalDateTime.now());
+            return estimate;
+        }
+
+        private EstimateResult estimateResult(EstimateStatus status) {
+            return new EstimateResult(ESTIMATE_ID, WORK_ORDER_ID, status, BigDecimal.valueOf(20),
+                    BigDecimal.ZERO, BigDecimal.valueOf(20), null, null, List.of());
         }
     }
 

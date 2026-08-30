@@ -7,7 +7,12 @@ import io.smallrye.mutiny.Uni;
 
 public interface WorkOrderNotificationPort {
 
-    Uni<Void> notifyEstimateReady(WorkOrder order, Estimate estimate);
+    Uni<Void> notifyEstimateAwaitingDecision(WorkOrder order, Estimate estimate,
+            EstimateDecisionInvitation invitation);
 
-    Uni<Void> notifyWorkOrderCompleted(WorkOrder order);
+    /**
+     * Avisa o cliente do estágio em que o atendimento está e devolve o link de acompanhamento.
+     * Vale para a abertura e para cada mudança de status posterior, inclusive a conclusão.
+     */
+    Uni<Void> notifyWorkOrderProgress(WorkOrder order, WorkOrderTrackingInvitation invitation);
 }

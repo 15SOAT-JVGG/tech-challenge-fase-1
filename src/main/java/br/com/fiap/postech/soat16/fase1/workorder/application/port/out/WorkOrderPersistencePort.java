@@ -10,9 +10,9 @@ import io.smallrye.mutiny.Uni;
 
 public interface WorkOrderPersistencePort {
 
-    Uni<List<WorkOrder>> findPage(int page, int size);
+    Uni<List<WorkOrder>> findOperationalQueuePage(int page, int size);
 
-    Uni<Long> countWorkOrders();
+    Uni<Long> countOperationalQueue();
 
     Uni<List<WorkOrder>> findClosed();
 

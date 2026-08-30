@@ -35,4 +35,21 @@ public class WorkOrderService {
     private BigDecimal price;
 
     private LocalDateTime performedAt;
+
+    /**
+     * Serviço da solicitação inicial. O nome e o preço base do catálogo são copiados aqui para que
+     * uma atualização posterior do catálogo não altere um orçamento já emitido. A linha ainda não
+     * foi executada, mas {@code performedAt} é obrigatório na persistência e recebe o instante da
+     * abertura.
+     */
+    public static WorkOrderService requestFromCatalog(WorkOrder workOrder, ServiceItem serviceItem,
+            LocalDateTime requestedAt) {
+        var service = new WorkOrderService();
+        service.workOrder = workOrder;
+        service.serviceItem = serviceItem;
+        service.description = serviceItem.getName();
+        service.price = serviceItem.getBasePrice();
+        service.performedAt = requestedAt;
+        return service;
+    }
 }

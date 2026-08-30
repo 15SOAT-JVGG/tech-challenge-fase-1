@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
 import br.com.fiap.postech.soat16.fase1.shared.domain.model.audit.AuditableEntity;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateAlreadyDecidedException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
@@ -39,6 +40,8 @@ public class Estimate extends AuditableEntity {
     private LocalDateTime approvedAt;
 
     private LocalDateTime sentAt;
+
+    private LocalDateTime reservedAt;
 
     private List<EstimateItem> items = new ArrayList<>();
 
@@ -81,5 +84,37 @@ public class Estimate extends AuditableEntity {
         if (status != EstimateStatus.PENDING) {
             throw new EstimateAlreadyDecidedException();
         }
+    }
+
+    /**
+     * Reserva o saldo de todas as peças ou de nenhuma: a disponibilidade é conferida item a item
+     * antes de qualquer baixa, para que uma peça em falta no fim da lista não deixe as anteriores
+     * já debitadas. Devolve as peças afetadas, que o chamador precisa persistir.
+     */
+    public List<Part> reserveParts(LocalDateTime reservedAt) {
+        assertPending();
+        if (hasReservedParts()) {
+            return List.of();
+        }
+        items.forEach(EstimateItem::assertStockAvailable);
+        this.reservedAt = reservedAt;
+        return items.stream().map(EstimateItem::reserve).toList();
+    }
+
+    /**
+     * Devolver o que nunca foi reservado não é erro: um orçamento recusado antes de chegar a
+     * WAITING_APPROVAL simplesmente não tem saldo a restituir.
+     */
+    @SuppressWarnings("PMD.NullAssignment")
+    public List<Part> restoreParts() {
+        if (!hasReservedParts()) {
+            return List.of();
+        }
+        reservedAt = null;
+        return items.stream().map(EstimateItem::restore).toList();
+    }
+
+    public boolean hasReservedParts() {
+        return reservedAt != null;
     }
 }

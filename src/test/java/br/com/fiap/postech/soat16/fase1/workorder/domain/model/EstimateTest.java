@@ -1,7 +1,9 @@
 package br.com.fiap.postech.soat16.fase1.workorder.domain.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import br.com.fiap.postech.soat16.fase1.part.domain.model.Part;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateAlreadyDecidedException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InsufficientPartStockException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateStatus;
 
 @DisplayName("Estimate model — Unit Tests")
@@ -71,6 +74,99 @@ class EstimateTest {
 
             assertThrows(EstimateAlreadyDecidedException.class,
                     () -> estimate.approve(LocalDateTime.of(2026, 1, 10, 12, 0)));
+        }
+    }
+
+    @Nested
+    @DisplayName("reserva de estoque")
+    class PartsReservation {
+
+        private static final LocalDateTime RESERVED_AT = LocalDateTime.of(2026, 1, 10, 9, 0);
+
+        @Test
+        @DisplayName("baixa o saldo de todas as peças e devolve as afetadas")
+        void reservesEveryPart() {
+            Part brakePad = part("Pastilha", 10);
+            Part filter = part("Filtro", 8);
+            Estimate estimate = estimateWith(EstimateItem.create(brakePad, 4, null),
+                    EstimateItem.create(filter, 2, null));
+
+            List<Part> reserved = estimate.reserveParts(RESERVED_AT);
+
+            assertEquals(List.of(brakePad, filter), reserved);
+            assertEquals(6, brakePad.getStockQuantity());
+            assertEquals(6, filter.getStockQuantity());
+            assertTrue(estimate.hasReservedParts());
+        }
+
+        @Test
+        @DisplayName("não baixa nenhuma peça quando uma delas não tem saldo suficiente")
+        void reservesAllPartsOrNone() {
+            Part brakePad = part("Pastilha", 10);
+            Part filter = part("Filtro", 1);
+            Estimate estimate = estimateWith(EstimateItem.create(brakePad, 4, null),
+                    EstimateItem.create(filter, 2, null));
+
+            assertThrows(InsufficientPartStockException.class, () -> estimate.reserveParts(RESERVED_AT));
+
+            assertEquals(10, brakePad.getStockQuantity());
+            assertEquals(1, filter.getStockQuantity());
+            assertFalse(estimate.hasReservedParts());
+        }
+
+        @Test
+        @DisplayName("não reserva de novo um orçamento já reservado")
+        void doesNotReserveTwice() {
+            Part brakePad = part("Pastilha", 10);
+            Estimate estimate = estimateWith(EstimateItem.create(brakePad, 4, null));
+            estimate.reserveParts(RESERVED_AT);
+
+            assertEquals(List.of(), estimate.reserveParts(RESERVED_AT.plusHours(1)));
+            assertEquals(6, brakePad.getStockQuantity());
+        }
+
+        @Test
+        @DisplayName("devolve ao estoque as peças reservadas e encerra a reserva")
+        void restoresReservedParts() {
+            Part brakePad = part("Pastilha", 10);
+            Part filter = part("Filtro", 8);
+            Estimate estimate = estimateWith(EstimateItem.create(brakePad, 4, null),
+                    EstimateItem.create(filter, 2, null));
+            estimate.reserveParts(RESERVED_AT);
+
+            List<Part> restored = estimate.restoreParts();
+
+            assertEquals(List.of(brakePad, filter), restored);
+            assertEquals(10, brakePad.getStockQuantity());
+            assertEquals(8, filter.getStockQuantity());
+            assertFalse(estimate.hasReservedParts());
+        }
+
+        @Test
+        @DisplayName("não devolve saldo de um orçamento que nunca reservou peças")
+        void restoresNothingWithoutReservation() {
+            Part brakePad = part("Pastilha", 10);
+            Estimate estimate = estimateWith(EstimateItem.create(brakePad, 4, null));
+
+            assertEquals(List.of(), estimate.restoreParts());
+            assertEquals(10, brakePad.getStockQuantity());
+        }
+
+        @Test
+        @DisplayName("não reserva peças de um orçamento já decidido")
+        void rejectsReservationOfDecidedEstimate() {
+            Estimate estimate = estimateWith(EstimateItem.create(part("Pastilha", 10), 4, null));
+            estimate.reject();
+
+            assertThrows(EstimateAlreadyDecidedException.class, () -> estimate.reserveParts(RESERVED_AT));
+        }
+
+        private Estimate estimateWith(EstimateItem... items) {
+            return Estimate.create(new WorkOrder(), List.of(items), List.of());
+        }
+
+        private Part part(String name, int stockQuantity) {
+            return new Part(name, "desc", new BigDecimal("25.00"), stockQuantity, "UN");
         }
     }
 

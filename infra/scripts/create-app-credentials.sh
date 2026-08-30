@@ -14,6 +14,8 @@
 #   par RS256                 JWT_PRIVATE_KEY_B64 / JWT_PUBLIC_KEY_B64 quando definidos,
 #                             senão um diretório local gerado por
 #                             infra/scripts/generate-jwt-pair.sh
+#   credenciais de SMTP       MAIL_USERNAME / MAIL_PASSWORD, opcionais: sem elas o
+#                             mailer só entrega se estiver em modo simulado
 #
 # Idempotente: reescreve os dois a cada execução. Reiniciar os pods depois é de quem
 # chama (`kubectl rollout restart deploy/oficina-mecanica`).
@@ -78,6 +80,20 @@ else
     fi
 fi
 
+# Usuário e senha do SMTP são segredo e por isso vivem aqui, enquanto host, porta e
+# remetente ficam no ConfigMap: a conta de e-mail tem ciclo de vida próprio, e trocá-la
+# não deveria pedir um commit. As duas andam juntas — o servidor recusa a autenticação
+# com apenas uma delas, e o sintoma seria um e-mail que nunca chega, sem erro no deploy.
+MAIL_USERNAME="${MAIL_USERNAME:-}"
+MAIL_PASSWORD="${MAIL_PASSWORD:-}"
+if [[ -n "$MAIL_USERNAME" && -z "$MAIL_PASSWORD" ]] || [[ -z "$MAIL_USERNAME" && -n "$MAIL_PASSWORD" ]]; then
+    echo "MAIL_USERNAME e MAIL_PASSWORD andam juntas: defina as duas, ou nenhuma." >&2
+    exit 1
+fi
+if [[ -z "$MAIL_USERNAME" ]]; then
+    echo "Sem credenciais de SMTP: o e-mail só sai se MAIL_MOCK for true no ConfigMap."
+fi
+
 # Em CI o par chega por variável de ambiente; localmente, por arquivo.
 JWT_WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$JWT_WORK_DIR"' EXIT
@@ -103,6 +119,8 @@ kubectl create secret generic "$ENV_SECRET" \
     --from-literal=POSTGRES_PASSWORD="$DATABASE_PASSWORD" \
     --from-literal=APP_SEED_ADMIN_PASSWORD="$APP_SEED_ADMIN_PASSWORD" \
     --from-literal=APP_SEED_MECHANIC_PASSWORD="$APP_SEED_MECHANIC_PASSWORD" \
+    --from-literal=MAIL_USERNAME="$MAIL_USERNAME" \
+    --from-literal=MAIL_PASSWORD="$MAIL_PASSWORD" \
     --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create secret generic "$JWT_SECRET" \

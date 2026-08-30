@@ -23,6 +23,7 @@ public class AppExceptionMapper implements ExceptionMapper<AppException> {
             case UNAUTHORIZED -> 401;
             case NOT_FOUND -> 404;
             case CONFLICT -> 409;
+            case GONE -> 410;
             case BUSINESS -> 422;
         };
 

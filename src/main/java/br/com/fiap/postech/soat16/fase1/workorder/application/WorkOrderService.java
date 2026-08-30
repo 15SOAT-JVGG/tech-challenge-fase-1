@@ -25,27 +25,39 @@ import br.com.fiap.postech.soat16.fase1.workorder.application.command.OpenWorkOr
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.EstimateMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.WorkOrderMapper;
 import br.com.fiap.postech.soat16.fase1.workorder.application.mapper.WorkOrderServiceMapper;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateDecisionInvitation;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateDecisionTokenPersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimateDecisionTokenSignaturePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.EstimatePersistencePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderNotificationPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderPersistencePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderServicePersistencePort;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderTrackingInvitation;
+import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkOrderTrackingTokenSignaturePort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.port.out.WorkshopCatalogPort;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.OpenWorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderMetricsResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderTrackingResult;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimateNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.EstimatePartNotFoundException;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.InvalidEstimateDecisionTokenException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.exception.WorkOrderNotFoundException;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.Estimate;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.model.EstimateDecisionToken;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.EstimateItem;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrder;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderHistory;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderTrackingToken;
+import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.EstimateDecision;
 import br.com.fiap.postech.soat16.fase1.workorder.domain.model.enums.WorkOrderStatus;
 
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.quarkus.logging.Log;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import lombok.RequiredArgsConstructor;
 
@@ -56,15 +68,23 @@ public class WorkOrderService {
     private final WorkOrderPersistencePort repository;
     private final EstimatePersistencePort estimateRepository;
     private final WorkOrderServicePersistencePort serviceRepository;
+    private final EstimateDecisionTokenPersistencePort decisionTokenRepository;
     private final WorkshopCatalogPort catalog;
     private final WorkOrderMapper mapper;
     private final EstimateMapper estimateMapper;
     private final WorkOrderServiceMapper serviceMapper;
     private final WorkOrderNotificationPort notificationService;
+    private final EstimateDecisionTokenSignaturePort decisionTokenSignature;
+    private final WorkOrderTrackingTokenSignaturePort trackingTokenSignature;
 
+    /**
+     * A fila operacional da oficina: somente ordens ainda em atendimento, agrupadas pelo estágio de
+     * trabalho e, dentro de cada grupo, da mais antiga para a mais recente.
+     */
     @WithSession
-    public Uni<PagedResult<WorkOrderResult>> findAll(String q, int page, int size) {
-        return Uni.combine().all().unis(repository.findPage(page, size), repository.countWorkOrders()).asTuple()
+    public Uni<PagedResult<WorkOrderResult>> findOperationalQueue(int page, int size) {
+        return Uni.combine().all()
+                .unis(repository.findOperationalQueuePage(page, size), repository.countOperationalQueue()).asTuple()
                 .map(tuple -> PagedResult.of(
                         tuple.getItem1().stream().map(mapper::toResult).toList(),
                         page,
@@ -93,8 +113,29 @@ public class WorkOrderService {
                 .map(mapper::toResult);
     }
 
+    /**
+     * O acompanhamento do cliente: o link assinado é a única credencial, e ele responde apenas o
+     * andamento do atendimento. Um link forjado ou vencido não conta nada sobre a ordem.
+     */
+    @WithSession
+    public Uni<WorkOrderTrackingResult> track(String signedToken) {
+        LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+        return Uni.createFrom().item(signedToken)
+                .map(trackingTokenSignature::read)
+                .invoke(token -> token.ensureValidAt(now))
+                .flatMap(token -> repository.findByWorkOrderId(token.workOrderId()))
+                .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
+                .map(mapper::toTrackingResult);
+    }
+
+    /**
+     * Abre a ordem em RECEIVED e, quando a solicitação inicial traz peças ou serviços, o orçamento
+     * pendente correspondente. A transação única garante que uma referência inválida não deixe
+     * ordem, linhas de serviço ou orçamento pela metade.
+     */
     @WithTransaction
-    public Uni<Void> create(OpenWorkOrderCommand request) {
+    public Uni<OpenWorkOrderResult> create(OpenWorkOrderCommand request) {
+        LocalDateTime openedAt = LocalDateTime.now(ZoneId.systemDefault());
         return catalog.findCustomerById(request.customerId())
                 .onItem().ifNull().failWith(CustomerNotFoundException::new)
                 .flatMap(customer -> catalog.findVehicleById(request.vehicleId())
@@ -106,8 +147,57 @@ public class WorkOrderService {
                                         worker,
                                         request.description(),
                                         request.priority(),
-                                        LocalDateTime.now(ZoneId.systemDefault())))
-                                        .replaceWithVoid())));
+                                        openedAt)))))
+                .flatMap(order -> openInitialEstimate(order, request, openedAt)
+                        .map(estimate -> new OpenWorkOrderResult(
+                                mapper.toResult(order),
+                                estimateMapper.toResult(estimate)))
+                        .flatMap(opened -> notifyProgress(order, openedAt).replaceWith(opened)));
+    }
+
+    private Uni<Estimate> openInitialEstimate(WorkOrder order, OpenWorkOrderCommand request,
+            LocalDateTime openedAt) {
+        if (!request.hasInitialRequest()) {
+            return Uni.createFrom().nullItem();
+        }
+        return requestServices(order, request.services(), openedAt)
+                .flatMap(services -> requestParts(request.parts())
+                        .flatMap(items -> persistEstimate(order, items, services)))
+                .flatMap(estimate -> persistOrderWithHistory(order, order.registerEstimate(estimate, openedAt))
+                        .replaceWith(estimate));
+    }
+
+    /**
+     * As linhas são gravadas em sequência: a sessão reativa do Hibernate não aceita escritas
+     * concorrentes.
+     */
+    private Uni<List<br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService>> requestServices(
+            WorkOrder order, List<OpenWorkOrderCommand.RequestedService> requested, LocalDateTime openedAt) {
+        return Multi.createFrom().iterable(requested)
+                .onItem().transformToUniAndConcatenate(service -> catalog
+                        .findServiceItemById(service.serviceItemId())
+                        .onItem().ifNull()
+                        .failWith(() -> new ServiceItemNotFoundException(service.serviceItemId()))
+                        .flatMap(serviceItem -> serviceRepository.save(
+                                br.com.fiap.postech.soat16.fase1.workorder.domain.model.WorkOrderService
+                                        .requestFromCatalog(order, serviceItem, openedAt))))
+                .collect().asList();
+    }
+
+    private Uni<List<EstimateItem>> requestParts(List<OpenWorkOrderCommand.RequestedPart> requested) {
+        if (requested.isEmpty()) {
+            return Uni.createFrom().item(List.of());
+        }
+        List<Uni<EstimateItem>> itemUnis = requested.stream()
+                .map(part -> lookupPart(part.partId())
+                        .map(found -> EstimateItem.create(found, part.quantity(), null)))
+                .toList();
+        return Uni.join().all(itemUnis).andFailFast();
+    }
+
+    private Uni<Part> lookupPart(UUID partId) {
+        return catalog.findPartById(partId)
+                .onItem().ifNull().failWith(() -> new EstimatePartNotFoundException(partId));
     }
 
     private Uni<Worker> resolveAssignedWorker(UUID assignedWorkerId) {
@@ -118,8 +208,14 @@ public class WorkOrderService {
                 .onItem().ifNull().failWith(() -> new WorkerNotFoundException(assignedWorkerId));
     }
 
+    /**
+     * Entrar em WAITING_APPROVAL é o passo que compromete a oficina com o cliente: a mesma transação
+     * reserva as peças do orçamento pendente e envia o convite de decisão. Saldo insuficiente
+     * desfaz tudo e a ordem permanece em DIAGNOSIS, sem e-mail.
+     */
     @WithTransaction
     public Uni<WorkOrderResult> updateStatus(UUID id, ChangeWorkOrderStatusCommand request) {
+        LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
         return repository.findByWorkOrderId(id)
                 .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
                 .flatMap(order -> {
@@ -127,19 +223,85 @@ public class WorkOrderService {
                     Uni<Boolean> approvedEstimate = requiresApprovedEstimate(request.status())
                             ? hasApprovedEstimate(id)
                             : Uni.createFrom().item(false);
-                    Uni<Void> restoreStock = request.status() == WorkOrderStatus.CANCELLED
-                            ? restoreStockIfReserved(order)
-                            : Uni.createFrom().voidItem();
                     return approvedEstimate
-                            .flatMap(hasApproved -> restoreStock
-                                    .flatMap(ignored -> {
-                                        var history = order.transitionTo(
-                                                request.status(),
-                                                hasApproved,
-                                                LocalDateTime.now(ZoneId.systemDefault()));
-                                        return persistOrderWithHistory(order, Optional.of(history));
-                                    }))
+                            .flatMap(hasApproved -> {
+                                var history = order.transitionTo(request.status(), hasApproved, now);
+                                return persistOrderWithHistory(order, Optional.of(history));
+                            })
+                            .flatMap(saved -> request.status() == WorkOrderStatus.WAITING_APPROVAL
+                                    ? sendPendingEstimateToCustomer(saved, now).replaceWith(saved)
+                                    : Uni.createFrom().item(saved))
+                            .flatMap(saved -> notifyProgress(saved, now).replaceWith(saved))
                             .map(mapper::toResult);
+                });
+    }
+
+    private Uni<Void> sendPendingEstimateToCustomer(WorkOrder order, LocalDateTime now) {
+        return estimateRepository.findPendingByWorkOrderId(order.getId())
+                .onItem().ifNull().failWith(EstimateNotFoundException::new)
+                .flatMap(estimate -> awaitCustomerDecision(order, estimate, now));
+    }
+
+    private Uni<Void> awaitCustomerDecision(WorkOrder order, Estimate estimate, LocalDateTime now) {
+        return reserveParts(estimate, now)
+                .flatMap(ignored -> {
+                    estimate.markSent(now);
+                    return estimateRepository.save(estimate);
+                })
+                .flatMap(sent -> inviteCustomerToDecide(order, sent, now));
+    }
+
+    /**
+     * Os dois tokens são gravados em sequência: a sessão reativa do Hibernate não aceita escritas
+     * concorrentes.
+     */
+    private Uni<Void> inviteCustomerToDecide(WorkOrder order, Estimate estimate, LocalDateTime now) {
+        var approveToken = EstimateDecisionToken.issue(
+                order.getId(), estimate.getId(), EstimateDecision.APPROVE, now);
+        var rejectToken = EstimateDecisionToken.issue(
+                order.getId(), estimate.getId(), EstimateDecision.REJECT, now);
+        return decisionTokenRepository.save(approveToken)
+                .flatMap(saved -> decisionTokenRepository.save(rejectToken))
+                .flatMap(saved -> notificationService.notifyEstimateAwaitingDecision(
+                        order,
+                        estimate,
+                        new EstimateDecisionInvitation(
+                                decisionTokenSignature.sign(approveToken),
+                                decisionTokenSignature.sign(rejectToken),
+                                approveToken.getExpiresAt())));
+    }
+
+    /**
+     * Registra a decisão que o cliente tomou pelo link recebido por e-mail. O token vale uma única
+     * vez: se a decisão não puder ser aplicada, a transação inteira volta atrás e o link continua
+     * disponível.
+     */
+    @WithTransaction
+    public Uni<EstimateResult> decideEstimate(String signedToken) {
+        LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+        return Uni.createFrom().item(signedToken)
+                .map(decisionTokenSignature::readTokenId)
+                .flatMap(decisionTokenRepository::findByTokenId)
+                .onItem().ifNull().failWith(InvalidEstimateDecisionTokenException::new)
+                .flatMap(token -> {
+                    token.consume(now);
+                    return decisionTokenRepository.save(token);
+                })
+                .flatMap(token -> applyCustomerDecision(token, now))
+                .map(estimateMapper::toResult);
+    }
+
+    private Uni<Estimate> applyCustomerDecision(EstimateDecisionToken token, LocalDateTime now) {
+        return repository.findByWorkOrderId(token.getWorkOrderId())
+                .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
+                .flatMap(order -> {
+                    order.ensureMutable();
+                    return estimateRepository
+                            .findByEstimateIdAndWorkOrderId(token.getEstimateId(), token.getWorkOrderId())
+                            .onItem().ifNull().failWith(EstimateNotFoundException::new)
+                            .flatMap(estimate -> token.getDecision() == EstimateDecision.APPROVE
+                                    ? approve(order, estimate, now)
+                                    : reject(order, estimate, now));
                 });
     }
 
@@ -165,7 +327,8 @@ public class WorkOrderService {
                     order.ensureMutable();
                     return estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, workOrderId)
                             .onItem().ifNull().failWith(EstimateNotFoundException::new)
-                            .flatMap(estimate -> approve(order, estimate));
+                            .flatMap(estimate -> approve(order, estimate,
+                                    LocalDateTime.now(ZoneId.systemDefault())));
                 })
                 .map(estimateMapper::toResult);
     }
@@ -178,7 +341,8 @@ public class WorkOrderService {
                     order.ensureMutable();
                     return estimateRepository.findByEstimateIdAndWorkOrderId(estimateId, workOrderId)
                             .onItem().ifNull().failWith(EstimateNotFoundException::new)
-                            .flatMap(estimate -> reject(order, estimate));
+                            .flatMap(estimate -> reject(order, estimate,
+                                    LocalDateTime.now(ZoneId.systemDefault())));
                 })
                 .map(estimateMapper::toResult);
     }
@@ -206,6 +370,7 @@ public class WorkOrderService {
 
     @WithTransaction
     public Uni<WorkOrderResult> close(UUID id, CloseWorkOrderCommand request) {
+        LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
         return repository.findByWorkOrderId(id)
                 .onItem().ifNull().failWith(WorkOrderNotFoundException::new)
                 .flatMap(order -> {
@@ -216,42 +381,69 @@ public class WorkOrderService {
                                     Optional.of(order.close(
                                             request.finalValue(),
                                             hasApproved,
-                                            LocalDateTime.now(ZoneId.systemDefault())))))
-                            .flatMap(saved -> notificationService.notifyWorkOrderCompleted(saved).replaceWith(saved))
+                                            now))))
+                            .flatMap(saved -> notifyProgress(saved, now).replaceWith(saved))
                             .map(mapper::toResult);
                 });
     }
 
-    private Uni<Estimate> approve(WorkOrder order, Estimate estimate) {
-        LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
-        estimate.assertPending();
-        return reserveStock(estimate)
-                .flatMap(ignored -> {
-                    estimate.approve(now);
-                    return persistOrderWithHistory(order, order.registerEstimateApproval(estimate, now))
-                            .flatMap(persisted -> estimateRepository.save(estimate));
-                });
+    /**
+     * A aprovação apenas confirma a reserva feita na entrada em WAITING_APPROVAL: o estoque já foi
+     * baixado e permanece comprometido com a execução.
+     */
+    private Uni<Estimate> approve(WorkOrder order, Estimate estimate, LocalDateTime now) {
+        estimate.approve(now);
+        Optional<WorkOrderHistory> statusChange = order.registerEstimateApproval(estimate, now);
+        return persistOrderWithHistory(order, statusChange)
+                .flatMap(persisted -> estimateRepository.save(estimate))
+                .flatMap(saved -> notifyProgressIfStatusChanged(order, statusChange, now).replaceWith(saved));
     }
 
-    private Uni<Estimate> reject(WorkOrder order, Estimate estimate) {
-        LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
+    private Uni<Estimate> reject(WorkOrder order, Estimate estimate, LocalDateTime now) {
         estimate.reject();
-        return persistOrderWithHistory(order, order.registerEstimateRejection(now))
-                .flatMap(persisted -> estimateRepository.save(estimate));
+        Optional<WorkOrderHistory> statusChange = order.registerEstimateRejection(now);
+        return restoreParts(estimate)
+                .flatMap(ignored -> persistOrderWithHistory(order, statusChange))
+                .flatMap(persisted -> estimateRepository.save(estimate))
+                .flatMap(saved -> notifyProgressIfStatusChanged(order, statusChange, now).replaceWith(saved));
     }
 
+    /**
+     * A condição olha o status resultante, e não se houve transição: um orçamento criado para uma
+     * ordem que já estava em WAITING_APPROVAL também precisa reservar e ser enviado, senão poderia
+     * ser aprovado sem que o estoque tivesse sido baixado.
+     */
     private Uni<Estimate> finalizeEstimateCreation(WorkOrder order, Estimate estimate) {
         LocalDateTime now = LocalDateTime.now(ZoneId.systemDefault());
-        estimate.markSent(now);
-        return persistOrderWithHistory(order, order.registerEstimate(estimate, now))
-                .flatMap(saved -> notificationService.notifyEstimateReady(saved, estimate))
+        Optional<WorkOrderHistory> statusChange = order.registerEstimate(estimate, now);
+        return persistOrderWithHistory(order, statusChange)
+                .flatMap(saved -> saved.getStatus() == WorkOrderStatus.WAITING_APPROVAL
+                        ? awaitCustomerDecision(saved, estimate, now)
+                        : Uni.createFrom().voidItem())
+                .flatMap(ignored -> notifyProgressIfStatusChanged(order, statusChange, now))
                 .replaceWith(estimate);
+    }
+
+    /**
+     * O acompanhamento é reemitido a cada aviso: o cliente sempre recebe um link com trinta dias
+     * pela frente, e a oficina não precisa guardar token nenhum.
+     */
+    private Uni<Void> notifyProgress(WorkOrder order, LocalDateTime now) {
+        var token = WorkOrderTrackingToken.issue(order.getId(), now);
+        return notificationService.notifyWorkOrderProgress(order, new WorkOrderTrackingInvitation(
+                trackingTokenSignature.sign(token), token.expiresAt()));
+    }
+
+    private Uni<Void> notifyProgressIfStatusChanged(WorkOrder order,
+            Optional<WorkOrderHistory> statusChange, LocalDateTime now) {
+        return statusChange.isEmpty()
+                ? Uni.createFrom().voidItem()
+                : notifyProgress(order, now);
     }
 
     private Uni<List<EstimateItem>> buildItems(CreateEstimateCommand request) {
         List<Uni<EstimateItem>> itemUnis = request.items().stream()
-                .map(itemDto -> catalog.findPartById(itemDto.partId())
-                        .onItem().ifNull().failWith(() -> new EstimatePartNotFoundException(itemDto.partId()))
+                .map(itemDto -> lookupPart(itemDto.partId())
                         .map(part -> EstimateItem.create(part, itemDto.quantity(), itemDto.unitPrice())))
                 .toList();
         return Uni.join().all(itemUnis).andFailFast();
@@ -262,46 +454,17 @@ public class WorkOrderService {
         return estimateRepository.save(Estimate.create(order, items, services));
     }
 
-    /**
-     * Baixa o estoque somente após a aprovação do orçamento. A transação é revertida se alguma peça
-     * não tiver estoque suficiente.
-     */
-    private Uni<Void> reserveStock(Estimate estimate) {
-        List<Part> parts = estimate.getItems().stream()
-                .map(item -> {
-                    Part part = item.getPart();
-                    part.decreaseStock(item.getQuantity());
-                    if (part.isLowStock()) {
-                        Log.warnf("Estoque baixo apos reserva: peca=%s restante=%d minimo=%d",
-                                part.getName(), part.getStockQuantity(), part.getMinimumStock());
-                    }
-                    return part;
-                })
-                .toList();
-        return catalog.saveParts(parts);
+    private Uni<Void> reserveParts(Estimate estimate, LocalDateTime reservedAt) {
+        List<Part> reserved = estimate.reserveParts(reservedAt);
+        reserved.stream()
+                .filter(Part::isLowStock)
+                .forEach(part -> Log.warnf("Estoque baixo apos reserva: peca=%s restante=%d minimo=%d",
+                        part.getName(), part.getStockQuantity(), part.getMinimumStock()));
+        return catalog.saveParts(reserved);
     }
 
-    /**
-     * Restaura o estoque somente quando as peças estão reservadas, mas ainda não foram consumidas.
-     */
-    private Uni<Void> restoreStockIfReserved(WorkOrder order) {
-        if (!order.hasReservedStock()) {
-            return Uni.createFrom().voidItem();
-        }
-        return estimateRepository.findApprovedByWorkOrderId(order.getId())
-                .flatMap(estimate -> {
-                    if (estimate == null) {
-                        return Uni.createFrom().voidItem();
-                    }
-                    List<Part> parts = estimate.getItems().stream()
-                            .map(item -> {
-                                Part part = item.getPart();
-                                part.increaseStock(item.getQuantity());
-                                return part;
-                            })
-                            .toList();
-                    return catalog.saveParts(parts);
-                });
+    private Uni<Void> restoreParts(Estimate estimate) {
+        return catalog.saveParts(estimate.restoreParts());
     }
 
     private Uni<WorkOrder> persistOrderWithHistory(WorkOrder order,
@@ -317,6 +480,6 @@ public class WorkOrderService {
     }
 
     private boolean requiresApprovedEstimate(WorkOrderStatus target) {
-        return target == WorkOrderStatus.APPROVED || target == WorkOrderStatus.IN_PROGRESS;
+        return target == WorkOrderStatus.IN_PROGRESS;
     }
 }

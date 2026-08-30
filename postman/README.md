@@ -1,6 +1,6 @@
 # Collection Postman — Oficina Mecânica API (E2E)
 
-`Oficina-Mecanica-E2E.postman_collection.json` reúne 98 requisições em 10 pastas, executadas em ordem:
+`Oficina-Mecanica-E2E.postman_collection.json` reúne 103 requisições em 10 pastas, executadas em ordem:
 
 | Pasta | Cobertura |
 |---|---|
@@ -10,16 +10,33 @@
 | 03 - Workers | CRUD (ADMIN-only), login de worker (não gera JWT — só valida credenciais) |
 | 04 - Parts and Supplies | CRUD, ajuste de estoque, low-stock, RBAC (mutação só ADMIN) |
 | 05 - Service Catalog | CRUD, RBAC (mutação só ADMIN) |
-| 06 - Work Orders - Happy Path | Ciclo completo: RECEIVED → DIAGNOSIS → orçamento → aprovação → IN_PROGRESS → fechamento → DELIVERED, métricas |
-| 07 - Work Orders - Rejection and Public Channel | Rejeição de orçamento, novo orçamento, aprovação via canal público (sem auth) |
-| 08 - Work Orders - Cancellation and Locking | Cancelamento e bloqueio de OS cancelada |
+| 06 - Work Orders - Happy Path | Abertura com solicitação inicial (orçamento pendente atômico) e ciclo completo: RECEIVED → DIAGNOSIS → orçamento → aprovação → IN_PROGRESS → fechamento → DELIVERED, métricas |
+| 07 - Ordens de Serviço - Canal Público | Canal do cliente por link assinado: não há acesso por id (404), links forjados são recusados (`TRACKING_TOKEN_INVALID` / `DECISION_TOKEN_INVALID`, 400) e a OS segue aguardando decisão. As três requisições com os links reais são opcionais — ver [Exercitando os links do cliente](#exercitando-os-links-do-cliente) |
+| 08 - Ordens de Serviço - Recusa de Orçamento e Bloqueio | Recusa de orçamento conclui a OS com `cancelledAt` e bloqueia novas mutações com `WORK_ORDER_LOCKED` |
 | 09 - Cross-cutting Security | 401 sem token, 404 para recurso inexistente |
 
 ## Como rodar
 
 A API precisa estar no ar (`docker compose up`, ver README principal).
 
-**Opção A — Postman GUI:** importe o arquivo, ajuste a variável de coleção `base_url` se necessário (default `http://localhost:8080`), rode com o Collection Runner em ordem de pasta.
+Três variáveis de coleção governam para onde a suíte aponta e com quem ela se autentica. Os
+defaults valem para o `docker compose`; contra outro ambiente, sobrescreva as três:
+
+| Variável | Default | O que é |
+|---|---|---|
+| `base_url` | `http://localhost:8080` | Endereço da API |
+| `admin_password` | `admin123` | Senha de seed do ADMIN (`APP_SEED_ADMIN_PASSWORD`) |
+| `mechanic_password` | `mecanico123` | Senha de seed do MECHANIC (`APP_SEED_MECHANIC_PASSWORD`) |
+
+**Opção A — Postman GUI:** importe o arquivo, ajuste as variáveis de coleção se necessário, rode com
+o Collection Runner em ordem de pasta.
+
+**Opção A' — Bruno:** o Bruno importa collection do schema v2.1 (*Import Collection → Postman
+Collection*), mas a tradução dos scripts é parcial, e esta collection depende deles: são 172
+asserções que capturam ids e tokens de um request para o próximo. Espere revisar o que não converter,
+com atenção às três requisições opcionais da pasta 07, que usam `pm.execution.skipRequest()`. Para
+apenas executar a suíte, o Newman abaixo é o caminho de menor atrito, porque roda a collection como
+ela foi escrita e não exige GUI nem conta.
 
 **Opção B — Newman via Docker (sem instalar nada):**
 
@@ -42,8 +59,51 @@ docker run --rm --network=tech-challenge_oficina_mecanica_net \
   --env-var base_url=http://srv-oficina-mecanica:8080
 ```
 
+**Opção C — Newman contra o ambiente implantado.** Sem `--network`, porque o endereço é público, e
+com as senhas daquele ambiente, que não são as do compose:
+
+```shell
+docker run --rm -v "$(pwd)/postman:/etc/newman" -t postman/newman:latest \
+  run /etc/newman/Oficina-Mecanica-E2E.postman_collection.json \
+  --env-var base_url="http://$(kubectl get svc oficina-mecanica \
+      -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')" \
+  --env-var admin_password="$APP_SEED_ADMIN_PASSWORD" \
+  --env-var mechanic_password="$APP_SEED_MECHANIC_PASSWORD"
+```
+
+## Exercitando os links do cliente
+
+Os links de acompanhamento e de decisão só existem dentro do e-mail que a aplicação envia ao
+cliente, então a collection não consegue capturá-los sozinha. Onde procurá-los depende de como o
+mailer está configurado.
+
+Sem servidor SMTP — `MAIL_MOCK` em `true`, o default de desenvolvimento — a mensagem não é entregue e
+sai no log, que é de onde o token vem:
+
+```shell
+docker compose logs app | grep -o 'work-orders/tracking/[^ ]*'
+docker compose logs app | grep -o 'work-orders/estimate-decisions/[^ ]*'
+```
+
+Com SMTP configurado, o log não traz mais o corpo da mensagem: o token está no e-mail. No ambiente
+implantado o destino é o sandbox do Mailtrap (ver `k8s/configmap.yaml`), então o link sai da caixa de
+entrada de lá — o e-mail chega mesmo com endereço de cliente fictício, porque o sandbox captura tudo
+em vez de entregar. Uma falha de entrega **não** reprova o atendimento: ela é registrada como
+`Notificacao nao entregue` no log e a OS segue seu curso, o que vale conferir quando o e-mail não
+aparecer.
+
+Cole o token (o trecho depois da última barra) nas variáveis de coleção `tracking_token` e
+`estimate_decision_token` e rode de novo a pasta 07: as três requisições que dependem deles deixam
+de ser puladas e passam a exercitar o acompanhamento, a decisão e o `410` do link reapresentado. A
+pasta 07 encerra com o orçamento ainda pendente justamente para que os links continuem válidos.
+
+Enquanto as variáveis estiverem vazias, essas requisições se pulam sozinhas
+(`pm.execution.skipRequest()`, exige Postman 10.12+ ou Newman 5.3.2+) e o restante da pasta roda
+normalmente.
+
 ## Notas
 
 - A collection é auto-contida: tokens e ids são gerados e propagados via variáveis de coleção (CPF e placa válidos são gerados dinamicamente nos pre-request scripts).
 - Pode ser executada repetidamente sem reset do banco — usa dados aleatórios e CPFs/placas únicos a cada run.
-- `List Work Orders (capture id)` busca a OS recém-criada filtrando por `description` (os endpoints de criação de Customer/Vehicle/Worker/WorkOrder não retornam corpo), com `size=100`. Em bases com muitas OS acumuladas de runs antigos, isso pode falhar — nesse caso, considere limpar o banco antes de rodar.
+- A abertura de OS devolve o id no corpo do `201`, então as requisições de criação capturam `work_order_id` direto da resposta. As requisições de listagem apenas conferem que a OS recém-aberta aparece na fila, filtrando por `description` com `size=100`. Em bases com muitas OS acumuladas de runs antigos, essa conferência pode falhar — nesse caso, considere limpar o banco antes de rodar.
+- Os endpoints de criação de Customer/Vehicle/Worker continuam sem corpo de resposta: os ids são capturados pelas buscas por documento/placa/login.

@@ -59,6 +59,9 @@ public class EstimateJpaEntity extends AuditableJpaEntity {
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
 
+    @Column(name = "reserved_at")
+    private LocalDateTime reservedAt;
+
     @OneToMany(mappedBy = "estimate", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<EstimateItemJpaEntity> items = new ArrayList<>();
 }

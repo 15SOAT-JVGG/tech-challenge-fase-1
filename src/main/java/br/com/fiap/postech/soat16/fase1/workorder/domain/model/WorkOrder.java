@@ -32,8 +32,7 @@ public class WorkOrder extends AuditableEntity {
     private static final Map<WorkOrderStatus, WorkOrderStatus> FORWARD_TRANSITIONS = Map.of(
             WorkOrderStatus.RECEIVED, WorkOrderStatus.DIAGNOSIS,
             WorkOrderStatus.DIAGNOSIS, WorkOrderStatus.WAITING_APPROVAL,
-            WorkOrderStatus.WAITING_APPROVAL, WorkOrderStatus.APPROVED,
-            WorkOrderStatus.APPROVED, WorkOrderStatus.IN_PROGRESS
+            WorkOrderStatus.WAITING_APPROVAL, WorkOrderStatus.IN_PROGRESS
     );
 
     @EqualsAndHashCode.Include
@@ -54,6 +53,8 @@ public class WorkOrder extends AuditableEntity {
     private LocalDateTime openedAt;
 
     private LocalDateTime closedAt;
+
+    private LocalDateTime cancelledAt;
 
     private BigDecimal estimatedValue;
 
@@ -103,7 +104,7 @@ public class WorkOrder extends AuditableEntity {
         ensureMutable();
         estimatedValue = estimate.getTotalAmount();
         if (status == WorkOrderStatus.WAITING_APPROVAL) {
-            return Optional.of(applyStatus(WorkOrderStatus.APPROVED, changedAt));
+            return Optional.of(applyStatus(WorkOrderStatus.IN_PROGRESS, changedAt));
         }
         return Optional.empty();
     }
@@ -111,17 +112,26 @@ public class WorkOrder extends AuditableEntity {
     public Optional<WorkOrderHistory> registerEstimateRejection(LocalDateTime changedAt) {
         ensureMutable();
         if (status == WorkOrderStatus.WAITING_APPROVAL) {
-            return Optional.of(applyStatus(WorkOrderStatus.DIAGNOSIS, changedAt));
+            closedAt = changedAt;
+            cancelledAt = changedAt;
+            return Optional.of(applyStatus(WorkOrderStatus.COMPLETED, changedAt));
         }
         return Optional.empty();
     }
 
     public boolean hasReservedStock() {
-        return status == WorkOrderStatus.APPROVED;
+        return status == WorkOrderStatus.IN_PROGRESS;
+    }
+
+    /**
+     * Cancelamento aqui é só um: a recusa do orçamento pelo cliente, que conclui a ordem.
+     */
+    public boolean wasCancelled() {
+        return cancelledAt != null;
     }
 
     public void ensureMutable() {
-        if (status == WorkOrderStatus.DELIVERED || status == WorkOrderStatus.CANCELLED) {
+        if (status == WorkOrderStatus.DELIVERED || wasCancelled()) {
             throw new WorkOrderLockedException();
         }
     }
@@ -139,9 +149,6 @@ public class WorkOrder extends AuditableEntity {
             throw new InvalidWorkOrderStatusTransitionException(
                     "Use PATCH /v1/work-orders/{id}/close to complete a work order");
         }
-        if (target == WorkOrderStatus.CANCELLED) {
-            return;
-        }
         if (target == WorkOrderStatus.DELIVERED) {
             if (status != WorkOrderStatus.COMPLETED) {
                 throw new InvalidWorkOrderStatusTransitionException(status, target);
@@ -155,8 +162,7 @@ public class WorkOrder extends AuditableEntity {
 
     private void ensureApprovedEstimateWhenRequired(WorkOrderStatus target,
             boolean hasApprovedEstimate) {
-        if ((target == WorkOrderStatus.APPROVED || target == WorkOrderStatus.IN_PROGRESS)
-                && !hasApprovedEstimate) {
+        if (target == WorkOrderStatus.IN_PROGRESS && !hasApprovedEstimate) {
             throw new EstimateNotApprovedException();
         }
     }

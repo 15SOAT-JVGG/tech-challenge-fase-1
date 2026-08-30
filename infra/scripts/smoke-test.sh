@@ -132,10 +132,11 @@ generate_license_plate() {
     printf '%s%d%s%02d' "$plate" $((RANDOM % 10)) "$(random_letter)" $((RANDOM % 100))
 }
 
-# A abertura da OS não devolve o identificador, então a recuperação é pela listagem. O
-# veículo é novo nesta execução e por isso tem uma OS só, mas ela pode cair em qualquer
-# página: a ordenação é por prioridade, e o banco do ambiente acumula OS de execuções
-# anteriores. Percorrer as páginas é o que evita uma falha que não é do ambiente.
+# A abertura já devolve o identificador no corpo do 201; percorrer a listagem é o que
+# confirma que a OS chegou à fila operacional. O veículo é novo nesta execução e por isso
+# tem uma OS só, mas ela pode cair em qualquer página: a fila é ordenada por estágio de
+# trabalho e o banco do ambiente acumula OS de execuções anteriores. Percorrer as páginas
+# é o que evita uma falha que não é do ambiente.
 find_created_work_order() {
     local page=0 total_pages
     while :; do

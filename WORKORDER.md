@@ -15,48 +15,110 @@ veículo. Para detalhes de autenticação, portas e como rodar o projeto, veja o
 | `EstimateItem` | Um item do orçamento: uma peça do catálogo (`Part`), quantidade e preço unitário. |
 | `WorkOrderService` | Uma linha de mão de obra executada na ordem (ex.: "Troca de óleo"), com descrição, preço e item do catálogo de serviços de origem. |
 | `WorkOrderHistory` | Registro interno de toda mudança de status da ordem (não exposto via API). |
+| `EstimateDecisionToken` | O direito a uma única decisão do cliente sobre um orçamento. Um token por decisão (aprovar/recusar), assinado, de uso único e válido por sete dias. |
+| `WorkOrderTrackingToken` | O direito de acompanhar uma ordem de serviço. Assinado, sem registro em banco, reemitido a cada aviso e válido por trinta dias. |
 
 ---
 
 ## Máquina de estados (`status`)
 
 ```
-RECEIVED ──► DIAGNOSIS ──► WAITING_APPROVAL ──► APPROVED ──► IN_PROGRESS ──► COMPLETED ──► DELIVERED
-  │            │               │               │              │
-  └────────────┴───────────────┴───────────────┴──────────────┴──────────────► CANCELLED
+RECEIVED ──► DIAGNOSIS ──► WAITING_APPROVAL ──► IN_PROGRESS ──► COMPLETED ──► DELIVERED
+                                  │
+                                  └── recusa ──► COMPLETED + cancelledAt
 ```
 
 - **RECEIVED** é o status inicial — definido automaticamente na criação, junto com `openedAt`.
-- **COMPLETED** só é alcançado pelo endpoint dedicado `PATCH /{id}/close` (não pelo `PATCH /{id}/status`).
+- **WAITING_APPROVAL** é o ponto em que a oficina se compromete com o cliente: a mesma transação
+  reserva no estoque todas as peças do orçamento pendente e envia ao cliente um e-mail com os links
+  de aprovação e recusa. Se qualquer peça não tiver saldo, nada é reservado, nenhum e-mail sai e a
+  OS permanece em `DIAGNOSIS` (`INSUFFICIENT_PART_STOCK`, HTTP 422).
+- **COMPLETED** é alcançado pelo endpoint dedicado `PATCH /{id}/close` ou pela recusa do orçamento.
 - **DELIVERED** só pode ser definido a partir de `COMPLETED`, via `PATCH /{id}/status`.
-- **CANCELLED** pode ser definido a partir de qualquer status não terminal (`RECEIVED`, `DIAGNOSIS`,
-  `WAITING_APPROVAL`, `APPROVED`, `IN_PROGRESS` ou `COMPLETED`).
-- **DELIVERED** e **CANCELLED** são terminais: qualquer tentativa de alterar a ordem depois disso
+- Não existe cancelamento manual nem status `CANCELLED`: a recusa conclui a OS e preenche
+  `cancelledAt`.
+- **DELIVERED** e uma OS concluída por recusa são terminais: qualquer tentativa de alterá-las
   retorna erro (`WorkOrderLockedException`, HTTP 422).
-- Não é permitido **pular etapas** via `PATCH /status` (ex.: ir de `RECEIVED` direto para `APPROVED`).
+- Não é permitido **pular etapas** via `PATCH /status` (ex.: ir de `RECEIVED` direto para
+  `IN_PROGRESS`).
 - Toda mudança de status (pelo `PATCH /status`, pelo `/close`, ou implicitamente ao aprovar um
-  orçamento) gera um registro em `WorkOrderHistory` com status anterior, novo status e data/hora.
+  orçamento ou registrar uma recusa) gera um registro em `WorkOrderHistory` com status anterior,
+  novo status e data/hora.
 
 ### Prioridade (`priority`)
 
-`LOW`, `MEDIUM` (padrão quando não informada), `HIGH`, `URGENT`. A listagem
-(`GET /v1/work-orders`) é sempre ordenada por prioridade — `URGENT` primeiro, `LOW` por último — e,
-dentro da mesma prioridade, pelas mais recentes primeiro.
+`LOW`, `MEDIUM` (padrão quando não informada), `HIGH`, `URGENT`. A prioridade é um atributo de
+triagem da ordem; ela não influencia a ordenação da listagem operacional.
+
+### Fila operacional (`GET /v1/work-orders`)
+
+A listagem administrativa é a fila de trabalho da oficina, e não um espelho de tudo que já passou
+por ela:
+
+- só entram as OS ainda em atendimento — `COMPLETED` e `DELIVERED` ficam de fora, inclusive as
+  concluídas por recusa do orçamento;
+- os grupos aparecem na ordem `IN_PROGRESS`, `WAITING_APPROVAL`, `DIAGNOSIS` e `RECEIVED`;
+- dentro do mesmo status, a OS aberta há mais tempo vem primeiro;
+- a contagem e a paginação (`page`, `size`) consideram exatamente esse conjunto filtrado;
+- a ordenação é a da fila, então os parâmetros `q` e `sort` do contrato de paginação compartilhado
+  são aceitos e ignorados nesta rota.
 
 ---
 
 ## Regras de orçamento (Estimate)
 
+- O orçamento inicial nasce junto da OS quando a abertura traz `services` ou `parts`, com status
+  `PENDING` e sem `sentAt` — ele só é enviado ao cliente mais adiante no ciclo.
 - `EstimateItem.totalPrice = quantity * unitPrice`. Se `unitPrice` não for informado na requisição,
-  o valor unitário da peça no catálogo (`Part.unitPrice`) é usado.
+  o valor unitário da peça no catálogo (`Part.unitPrice`) é usado. Na abertura o preço é sempre o do
+  catálogo, copiado como snapshot.
 - `Estimate.totalAmount` é a soma do `totalPrice` de todos os itens.
-- Ao **aprovar** um orçamento (`PATCH /estimate/{estimateId}/approve`):
+- Ao **aprovar** um orçamento:
   - `WorkOrder.estimatedValue` recebe o `totalAmount` do orçamento aprovado.
-  - Se a ordem estiver em `WAITING_APPROVAL`, ela avança automaticamente para `APPROVED` (gerando
+  - Se a ordem estiver em `WAITING_APPROVAL`, ela avança automaticamente para `IN_PROGRESS` (gerando
     histórico). Se já estiver em outro status, apenas o `estimatedValue` é atualizado.
+  - A reserva de estoque feita na entrada em `WAITING_APPROVAL` é mantida: a aprovação apenas
+    confirma o compromisso com a execução.
   - Um orçamento já aprovado ou rejeitado não pode ser aprovado novamente (`EstimateAlreadyDecidedException`, HTTP 409).
-- Uma ordem **não pode ser aprovada** (`APPROVED`, seja pelo `PATCH /status` ou implicitamente ao
-  aprovar um orçamento), **iniciar a execução** (`IN_PROGRESS`) **nem ser fechada** (`/close`) sem um
+- Ao **recusar** um orçamento pendente em `WAITING_APPROVAL`, as peças reservadas voltam ao estoque,
+  a OS avança para `COMPLETED`, recebe `closedAt` e `cancelledAt` e fica bloqueada para novas
+  alterações.
+
+### Acompanhamento do cliente por e-mail
+
+A abertura da OS e cada mudança de status posterior enviam ao cliente um e-mail contando em que
+estágio o atendimento está, com um link de acompanhamento
+(`GET /v1/public/work-orders/tracking/{token}`).
+
+- O link carrega um `WorkOrderTrackingToken` assinado com o par RS256 da API — um token **distinto
+  do de decisão**: acompanhar não altera nada, então o link vale por **trinta dias** e por quantas
+  consultas o cliente quiser.
+- Como não há nada a gastar, o token não é registrado no banco: a data de emissão viaja assinada no
+  link e é dela que sai o prazo. Cada aviso reemite o link, então o cliente sempre tem trinta dias
+  pela frente a partir da última novidade.
+- A resposta conta apenas o andamento — `workOrderId`, `status`, `openedAt`, `closedAt` e
+  `cancelledAt`. Valores, peças, descrição e mecânico ficam fora, porque um e-mail é reencaminhado.
+- Não existe consulta por id: sem o link, ou com um link forjado (`TRACKING_TOKEN_INVALID`, 400) ou
+  vencido (`TRACKING_TOKEN_EXPIRED`, 410), nada da OS é revelado.
+
+### Decisão do cliente por e-mail
+
+Ao entrar em `WAITING_APPROVAL`, a oficina envia por SMTP um e-mail ao cliente com dois links, um
+para aprovar e outro para recusar. Cada link carrega um `EstimateDecisionToken` assinado com o par
+RS256 da API e gravado no banco.
+
+- A assinatura prova que o link saiu da oficina; o registro no banco é o que garante o **uso único**,
+  porque uma assinatura continua válida a cada vez que é apresentada.
+- O prazo é de **sete dias** a partir da emissão.
+- Decidido o orçamento por um dos links, o outro deixa de valer (`ESTIMATE_ALREADY_DECIDED`, 409).
+- Toda tentativa recusada — link forjado, expirado ou já usado — não altera OS nem estoque.
+
+O endpoint é um `POST`, e não um `GET`, porque o token vale uma única vez: um cliente de e-mail que
+pré-carrega os links da mensagem consumiria a decisão sem que o cliente a tomasse.
+
+O envio depende da configuração SMTP (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`,
+`MAIL_FROM`) e do endereço público que forma os links (`APP_PUBLIC_BASE_URL`). Sem `MAIL_HOST` o
+mailer opera em modo simulado e apenas registra a mensagem em log.
 - Uma ordem **não pode iniciar a execução** (`IN_PROGRESS`) **nem ser fechada** (`/close`) sem um
   orçamento aprovado (`EstimateNotApprovedException`, HTTP 422).
 
@@ -64,16 +126,24 @@ dentro da mesma prioridade, pelas mais recentes primeiro.
 
 ## Endpoints
 
-| Método | Caminho | Descrição |
-|---|---|---|
-| `POST` | `/v1/work-orders` | Abre uma nova ordem de serviço. |
-| `GET` | `/v1/work-orders/{id}` | Busca uma ordem por id. |
-| `GET` | `/v1/work-orders` | Lista ordens, paginado e ordenado por prioridade. |
-| `PATCH` | `/v1/work-orders/{id}/status` | Avança o status da ordem (exceto para `COMPLETED`). |
-| `POST` | `/v1/work-orders/{id}/estimate` | Cria um orçamento com itens do catálogo de peças. |
-| `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/approve` | Aprova um orçamento pendente. |
-| `POST` | `/v1/work-orders/{id}/services` | Registra uma linha de mão de obra executada. |
-| `PATCH` | `/v1/work-orders/{id}/close` | Finaliza a ordem (`IN_PROGRESS` → `COMPLETED`). |
+Acesso, na notação do [modelo de acesso](docs/FASE-1.md#mapa-de-endpoints): 🔓 público (só o link
+assinado) · 🔧 `ADMIN` e `MECHANIC` · 🛡️ só `ADMIN`. Sem token, as rotas administrativas respondem
+`401`; a métrica de tempo médio, a única restrita por papel aqui, responde `403` ao `MECHANIC`.
+
+| Método | Caminho | Acesso | Descrição |
+|---|---|---|---|
+| `POST` | `/v1/work-orders` | 🔧 | Abre uma nova ordem de serviço e, junto dela, o orçamento pendente da solicitação inicial. |
+| `GET` | `/v1/work-orders/{id}` | 🔧 | Busca uma ordem por id. |
+| `GET` | `/v1/work-orders` | 🔧 | Lista a fila operacional: apenas OS em atendimento, paginadas e ordenadas por estágio de trabalho. |
+| `GET` | `/v1/work-orders/metrics/average-execution-time` | 🛡️ | Tempo médio de execução (abertura → conclusão) das OS já encerradas, em minutos, e o tamanho da amostra. |
+| `PATCH` | `/v1/work-orders/{id}/status` | 🔧 | Avança o status da ordem (exceto para `COMPLETED`). |
+| `POST` | `/v1/work-orders/{id}/estimate` | 🔧 | Cria um orçamento com itens do catálogo de peças. |
+| `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/approve` | 🔧 | Aprova um orçamento pendente. |
+| `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/reject` | 🔧 | Recusa o orçamento, devolve as peças ao estoque e conclui a OS com `cancelledAt`. |
+| `GET` | `/v1/public/work-orders/tracking/{token}` | 🔓 | Canal do cliente: acompanha a OS pelo link recebido por e-mail. |
+| `POST` | `/v1/public/work-orders/estimate-decisions/{token}` | 🔓 | Canal do cliente: registra a decisão pelo link recebido por e-mail. |
+| `POST` | `/v1/work-orders/{id}/services` | 🔧 | Registra uma linha de mão de obra executada. |
+| `PATCH` | `/v1/work-orders/{id}/close` | 🔧 | Finaliza a ordem (`IN_PROGRESS` → `COMPLETED`). |
 
 ---
 
@@ -91,12 +161,45 @@ curl -s -X POST http://localhost:8080/v1/work-orders \
         "vehicleId": "<vehicle-uuid>",
         "description": "Revisão dos 10.000km",
         "priority": "HIGH",
-        "assignedWorkerId": "<worker-uuid>"
+        "assignedWorkerId": "<worker-uuid>",
+        "services": [{"serviceItemId": "<service-item-uuid>"}],
+        "parts": [{"partId": "<part-uuid>", "quantity": 2}]
       }'
 ```
 
 A ordem é criada com `status = RECEIVED`, `openedAt` preenchido automaticamente. `priority` é opcional —
 se omitido, assume `MEDIUM`. `assignedWorkerId` — identifica o mecânico responsável pela OS.
+
+`services` e `parts` formam a **solicitação inicial** e são opcionais. Quando qualquer um deles vem
+preenchido, a mesma transação cria a OS e o orçamento pendente correspondente: os serviços viram
+linhas de mão de obra com o `basePrice` do catálogo e as peças viram itens do orçamento com o
+`unitPrice` do catálogo. Como os preços são copiados na abertura, uma atualização posterior do
+catálogo não altera o orçamento já emitido. Uma referência inválida (cliente, veículo, mecânico,
+item de serviço ou peça) faz a requisição inteira falhar sem deixar dados parciais.
+
+A resposta `201` traz a ordem aberta e o orçamento inicial, além do cabeçalho `Location` apontando
+para a nova OS:
+
+```json
+{
+  "workOrder": {"workOrderId": "...", "status": "RECEIVED", "estimatedValue": 270.00},
+  "estimate": {"estimateId": "...", "status": "PENDING", "partsAmount": 150.00,
+               "laborAmount": 120.00, "totalAmount": 270.00, "items": []}
+}
+```
+
+`estimate` vem `null` quando a abertura não traz solicitação inicial.
+
+A abertura também dispara o primeiro e-mail de acompanhamento ao cliente. Ele acompanha a OS pelo
+link recebido, sem autenticação:
+
+```shell
+curl -s http://localhost:8080/v1/public/work-orders/tracking/<tracking-token>
+```
+
+```json
+{"workOrderId": "...", "status": "RECEIVED", "openedAt": "2026-01-10T09:00:00"}
+```
 
 ### 2. Avançar para diagnóstico
 
@@ -120,27 +223,30 @@ curl -s -X POST http://localhost:8080/v1/work-orders/<work-order-id>/estimate \
 ```
 
 A resposta traz o `estimateId`, o `totalAmount` calculado e cada item com seu `totalPrice`.
-A criação do orçamento move a ordem automaticamente de `DIAGNOSIS` para `WAITING_APPROVAL`.
+A criação do orçamento move a ordem automaticamente de `DIAGNOSIS` para `WAITING_APPROVAL` — e é
+essa entrada que reserva as peças no estoque e dispara o e-mail de decisão ao cliente. Se faltar
+saldo de qualquer peça, a requisição inteira falha com `422` e a ordem continua em `DIAGNOSIS`.
 
 ### 4. Aprovar o orçamento
+
+O caminho normal é o cliente clicar no link de aprovação que recebeu por e-mail:
+
+```shell
+curl -s -X POST http://localhost:8080/v1/public/work-orders/estimate-decisions/<token>
+```
+
+A oficina também pode registrar a decisão pelo canal administrativo, quando o cliente responde por
+outro meio:
 
 ```shell
 curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/estimate/<estimate-id>/approve
 ```
 
-A ordem (que estava em `WAITING_APPROVAL`) passa automaticamente para `APPROVED`, e
-`estimatedValue` recebe o `totalAmount` do orçamento.
+Em qualquer um dos caminhos, a ordem (que estava em `WAITING_APPROVAL`) passa automaticamente para
+`IN_PROGRESS`, `estimatedValue` recebe o `totalAmount` do orçamento e a reserva de estoque é
+mantida. O orçamento só aceita uma decisão: a segunda tentativa responde `409`.
 
-### 5. Iniciar a execução
-
-```shell
-curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
-  -H "Content-Type: application/json" -d '{"status": "IN_PROGRESS"}'
-```
-
-Falharia com `422 ESTIMATE_NOT_APPROVED` se não houvesse orçamento aprovado.
-
-### 6. Registrar a mão de obra executada
+### 5. Registrar a mão de obra executada
 
 ```shell
 curl -s -X POST http://localhost:8080/v1/work-orders/<work-order-id>/services \
@@ -151,7 +257,7 @@ curl -s -X POST http://localhost:8080/v1/work-orders/<work-order-id>/services \
 Pode ser chamado várias vezes — cada chamada cria uma linha de `WorkOrderService` independente.
 `serviceItemId` — vincula a linha ao item do catálogo de serviços que a originou.
 
-### 7. Fechar a ordem
+### 6. Fechar a ordem
 
 ```shell
 curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/close \
@@ -164,7 +270,7 @@ Exige status `IN_PROGRESS` e orçamento aprovado. `finalValue` é opcional — s
 aprovado (ex.: serviço extra identificado durante a execução ou desconto concedido); quando
 informado, deve ser maior que zero. Define `closedAt` e move o status para `COMPLETED`.
 
-### 8. Entregar o veículo
+### 7. Entregar o veículo
 
 ```shell
 curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
@@ -174,14 +280,16 @@ curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
 A partir daqui a ordem está **bloqueada**: nenhuma alteração de status, orçamento ou serviço é
 mais aceita.
 
-### Cancelando uma ordem
+### Recusar o orçamento
 
-Em qualquer ponto antes de `DELIVERED`, a ordem pode ser cancelada:
+O cliente recusa pelo link de recusa que recebeu por e-mail:
 
 ```shell
-curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
-  -H "Content-Type: application/json" -d '{"status": "CANCELLED"}'
+curl -s -X POST http://localhost:8080/v1/public/work-orders/estimate-decisions/<token>
 ```
+
+As peças reservadas voltam ao estoque, a OS passa para `COMPLETED`, recebe `closedAt` e
+`cancelledAt` e não pode ser entregue nem alterada. Não existe endpoint de cancelamento manual.
 
 ---
 
@@ -189,11 +297,20 @@ curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
 
 | HTTP | Código | Quando acontece |
 |---|---|---|
+| 400 | `DECISION_TOKEN_INVALID` | Link de decisão adulterado, malformado ou não emitido para decidir orçamento. |
+| 400 | `TRACKING_TOKEN_INVALID` | Link de acompanhamento adulterado, malformado ou não emitido para acompanhar uma OS. |
+| 401 | — | Rota administrativa chamada sem `Authorization: Bearer`. |
+| 403 | — | `MECHANIC` pedindo a métrica de tempo médio, restrita ao `ADMIN`. |
 | 404 | `WORK_ORDER_NOT_FOUND` | Id de ordem inexistente. |
+| 404 | `WORKER_NOT_FOUND` | `assignedWorkerId` informado na abertura não existe. |
 | 404 | `ESTIMATE_PART_NOT_FOUND` | `partId` informado no orçamento não existe no catálogo. |
 | 404 | `ESTIMATE_NOT_FOUND` | `estimateId` não existe ou não pertence à ordem informada. |
 | 409 | `ESTIMATE_ALREADY_DECIDED` | Tentativa de aprovar um orçamento já aprovado/rejeitado. |
-| 422 | `WORK_ORDER_LOCKED` | Ordem já `DELIVERED` ou `CANCELLED`. |
+| 410 | `DECISION_TOKEN_EXPIRED` | Link de decisão apresentado depois dos sete dias. |
+| 410 | `DECISION_TOKEN_ALREADY_USED` | Link de decisão apresentado uma segunda vez. |
+| 410 | `TRACKING_TOKEN_EXPIRED` | Link de acompanhamento apresentado depois dos trinta dias. |
+| 422 | `INSUFFICIENT_PART_STOCK` | Saldo insuficiente para reservar uma peça ao levar a OS a `WAITING_APPROVAL`. |
+| 422 | `WORK_ORDER_LOCKED` | Ordem já `DELIVERED` ou concluída por recusa do orçamento. |
 | 422 | `INVALID_STATUS_TRANSITION` | Transição de status inválida (pular etapa, ir direto para `COMPLETED`, etc.). |
 | 422 | `ESTIMATE_NOT_APPROVED` | Tentativa de iniciar (`IN_PROGRESS`) ou fechar (`/close`) sem orçamento aprovado. |
 
@@ -203,11 +320,17 @@ curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
 
 O fluxo é validado em duas camadas, ambas no pacote `br.com.fiap.postech.soat16.fase1`:
 
-- **Unitário** — `service.WorkOrderServiceTest`: regras de negócio isoladas, repositórios mockados.
+- **Unitário** — `workorder.application.WorkOrderServiceTest`: regras de negócio isoladas, portas mockadas.
   Cobre também transições artificiais (ex.: travas combinadas) difíceis de reproduzir via API.
-- **Integração** — `controller.WorkOrderControllerIT`: mesmo fluxo batendo no endpoint HTTP real
+- **Integração** — `workorder.adapter.in.rest.controller.WorkOrderControllerIT`: mesmo fluxo no endpoint HTTP real
   contra um PostgreSQL via Testcontainers (`./mvnw test -Pitest`, requer Docker) — valida
   serialização JSON, mapeamento JPA/Hibernate Reactive e Bean Validation de ponta a ponta.
+
+Dois `*IT` cobrem o que cerca o fluxo: `auth.adapter.in.rest.SecurityIT` guarda o `401` sem token e o
+`403` do `MECHANIC` na métrica restrita ao `ADMIN`, e
+`workorder.adapter.in.rest.openapi.WorkOrderOpenApiContractIT` confere o documento servido em
+`/q/openapi` — as respostas declaradas em cada operação, incluindo `401` e `403`, e os efeitos de
+estoque descritos no orçamento.
 
 A tabela liga cada regra já descrita neste documento ao teste que a exercita (nomes abreviados
 como `Classe.método`; todas vivem dentro de uma classe `@Nested` com o mesmo nome do endpoint):
@@ -215,21 +338,43 @@ como `Classe.método`; todas vivem dentro de uma classe `@Nested` com o mesmo no
 | Regra de negócio | Integração (`WorkOrderControllerIT`) | Unitário (`WorkOrderServiceTest`) |
 |---|---|---|
 | Ordem nasce em `RECEIVED`, `openedAt` automático | `FullLifecycle.shouldCompleteFullLifecycle`, `Create.shouldCreateWorkOrder` | `Create.shouldPersistWorkOrder...` |
+| Abertura devolve a identificação da OS no corpo e no `Location` | `Create.shouldReturnCreatedWorkOrderIdentification` | `WorkOrderControllerTest.Create.shouldReturn201WhenCreateSucceeds` |
+| Solicitação inicial abre OS e orçamento pendente na mesma transação | `Create.shouldOpenWorkOrderWithInitialPendingEstimate` | `Create.shouldCreatePendingEstimateFromInitialRequest` |
+| Preços do orçamento são snapshot do catálogo | `Create.shouldKeepEstimatePricesAfterCatalogUpdate` | `Create.shouldSnapshotServicePrice` |
+| Item de serviço ou peça inválido na abertura → 404 sem dados parciais | `Create.shouldReturn404WhenServiceItemNotFound` / `...RequestedPartNotFound` | `Create.shouldThrowWhenRequestedServiceItemMissing` / `...RequestedPartMissing` |
 | Cliente/veículo inexistente ao criar → 404 | `Create.shouldReturn404WhenCustomerNotFound` / `...VehicleNotFound` | `Create.shouldThrow...NotFoundException` |
-| Não é permitido pular etapas (ex.: `RECEIVED` → `APPROVED` direto) | `UpdateStatus.shouldRejectSkippingStages` | `UpdateStatus.shouldRejectSkippingStages` |
+| Mecânico responsável é registrado na abertura; se não existir → 404 sem dados parciais | `Create.shouldAssignTheRequestedWorker`, `...shouldReturn404WhenAssignedWorkerNotFound` | — (exercitado ponta a ponta) |
+| Não é permitido pular etapas (ex.: `RECEIVED` → `IN_PROGRESS` direto) | `UpdateStatus.shouldRejectSkippingCanonicalStages` | `UpdateStatus.shouldRejectSkippingStages` |
 | `COMPLETED` só via `/close`, nunca pelo `/status` | `UpdateStatus.shouldRejectCompletedViaGenericEndpoint` | `UpdateStatus.shouldRejectJumpingDirectlyToCompleted` |
-| `CANCELLED` a partir de qualquer status não terminal | `FullLifecycle.shouldCancelFromNonTerminalStatus` | `UpdateStatus.shouldAllowCancelledFromAnyNonTerminalStatus` |
-| `DELIVERED`/`CANCELLED` bloqueiam qualquer alteração posterior (`WORK_ORDER_LOCKED`) | `FullLifecycle.shouldLockWorkOrderAfterDelivered` | `UpdateStatus.shouldThrowWorkOrderLockedException...`, `CreateEstimate`/`AddService.shouldThrowWorkOrderLockedException...` |
+| A recusa conclui a OS e preenche `cancelledAt` | `EstimateDecisionAndStock.shouldRejectEstimateAndCompleteWorkOrder` | `RejectEstimate.shouldRejectAndCompleteWorkOrder` |
+| `DELIVERED` e conclusão por recusa bloqueiam alterações (`WORK_ORDER_LOCKED`) | `FullLifecycle.shouldLockWorkOrderAfterDelivered`, `EstimateDecisionAndStock.shouldLockWorkOrderAfterEstimateRejection` | `WorkOrderTest.rejectsDeliveryAfterEstimateRejection` |
 | Orçamento aprovado grava `estimatedValue` na ordem | `ApproveEstimate.shouldApproveAndAdvanceStatus` | `ApproveEstimate.shouldApproveEstimateSetEstimatedValue...` |
-| Aprovar orçamento em `WAITING_APPROVAL` avança a ordem para `APPROVED` automaticamente | `ApproveEstimate.shouldApproveAndAdvanceStatus` | `ApproveEstimate.shouldApproveEstimateSetEstimatedValue...AdvanceWaitingApprovalToApproved` |
+| Aprovar orçamento em `WAITING_APPROVAL` avança a ordem para `IN_PROGRESS` automaticamente | `ApproveEstimate.shouldApproveAndAdvanceStatus` | `ApproveEstimate.shouldApproveAndAdvanceStatus` |
 | Orçamento já decidido não pode ser aprovado de novo → 409 | `ApproveEstimate.shouldReturn409WhenAlreadyDecided` | `ApproveEstimate.shouldThrowEstimateAlreadyDecidedException` |
-| Ordem não pode ir para `APPROVED` nem `IN_PROGRESS` sem orçamento aprovado | `UpdateStatus.shouldRejectApprovingWithoutApprovedEstimate` | `UpdateStatus.shouldThrowEstimateNotApprovedException...WhenApproving` / `...StartingExecution` |
+| Ordem não pode ir para `IN_PROGRESS` sem orçamento aprovado | `UpdateStatus.shouldRejectApprovingWithoutApprovedEstimate` | `UpdateStatus.shouldThrowWhenStartingWithoutApprovedEstimate` |
 | `/close` exige orçamento aprovado e status `IN_PROGRESS` | `Close.shouldReturn422WhenNotInProgress` | `Close.shouldThrow...WhenNotInProgress`, `...WhenThereIsNoApprovedEstimate` |
 | `finalValue` opcional no fechamento — usa `estimatedValue` se omitido | `Close.shouldCloseUsingEstimatedValueWhenOmitted` | `Close.shouldCompleteUsingTheApprovedEstimateValueWhenFinalValueIsOmitted` |
 | `finalValue` pode divergir do orçamento (serviço extra/desconto) | `Close.shouldCloseUsingProvidedFinalValue` | `Close.shouldUseTheProvidedFinalValueWhenPresent`, `...shouldRecordHistoryTransitionToCompletedWhenFinalValueDiffersFromTheEstimate` |
+| Abertura e cada mudança de status enviam e-mail com link de acompanhamento | `PublicChannel.shouldEmailTrackingLinkOnOpeningAndOnEveryStatusChange` | `ProgressNotification.shouldInviteToTrackOnOpening`, `...shouldNotifyOnEveryStatusChange`, `...shouldNotifyOnClosing` |
+| Link de acompanhamento vale trinta dias e não se gasta | `PublicChannel.shouldTrackThroughEmailedLink` | `WorkOrderTrackingTokenTest.Issue.issuesTokenValidForThirtyDays` |
+| Acompanhamento expõe só o andamento do atendimento | `PublicChannel.shouldExposeOnlyTheProgressFields`, `...shouldTrackWorkOrderClosedByRejection` | `Track.shouldReturnTheTrackedWorkOrder` |
+| Sem link, com link forjado (400) ou vencido (410), nada da OS é revelado | `PublicChannel.shouldNotRevealTheWorkOrderWithoutToken`, `...shouldReturn400ForForgedTrackingLink`, `...shouldReturn410WhenTrackingLinkHasExpired` | `Track.shouldRejectForgedTrackingLink`, `...shouldRejectExpiredTrackingLink` |
+| Entrada em `WAITING_APPROVAL` reserva todas as peças do orçamento pendente | `EstimateDecisionAndStock.shouldReserveStockWhenAwaitingApproval` | `SendEstimateToCustomer.shouldReservePartsAndInviteCustomer` |
+| Saldo insuficiente não reserva nada, não envia e-mail e mantém a OS em `DIAGNOSIS` | `EstimateDecisionAndStock.shouldKeepDiagnosisWhenInsufficientStock` | `SendEstimateToCustomer.shouldKeepDiagnosisWhenStockIsInsufficient` |
+| Orçamento criado sobre OS já em `WAITING_APPROVAL` também reserva e é enviado | `PublicChannel.shouldReserveAndEmailReplacementEstimate` | — (exercitado ponta a ponta) |
+| Entrada em `WAITING_APPROVAL` envia um link de aprovação e um de recusa | `PublicChannel.shouldEmailBothDecisionLinks` | `SendEstimateToCustomer.shouldIssueOneTokenPerDecision` |
+| Aprovação pelo link leva a OS a `IN_PROGRESS` e mantém a reserva | `PublicChannel.shouldApproveThroughEmailedLink` | `DecideEstimate.shouldApproveAndKeepReservation` |
+| Recusa pelo link devolve o estoque, conclui a OS e preenche `cancelledAt` | `PublicChannel.shouldRejectThroughEmailedLink` | `DecideEstimate.shouldRejectAndRestoreStock` |
+| Link de decisão vale uma única vez → 410 | `PublicChannel.shouldReturn410WhenLinkIsReused` | `DecideEstimate.shouldConsumeTokenOnce`, `...shouldRejectReusedToken` |
+| Link de decisão expira em sete dias → 410 | `PublicChannel.shouldReturn410WhenLinkHasExpired` | `DecideEstimate.shouldRejectExpiredToken` |
+| Link forjado ou não emitido pela oficina → 400, sem alterar OS nem estoque | `PublicChannel.shouldReturn400ForForgedLink` | `DecideEstimate.shouldRejectTamperedToken`, `...shouldRejectUnknownToken` |
+| Decidido o orçamento, o outro link deixa de valer → 409 | `PublicChannel.shouldReturn409WhenEstimateWasAlreadyDecided` | `DecideEstimate.shouldRejectSecondDecision` |
 | Peça inexistente no orçamento → 404 | `CreateEstimate.shouldReturn404WhenPartNotFound` | `CreateEstimate.shouldThrowEstimatePartNotFoundException` |
 | Itens de orçamento vazios são rejeitados → 400 | `CreateEstimate.shouldReturn400WhenItemsEmpty` | — (Bean Validation, não exercida no nível de serviço) |
 | Mão de obra pode ser registrada múltiplas vezes na mesma ordem | `AddService.shouldAddService` | `AddService.shouldPersistALaborServiceLine` |
+| Fila operacional agrupa por estágio e ordena pela OS mais antiga | `OperationalQueue.shouldGroupByWorkStage`, `...shouldPlaceTheOldestFirstWithinTheSameStatus` | `WorkOrderStatusTest.OperationalQueue.ordersFromTheMostAdvancedStage` |
+| Fila operacional exclui OS concluídas, entregues e recusadas | `OperationalQueue.shouldExcludeClosedWorkOrders` | `WorkOrderStatusTest.OperationalQueue.excludesClosedStatuses` |
+| Contagem e paginação consideram só o conjunto filtrado | `OperationalQueue.shouldCountOnlyTheQueuedWorkOrders`, `...shouldPaginateTheFilteredSet`, `...shouldReturnAnEmptyPageBeyondTheLastOne` | `FindOperationalQueue.shouldReturnPaginatedResponse` |
 
 Cenários de validação de payload (`@Valid`/Bean Validation, ex.: descrição em branco, preço/valor
 zero) só existem na camada de integração — só ali a requisição passa pelo filtro JAX-RS real antes

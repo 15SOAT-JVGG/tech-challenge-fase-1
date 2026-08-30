@@ -8,6 +8,7 @@ import br.com.fiap.postech.soat16.fase1.shared.domain.exception.AppException;
 public class WorkOrderLockedException extends AppException {
 
     public WorkOrderLockedException() {
-        super("Work order is delivered or cancelled and cannot be modified", WORK_ORDER_LOCKED, BUSINESS);
+        super("A ordem de serviço foi entregue ou concluída por recusa do orçamento e não pode ser alterada",
+                WORK_ORDER_LOCKED, BUSINESS);
     }
 }

@@ -3,6 +3,7 @@ package br.com.fiap.postech.soat16.fase1.workorder.adapter.out.persistence.entit
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -20,7 +21,12 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity(name = "WorkOrderHistory")
-@Table(name = "work_order_history", schema = "oficina_mecanica")
+@Table(name = "work_order_history", schema = "oficina_mecanica",
+        check = @CheckConstraint(name = "ck_work_order_history_status_canonical",
+                constraint = "(previous_status is null or previous_status in "
+                        + WorkOrderJpaEntity.CANONICAL_STATUS_VALUES
+                        + ") and new_status in "
+                        + WorkOrderJpaEntity.CANONICAL_STATUS_VALUES))
 @Getter
 @Setter
 public class WorkOrderHistoryJpaEntity {

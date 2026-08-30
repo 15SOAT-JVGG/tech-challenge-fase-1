@@ -2,6 +2,7 @@ package br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -32,10 +33,12 @@ import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.Wo
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.WorkOrderServiceRequestDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.request.WorkOrderStatusUpdateRequestDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.EstimateResponseDto;
+import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.OpenedWorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderMetricsResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.application.WorkOrderService;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.EstimateResult;
+import br.com.fiap.postech.soat16.fase1.workorder.application.result.OpenWorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderMetricsResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderResult;
 import br.com.fiap.postech.soat16.fase1.workorder.application.result.WorkOrderServiceResult;
@@ -65,28 +68,28 @@ class WorkOrderControllerTest {
     void setUp() {
         controller = new WorkOrderController(service);
         response = new WorkOrderResult(FIXED_UUID, UUID.randomUUID(), UUID.randomUUID(), "desc",
-                WorkOrderPriority.MEDIUM, WorkOrderStatus.RECEIVED, null, null, null, null, null);
+                WorkOrderPriority.MEDIUM, WorkOrderStatus.RECEIVED, null, null, null, null, null, null);
     }
 
     @Nested
-    @DisplayName("GET /v1/work-orders — findAll")
-    class FindAll {
+    @DisplayName("GET /v1/work-orders — findOperationalQueue")
+    class FindOperationalQueue {
 
         @Test
-        @DisplayName("should return paginated list when work orders exist")
+        @DisplayName("should return the paginated operational queue")
         void shouldReturnPaginatedList() {
             PageableRequestDto pageable = mock(PageableRequestDto.class);
-            when(pageable.getQ()).thenReturn(null);
             when(pageable.getPage()).thenReturn(0);
             when(pageable.getSize()).thenReturn(10);
 
             PagedResult<WorkOrderResult> page = PagedResult.of(List.of(response), 0, 10, 1L);
-            when(service.findAll(null, 0, 10)).thenReturn(Uni.createFrom().item(page));
+            when(service.findOperationalQueue(0, 10)).thenReturn(Uni.createFrom().item(page));
 
-            PageableResponseDto<WorkOrderResponseDto> result = controller.findAll(pageable).await().indefinitely();
+            PageableResponseDto<WorkOrderResponseDto> result =
+                    controller.findOperationalQueue(pageable).await().indefinitely();
 
             assertEquals(1, result.content().size());
-            verify(service).findAll(null, 0, 10);
+            verify(service).findOperationalQueue(0, 10);
         }
     }
 
@@ -138,16 +141,39 @@ class WorkOrderControllerTest {
     class Create {
 
         @Test
-        @DisplayName("should return HTTP 201 when create succeeds")
+        @DisplayName("should return HTTP 201 with the opened work order and its initial estimate")
         void shouldReturn201WhenCreateSucceeds() {
-            WorkOrderRequestDto dto = new WorkOrderRequestDto(UUID.randomUUID(), UUID.randomUUID(), "desc", null, null);
+            WorkOrderRequestDto dto = new WorkOrderRequestDto(
+                    UUID.randomUUID(), UUID.randomUUID(), "desc", null, null, null, null);
+            EstimateResult estimateResult = new EstimateResult(
+                    UUID.randomUUID(), FIXED_UUID, EstimateStatus.PENDING, BigDecimal.TEN, BigDecimal.ZERO,
+                    BigDecimal.TEN, null, null, List.of());
             var command = WorkOrderRestMapper.toCommand(dto);
-            when(service.create(command)).thenReturn(Uni.createFrom().voidItem());
+            when(service.create(command))
+                    .thenReturn(Uni.createFrom().item(new OpenWorkOrderResult(response, estimateResult)));
 
             Response result = controller.create(dto).await().indefinitely();
 
             assertEquals(201, result.getStatus());
+            assertEquals("/v1/work-orders/" + FIXED_UUID, result.getLocation().toString());
+            OpenedWorkOrderResponseDto body = (OpenedWorkOrderResponseDto) result.getEntity();
+            assertEquals(FIXED_UUID, body.workOrder().workOrderId());
+            assertEquals(EstimateStatus.PENDING, body.estimate().status());
             verify(service).create(command);
+        }
+
+        @Test
+        @DisplayName("should omit the estimate when the opening carries no initial request")
+        void shouldOmitEstimateWhenNoInitialRequest() {
+            WorkOrderRequestDto dto = new WorkOrderRequestDto(
+                    UUID.randomUUID(), UUID.randomUUID(), "desc", null, null, null, null);
+            var command = WorkOrderRestMapper.toCommand(dto);
+            when(service.create(command))
+                    .thenReturn(Uni.createFrom().item(new OpenWorkOrderResult(response, null)));
+
+            Response result = controller.create(dto).await().indefinitely();
+
+            assertNull(((OpenedWorkOrderResponseDto) result.getEntity()).estimate());
         }
     }
 
