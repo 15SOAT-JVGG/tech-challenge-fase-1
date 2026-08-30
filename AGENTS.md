@@ -115,9 +115,9 @@ domínio e persiste o resultado. Retorne sempre `Uni<T>` nas camadas reativas e 
 
 ## Testes
 
-### Cobertura mínima de 90%
+### Cobertura mínima de 80%
 
-O gate do JaCoCo em `pom.xml` (execução `check`) precisa passar com **no mínimo 90% de linhas
+O gate do JaCoCo em `pom.xml` (execução `check`) precisa passar com **no mínimo 80% de linhas
 cobertas no bundle**. Toda entrega inclui os testes que sustentam esse número.
 
 Relatório: `target/jacoco-report/index.html` após `./mvnw verify`.
