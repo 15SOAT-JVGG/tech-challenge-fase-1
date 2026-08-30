@@ -96,6 +96,8 @@ O node group ocupa 5 das 6 subnets da VPC default. `us-east-1e` fica de fora por
 
 ## Provisionando
 
+### Da máquina do operador
+
 Pré-requisitos: `terraform >= 1.10`, `aws` CLI e uma sessão ativa do lab (`AWS_ACCESS_KEY_ID`,
 `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`).
 
@@ -127,6 +129,52 @@ O bucket de state sobrevive de propósito; subir o ambiente de novo é um `apply
 Um cuidado: recursos que o Kubernetes cria na AWS por conta própria não estão no state. Se houver um
 `Service` do tipo `LoadBalancer` no cluster, apague-o com `kubectl` antes do `destroy`, ou o ELB fica
 órfão na conta.
+
+### Pela pipeline
+
+O mesmo Terraform e o mesmo state, rodando no GitHub Actions: o workflow **Workflow Infra**
+(`.github/workflows/infra.yml`). O disparo é manual, e só manual — nenhum merge começa vinte minutos
+de convergência de control plane por acidente (ADR-0003).
+
+O disparo pede a ação:
+
+| Ação | O que faz |
+|---|---|
+| `plan` | Mostra o que mudaria e para aí. É o default |
+| `apply` | Exibe o plano no resumo da execução e aplica exatamente aquele plano |
+
+O plano vai para arquivo justamente para que o `apply` não replaneje: o que roda é o que foi exibido.
+Esse arquivo **não** é publicado como artefato — ele carrega a senha do banco em claro. O que vai para
+o resumo da execução é o `terraform show` do plano, que redige valor sensível, e ao fim de um `apply`
+as saídas do Terraform, onde a senha aparece como `<sensitive>`.
+
+As credenciais são as da sessão do lab, guardadas como secrets do repositório e regravadas a cada
+reset: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` e `AWS_SESSION_TOKEN`, todas do painel *AWS
+Details* do Learner Lab. O primeiro passo do job é um `aws sts get-caller-identity`, para que uma
+sessão vencida falhe em segundos em vez de no meio do apply.
+
+`destroy` não está no workflow: é operação de fim de sessão, e o cuidado com o ELB órfão acima pede
+`kubectl` antes do comando — nada disso cabe num clique. Destrua da sua máquina.
+
+### Validação no pull request
+
+Num pull request para a `main`, o `ci.yml` verifica, sem tocar em nuvem:
+
+| Verificação | Comando |
+|---|---|
+| Formatação do HCL | `terraform -chdir=infra/terraform fmt -check -recursive -diff` |
+| Sintaxe e tipos do HCL | `terraform -chdir=infra/terraform init -backend=false` mais `validate` |
+| Kustomization dos manifestos | `kubectl kustomize k8s/` |
+| Schema dos manifestos | `kubeconform -strict -kubernetes-version 1.33.4` |
+
+O `-backend=false` é o que mantém a checagem fora da nuvem: sem state remoto, sem credencial. E o
+schema é verificado pelo `kubeconform`, não por `kubectl apply --dry-run=client`, porque o dry-run de
+cliente precisa falar com um servidor de API para validar campo — sem cluster ele não valida nada. Com
+`-strict`, um campo inexistente como `imagePullPolcy` reprova o pull request em vez de ser ignorado
+silenciosamente pelo cluster.
+
+`terraform plan` fica de fora: exigiria credencial da AWS e o state remoto, que é exatamente o que
+esta etapa não quer tocar. Em troca, o que o pull request não pega é ambiente divergente do HCL.
 
 ## Acessando o que foi criado
 

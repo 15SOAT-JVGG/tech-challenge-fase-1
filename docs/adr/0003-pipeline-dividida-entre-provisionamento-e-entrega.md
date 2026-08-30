@@ -17,4 +17,7 @@ execuções concorrentes de CI é a origem clássica de lock preso.
 
 O state do Terraform fica no S3 com chave fixa, e o provisionamento é uma ação deliberada de um
 operador, não um efeito colateral de merge. Em contrapartida, o ambiente pode divergir do HCL sem
-que nenhuma pipeline acuse — não há `terraform plan` contínuo em pull request.
+que nenhuma pipeline acuse — não há `terraform plan` contínuo em pull request. O que o pull request
+alcança sem credencial é menos que isso e ainda assim vale: formatação, sintaxe e tipos do HCL com
+`-backend=false`, mais o schema dos manifestos de `/k8s`. Pega erro de escrita em segundos; não pega
+ambiente divergente do código.

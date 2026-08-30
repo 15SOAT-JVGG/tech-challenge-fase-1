@@ -63,7 +63,53 @@ jobs:
       maven_goals: "verify"
       maven_args: ${{ inputs.skip_tests == true && '-DskipTests -Dstyle.color=always' || '-Dstyle.color=always' }}
 
-  # ── 4. SCA — varredura de dependências com OWASP Dependency-Check ────────────
+  # ── 4. IaC — sintaxe da infraestrutura e dos manifestos, sem tocar em nuvem ──
+  iac_validate:
+    name: IaC Validation (Terraform + Kubernetes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TERRAFORM_VERSION: "1.16.0"
+      # Acompanha o `kubernetes_version` do control plane em
+      # infra/terraform/variables.tf; o patch vem porque o schema é publicado por
+      # versão exata. É contra ele que os manifestos são validados.
+      KUBERNETES_VERSION: "1.33.4"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala o Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Formatação do HCL
+        run: terraform -chdir=infra/terraform fmt -check -recursive -diff
+
+      # -backend=false é o que mantém a validação fora da nuvem: sem state remoto e
+      # sem credencial da AWS, só os providers e a checagem de tipos do HCL.
+      - name: Sintaxe do HCL
+        run: |
+          terraform -chdir=infra/terraform init -backend=false
+          terraform -chdir=infra/terraform validate
+
+      - name: Instala o kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v${{ env.KUBERNETES_VERSION }}
+
+      - name: Renderiza os manifestos
+        run: kubectl kustomize k8s/ > rendered-manifests.yaml
+
+      # kubectl apply --dry-run=client precisaria falar com um servidor de API para
+      # validar campo; o kubeconform valida contra o schema da versão do cluster
+      # offline, e -strict recusa campo desconhecido em vez de ignorá-lo.
+      - name: Schema dos manifestos
+        run: |
+          docker run --rm -i ghcr.io/yannh/kubeconform:v0.8.0 \
+            -strict -summary -kubernetes-version "$KUBERNETES_VERSION" - < rendered-manifests.yaml
+
+  # ── 5. SCA — varredura de dependências com OWASP Dependency-Check ────────────
   sca_dependency_check:
     name: SCA (OWASP Dependency-Check)
     needs: [build]
@@ -75,7 +121,7 @@ jobs:
       format: "HTML"
       upload_artifact: true
 
-  # ── 5. Qualidade de código — SonarQube (via Tailscale) ───────────────────────
+  # ── 6. Qualidade de código — SonarQube (via Tailscale) ───────────────────────
   sonar:
     name: SonarQube Scan
     needs: [sca_dependency_check]
