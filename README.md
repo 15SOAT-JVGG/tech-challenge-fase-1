@@ -113,25 +113,27 @@ revisão: são verificadas por testes de arquitetura a cada build.
 
 ### Infraestrutura provisionada
 
-Tudo dentro da moldura `AWS` nasce do Terraform, exceto a VPC, as subnets e as roles IAM — a conta é
-do **AWS Academy (Learner Lab)**, que não concede `iam:CreateRole` e já entrega rede e roles prontas
-([ADR-0001](docs/adr/0001-eks-provisionado-com-roles-do-lab-na-vpc-default.md)).
+O que o `terraform apply` cria está ligado a ele por seta cheia. Ficam de fora a VPC, as subnets e as
+roles IAM, que a conta já entrega prontas — é do **AWS Academy (Learner Lab)**, que não concede
+`iam:CreateRole` ([ADR-0001](docs/adr/0001-eks-provisionado-com-roles-do-lab-na-vpc-default.md)) — e o
+bucket de state, que precisa existir **antes** do primeiro `init` e por isso vem de um script
+(`bootstrap-tf-state.sh`); o Terraform só o usa, daí a seta pontilhada.
 
 ```mermaid
 flowchart TB
     internet(["Internet"])
+    tf(["terraform apply"])
 
     subgraph aws["AWS · Learner Lab · us-east-1"]
+        s3[("S3<br/>state do Terraform")]
         ecr["ECR · oficina-mecanica<br/>imagem com tag = SHA do commit"]
-        s3["S3 · state do Terraform<br/>versionado e criptografado"]
 
         subgraph vpc["VPC default · subnets das AZs que ofertam t3.medium"]
             elb["ELB clássico<br/>Service type=LoadBalancer"]
 
             subgraph eks["EKS 1.33 · oficina-mecanica"]
                 cp["Control plane<br/>endpoint público e privado"]
-                config["ConfigMap<br/>oficina-mecanica-config"]
-                segredos["Secrets<br/>oficina-mecanica-env<br/>oficina-mecanica-jwt"]
+                config["ConfigMap e Secrets<br/>config · env · jwt"]
                 metrics["Addon metrics-server"]
                 hpa["HorizontalPodAutoscaler<br/>1 a 6 réplicas"]
 
@@ -144,11 +146,14 @@ flowchart TB
         end
     end
 
+    tf -. "state" .-> s3
+    tf --> cp
+    tf --> rds
+    tf --> ecr
     internet --> elb
     elb --> pods
-    cp --- nodegroup
+    cp -. "agenda" .-> pods
     config --> pods
-    segredos --> pods
     ecr -. "imagem" .-> pods
     pods -. "métricas" .-> metrics
     metrics -. "utilização" .-> hpa
