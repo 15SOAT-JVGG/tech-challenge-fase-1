@@ -1,6 +1,6 @@
 # Collection Postman — Oficina Mecânica API (E2E)
 
-`Oficina-Mecanica-E2E.postman_collection.json` cobre os 38 endpoints da API em 10 pastas, executadas em ordem:
+`Oficina-Mecanica-E2E.postman_collection.json` reúne 98 requisições em 10 pastas, executadas em ordem:
 
 | Pasta | Cobertura |
 |---|---|

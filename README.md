@@ -73,8 +73,7 @@ Terraform**, com **Postgres gerenciado no RDS**, exposição por **Load Balancer
 | Migrations | Flyway |
 | Segurança | SmallRye JWT (RS256) + RBAC |
 | Documentação | SmallRye OpenAPI / Swagger UI |
-| Observabilidade | SmallRye Health + OpenTelemetry + Micrometer/Prometheus |
-| Mapeamento | MapStruct |
+| Observabilidade | SmallRye Health · OpenTelemetry (desabilitado por default) |
 | Testes | JUnit 5, Mockito, REST-assured, Testcontainers |
 | Container | Docker (build multistage, runtime UBI9 non-root) |
 | Orquestração | Kubernetes 1.33 (Amazon EKS) |
@@ -290,8 +289,10 @@ dependências e leva alguns minutos; nas próximas é quase instantâneo (cache)
 | Derrubar | `docker compose down` |
 | Derrubar e apagar o banco | `docker compose down -v` |
 
-O `.env` é **opcional**: todos os valores já vêm preenchidos no `docker-compose.yml`. Crie um `.env` (a
-partir de `.env.example`) **somente** se quiser sobrescrever portas, senhas ou nomes padrão.
+O `.env` é **opcional**: o `docker-compose.yml` já preenche o que a aplicação precisa. Crie um `.env`
+(a partir de `.env.example`) **somente** se quiser sobrescrever senhas ou nomes padrão.
+
+A coluna abaixo é o padrão **da aplicação**, que vale fora do Compose:
 
 | Variável | Descrição | Padrão |
 |---|---|---|
@@ -304,6 +305,11 @@ partir de `.env.example`) **somente** se quiser sobrescrever portas, senhas ou n
 | `JWT_EXPIRATION_HOURS` | Validade do token (horas) | `8` |
 | `JWT_PRIVATE_KEY_LOCATION` | Chave privada de assinatura RS256 | `.local-jwt/privateKey.pem` |
 | `JWT_PUBLIC_KEY_LOCATION` | Chave pública de validação RS256 | `.local-jwt/publicKey.pem` |
+
+Dentro do Compose dois padrões mudam. `INFRA_HOST_POSTGRES` é **fixado** no `docker-compose.yml` para o
+container do banco (`oficina-mecanica-postgres`) e é o único valor que o `.env` não sobrescreve. As duas
+`JWT_*_KEY_LOCATION` passam a apontar para `/etc/jwt`, onde o volume do serviço `jwt-keys` é montado —
+essas ainda aceitam sobrescrita.
 
 > **Banco x Schema:** o **banco** chama-se `oficina` e a aplicação cria/usa o **schema**
 > `oficina_mecanica` automaticamente na inicialização (Flyway). Não confunda os dois.
@@ -582,9 +588,11 @@ Base local: `http://localhost:8080`. No cluster, o hostname do ELB. Papéis: �
 🔧 ADMIN+MECHANIC · 🛡️ ADMIN.
 
 > **Modelo de acesso (segregação de funções):** os **cadastros/dados-mestre** (clientes, veículos,
-> serviços, peças e workers) são **escritos apenas pelo ADMIN**; o MECHANIC pode **consultá-los**
-> (GET) mas não criar/editar/excluir. As **Ordens de Serviço** (abrir, mudar status, lançar serviço,
-> orçamento, fechar) são operadas por **ADMIN e MECHANIC**. O ADMIN é superusuário (faz tudo).
+> serviços e peças) são **escritos apenas pelo ADMIN**; o MECHANIC pode **consultá-los** (GET) mas não
+> criar/editar/excluir. As **Ordens de Serviço** (abrir, mudar status, lançar serviço, orçamento,
+> fechar) são operadas por **ADMIN e MECHANIC**. Os **workers** são a exceção: são dados de pessoal, e
+> o `WorkerController` é `ADMIN` inteiro — nem a leitura é liberada ao MECHANIC. O ADMIN é
+> superusuário (faz tudo).
 
 ### Autenticação — `/v1/auth`
 | Método | Path | Acesso |
@@ -687,8 +695,9 @@ Detalhes em [WORKORDER.md](WORKORDER.md).
 ## Collection das APIs
 
 **[`postman/Oficina-Mecanica-E2E.postman_collection.json`](postman/Oficina-Mecanica-E2E.postman_collection.json)**
-— 38 endpoints em 10 pastas, em ordem executável (auth → CRUDs → ciclo completo da OS → canal público
-→ segurança). É auto-contida: gera tokens, CPFs e placas válidos dinamicamente. Instruções de uso em
+— 98 requisições em 10 pastas, em ordem executável (auth → CRUDs → ciclo completo da OS → canal
+público → segurança), cobrindo tanto o caminho de sucesso quanto os erros de RBAC e validação. É
+auto-contida: gera tokens, CPFs e placas válidos dinamicamente. Instruções de uso em
 [postman/README.md](postman/README.md).
 
 Aponte a variável `base_url` para o ambiente que quer exercitar — `http://localhost:8080` no local, ou
