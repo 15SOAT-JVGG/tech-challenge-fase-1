@@ -44,18 +44,31 @@ env:
 jobs:
 
   # ── 1. Gate de qualidade: build e testes da aplicação ────────────────────────
+  #
+  # `verify` é o gate inteiro num comando: compila, roda os testes unitários, Checkstyle,
+  # PMD, SpotBugs, Spotless e o mínimo de cobertura do JaCoCo. Teste vermelho para a
+  # entrega aqui, antes de existir imagem.
+  #
+  # O job não reusa o workflow de build compartilhado que o ci.yml chama: ele vive num
+  # repositório privado da organização cujo acesso não está liberado para este repo, e
+  # `uses` de workflow inacessível reprova a execução antes de qualquer job começar. O
+  # caminho de entrega não pode depender disso.
   build:
     name: Build & Tests (Quarkus JVM)
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/build-java-quarkus-jvm.yml@main
-    with:
-      java_version: "21"
-      use_tailscale: false
-      # Nada consome o relatório nem o jar: o que vai ao cluster é a imagem, construída
-      # no job seguinte a partir do mesmo commit.
-      upload_coverage: false
-      upload_artifacts: false
-      maven_goals: "verify"
-      maven_args: "-Dstyle.color=always"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala o Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build, testes e gates de qualidade
+        run: ./mvnw --batch-mode verify
 
   # ── 2. Imagem no registry, identificada pelo commit ──────────────────────────
   #
