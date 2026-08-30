@@ -21,21 +21,23 @@ veículo. Para detalhes de autenticação, portas e como rodar o projeto, veja o
 ## Máquina de estados (`status`)
 
 ```
-RECEIVED ──► DIAGNOSIS ──► WAITING_APPROVAL ──► APPROVED ──► IN_PROGRESS ──► COMPLETED ──► DELIVERED
-  │            │               │               │              │
-  └────────────┴───────────────┴───────────────┴──────────────┴──────────────► CANCELLED
+RECEIVED ──► DIAGNOSIS ──► WAITING_APPROVAL ──► IN_PROGRESS ──► COMPLETED ──► DELIVERED
+                                  │
+                                  └── recusa ──► COMPLETED + cancelledAt
 ```
 
 - **RECEIVED** é o status inicial — definido automaticamente na criação, junto com `openedAt`.
-- **COMPLETED** só é alcançado pelo endpoint dedicado `PATCH /{id}/close` (não pelo `PATCH /{id}/status`).
+- **COMPLETED** é alcançado pelo endpoint dedicado `PATCH /{id}/close` ou pela recusa do orçamento.
 - **DELIVERED** só pode ser definido a partir de `COMPLETED`, via `PATCH /{id}/status`.
-- **CANCELLED** pode ser definido a partir de qualquer status não terminal (`RECEIVED`, `DIAGNOSIS`,
-  `WAITING_APPROVAL`, `APPROVED`, `IN_PROGRESS` ou `COMPLETED`).
-- **DELIVERED** e **CANCELLED** são terminais: qualquer tentativa de alterar a ordem depois disso
+- Não existe cancelamento manual nem status `CANCELLED`: a recusa conclui a OS e preenche
+  `cancelledAt`.
+- **DELIVERED** e uma OS concluída por recusa são terminais: qualquer tentativa de alterá-las
   retorna erro (`WorkOrderLockedException`, HTTP 422).
-- Não é permitido **pular etapas** via `PATCH /status` (ex.: ir de `RECEIVED` direto para `APPROVED`).
+- Não é permitido **pular etapas** via `PATCH /status` (ex.: ir de `RECEIVED` direto para
+  `IN_PROGRESS`).
 - Toda mudança de status (pelo `PATCH /status`, pelo `/close`, ou implicitamente ao aprovar um
-  orçamento) gera um registro em `WorkOrderHistory` com status anterior, novo status e data/hora.
+  orçamento ou registrar uma recusa) gera um registro em `WorkOrderHistory` com status anterior,
+  novo status e data/hora.
 
 ### Prioridade (`priority`)
 
@@ -52,11 +54,11 @@ dentro da mesma prioridade, pelas mais recentes primeiro.
 - `Estimate.totalAmount` é a soma do `totalPrice` de todos os itens.
 - Ao **aprovar** um orçamento (`PATCH /estimate/{estimateId}/approve`):
   - `WorkOrder.estimatedValue` recebe o `totalAmount` do orçamento aprovado.
-  - Se a ordem estiver em `WAITING_APPROVAL`, ela avança automaticamente para `APPROVED` (gerando
+  - Se a ordem estiver em `WAITING_APPROVAL`, ela avança automaticamente para `IN_PROGRESS` (gerando
     histórico). Se já estiver em outro status, apenas o `estimatedValue` é atualizado.
   - Um orçamento já aprovado ou rejeitado não pode ser aprovado novamente (`EstimateAlreadyDecidedException`, HTTP 409).
-- Uma ordem **não pode ser aprovada** (`APPROVED`, seja pelo `PATCH /status` ou implicitamente ao
-  aprovar um orçamento), **iniciar a execução** (`IN_PROGRESS`) **nem ser fechada** (`/close`) sem um
+- Ao **recusar** um orçamento pendente em `WAITING_APPROVAL`, a OS avança para `COMPLETED`, recebe
+  `closedAt` e `cancelledAt` e fica bloqueada para novas alterações.
 - Uma ordem **não pode iniciar a execução** (`IN_PROGRESS`) **nem ser fechada** (`/close`) sem um
   orçamento aprovado (`EstimateNotApprovedException`, HTTP 422).
 
@@ -72,6 +74,7 @@ dentro da mesma prioridade, pelas mais recentes primeiro.
 | `PATCH` | `/v1/work-orders/{id}/status` | Avança o status da ordem (exceto para `COMPLETED`). |
 | `POST` | `/v1/work-orders/{id}/estimate` | Cria um orçamento com itens do catálogo de peças. |
 | `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/approve` | Aprova um orçamento pendente. |
+| `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/reject` | Recusa o orçamento e conclui a OS com `cancelledAt`. |
 | `POST` | `/v1/work-orders/{id}/services` | Registra uma linha de mão de obra executada. |
 | `PATCH` | `/v1/work-orders/{id}/close` | Finaliza a ordem (`IN_PROGRESS` → `COMPLETED`). |
 
@@ -128,19 +131,10 @@ A criação do orçamento move a ordem automaticamente de `DIAGNOSIS` para `WAIT
 curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/estimate/<estimate-id>/approve
 ```
 
-A ordem (que estava em `WAITING_APPROVAL`) passa automaticamente para `APPROVED`, e
+A ordem (que estava em `WAITING_APPROVAL`) passa automaticamente para `IN_PROGRESS`, e
 `estimatedValue` recebe o `totalAmount` do orçamento.
 
-### 5. Iniciar a execução
-
-```shell
-curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
-  -H "Content-Type: application/json" -d '{"status": "IN_PROGRESS"}'
-```
-
-Falharia com `422 ESTIMATE_NOT_APPROVED` se não houvesse orçamento aprovado.
-
-### 6. Registrar a mão de obra executada
+### 5. Registrar a mão de obra executada
 
 ```shell
 curl -s -X POST http://localhost:8080/v1/work-orders/<work-order-id>/services \
@@ -151,7 +145,7 @@ curl -s -X POST http://localhost:8080/v1/work-orders/<work-order-id>/services \
 Pode ser chamado várias vezes — cada chamada cria uma linha de `WorkOrderService` independente.
 `serviceItemId` — vincula a linha ao item do catálogo de serviços que a originou.
 
-### 7. Fechar a ordem
+### 6. Fechar a ordem
 
 ```shell
 curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/close \
@@ -164,7 +158,7 @@ Exige status `IN_PROGRESS` e orçamento aprovado. `finalValue` é opcional — s
 aprovado (ex.: serviço extra identificado durante a execução ou desconto concedido); quando
 informado, deve ser maior que zero. Define `closedAt` e move o status para `COMPLETED`.
 
-### 8. Entregar o veículo
+### 7. Entregar o veículo
 
 ```shell
 curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
@@ -174,14 +168,17 @@ curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
 A partir daqui a ordem está **bloqueada**: nenhuma alteração de status, orçamento ou serviço é
 mais aceita.
 
-### Cancelando uma ordem
+### Recusar o orçamento
 
-Em qualquer ponto antes de `DELIVERED`, a ordem pode ser cancelada:
+O cliente pode recusar um orçamento pendente:
 
 ```shell
-curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
-  -H "Content-Type: application/json" -d '{"status": "CANCELLED"}'
+curl -s -X PATCH \
+  http://localhost:8080/v1/public/work-orders/<work-order-id>/estimate/<estimate-id>/reject
 ```
+
+A OS passa para `COMPLETED`, recebe `closedAt` e `cancelledAt` e não pode ser entregue nem alterada.
+Não existe endpoint de cancelamento manual.
 
 ---
 
@@ -193,7 +190,7 @@ curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
 | 404 | `ESTIMATE_PART_NOT_FOUND` | `partId` informado no orçamento não existe no catálogo. |
 | 404 | `ESTIMATE_NOT_FOUND` | `estimateId` não existe ou não pertence à ordem informada. |
 | 409 | `ESTIMATE_ALREADY_DECIDED` | Tentativa de aprovar um orçamento já aprovado/rejeitado. |
-| 422 | `WORK_ORDER_LOCKED` | Ordem já `DELIVERED` ou `CANCELLED`. |
+| 422 | `WORK_ORDER_LOCKED` | Ordem já `DELIVERED` ou concluída por recusa do orçamento. |
 | 422 | `INVALID_STATUS_TRANSITION` | Transição de status inválida (pular etapa, ir direto para `COMPLETED`, etc.). |
 | 422 | `ESTIMATE_NOT_APPROVED` | Tentativa de iniciar (`IN_PROGRESS`) ou fechar (`/close`) sem orçamento aprovado. |
 
@@ -203,9 +200,9 @@ curl -s -X PATCH http://localhost:8080/v1/work-orders/<work-order-id>/status \
 
 O fluxo é validado em duas camadas, ambas no pacote `br.com.fiap.postech.soat16.fase1`:
 
-- **Unitário** — `service.WorkOrderServiceTest`: regras de negócio isoladas, repositórios mockados.
+- **Unitário** — `workorder.application.WorkOrderServiceTest`: regras de negócio isoladas, portas mockadas.
   Cobre também transições artificiais (ex.: travas combinadas) difíceis de reproduzir via API.
-- **Integração** — `controller.WorkOrderControllerIT`: mesmo fluxo batendo no endpoint HTTP real
+- **Integração** — `workorder.adapter.in.rest.controller.WorkOrderControllerIT`: mesmo fluxo no endpoint HTTP real
   contra um PostgreSQL via Testcontainers (`./mvnw test -Pitest`, requer Docker) — valida
   serialização JSON, mapeamento JPA/Hibernate Reactive e Bean Validation de ponta a ponta.
 
@@ -216,14 +213,14 @@ como `Classe.método`; todas vivem dentro de uma classe `@Nested` com o mesmo no
 |---|---|---|
 | Ordem nasce em `RECEIVED`, `openedAt` automático | `FullLifecycle.shouldCompleteFullLifecycle`, `Create.shouldCreateWorkOrder` | `Create.shouldPersistWorkOrder...` |
 | Cliente/veículo inexistente ao criar → 404 | `Create.shouldReturn404WhenCustomerNotFound` / `...VehicleNotFound` | `Create.shouldThrow...NotFoundException` |
-| Não é permitido pular etapas (ex.: `RECEIVED` → `APPROVED` direto) | `UpdateStatus.shouldRejectSkippingStages` | `UpdateStatus.shouldRejectSkippingStages` |
+| Não é permitido pular etapas (ex.: `RECEIVED` → `IN_PROGRESS` direto) | `UpdateStatus.shouldRejectSkippingCanonicalStages` | `UpdateStatus.shouldRejectSkippingStages` |
 | `COMPLETED` só via `/close`, nunca pelo `/status` | `UpdateStatus.shouldRejectCompletedViaGenericEndpoint` | `UpdateStatus.shouldRejectJumpingDirectlyToCompleted` |
-| `CANCELLED` a partir de qualquer status não terminal | `FullLifecycle.shouldCancelFromNonTerminalStatus` | `UpdateStatus.shouldAllowCancelledFromAnyNonTerminalStatus` |
-| `DELIVERED`/`CANCELLED` bloqueiam qualquer alteração posterior (`WORK_ORDER_LOCKED`) | `FullLifecycle.shouldLockWorkOrderAfterDelivered` | `UpdateStatus.shouldThrowWorkOrderLockedException...`, `CreateEstimate`/`AddService.shouldThrowWorkOrderLockedException...` |
+| A recusa conclui a OS e preenche `cancelledAt` | `EstimateDecisionAndStock.shouldRejectEstimateAndCompleteWorkOrder` | `RejectEstimate.shouldRejectAndCompleteWorkOrder` |
+| `DELIVERED` e conclusão por recusa bloqueiam alterações (`WORK_ORDER_LOCKED`) | `FullLifecycle.shouldLockWorkOrderAfterDelivered`, `EstimateDecisionAndStock.shouldLockWorkOrderAfterEstimateRejection` | `WorkOrderTest.rejectsDeliveryAfterEstimateRejection` |
 | Orçamento aprovado grava `estimatedValue` na ordem | `ApproveEstimate.shouldApproveAndAdvanceStatus` | `ApproveEstimate.shouldApproveEstimateSetEstimatedValue...` |
-| Aprovar orçamento em `WAITING_APPROVAL` avança a ordem para `APPROVED` automaticamente | `ApproveEstimate.shouldApproveAndAdvanceStatus` | `ApproveEstimate.shouldApproveEstimateSetEstimatedValue...AdvanceWaitingApprovalToApproved` |
+| Aprovar orçamento em `WAITING_APPROVAL` avança a ordem para `IN_PROGRESS` automaticamente | `ApproveEstimate.shouldApproveAndAdvanceStatus` | `ApproveEstimate.shouldApproveAndAdvanceStatus` |
 | Orçamento já decidido não pode ser aprovado de novo → 409 | `ApproveEstimate.shouldReturn409WhenAlreadyDecided` | `ApproveEstimate.shouldThrowEstimateAlreadyDecidedException` |
-| Ordem não pode ir para `APPROVED` nem `IN_PROGRESS` sem orçamento aprovado | `UpdateStatus.shouldRejectApprovingWithoutApprovedEstimate` | `UpdateStatus.shouldThrowEstimateNotApprovedException...WhenApproving` / `...StartingExecution` |
+| Ordem não pode ir para `IN_PROGRESS` sem orçamento aprovado | `UpdateStatus.shouldRejectApprovingWithoutApprovedEstimate` | `UpdateStatus.shouldThrowWhenStartingWithoutApprovedEstimate` |
 | `/close` exige orçamento aprovado e status `IN_PROGRESS` | `Close.shouldReturn422WhenNotInProgress` | `Close.shouldThrow...WhenNotInProgress`, `...WhenThereIsNoApprovedEstimate` |
 | `finalValue` opcional no fechamento — usa `estimatedValue` se omitido | `Close.shouldCloseUsingEstimatedValueWhenOmitted` | `Close.shouldCompleteUsingTheApprovedEstimateValueWhenFinalValueIsOmitted` |
 | `finalValue` pode divergir do orçamento (serviço extra/desconto) | `Close.shouldCloseUsingProvidedFinalValue` | `Close.shouldUseTheProvidedFinalValueWhenPresent`, `...shouldRecordHistoryTransitionToCompletedWhenFinalValueDiffersFromTheEstimate` |

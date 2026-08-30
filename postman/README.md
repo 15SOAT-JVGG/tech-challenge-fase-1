@@ -1,6 +1,6 @@
 # Collection Postman — Oficina Mecânica API (E2E)
 
-`Oficina-Mecanica-E2E.postman_collection.json` reúne 98 requisições em 10 pastas, executadas em ordem:
+`Oficina-Mecanica-E2E.postman_collection.json` reúne 97 requisições em 10 pastas, executadas em ordem:
 
 | Pasta | Cobertura |
 |---|---|
@@ -11,8 +11,8 @@
 | 04 - Parts and Supplies | CRUD, ajuste de estoque, low-stock, RBAC (mutação só ADMIN) |
 | 05 - Service Catalog | CRUD, RBAC (mutação só ADMIN) |
 | 06 - Work Orders - Happy Path | Ciclo completo: RECEIVED → DIAGNOSIS → orçamento → aprovação → IN_PROGRESS → fechamento → DELIVERED, métricas |
-| 07 - Work Orders - Rejection and Public Channel | Rejeição de orçamento, novo orçamento, aprovação via canal público (sem auth) |
-| 08 - Work Orders - Cancellation and Locking | Cancelamento e bloqueio de OS cancelada |
+| 07 - Ordens de Serviço - Canal Público | Acompanhamento e aprovação de orçamento pelo canal público (sem auth) |
+| 08 - Ordens de Serviço - Recusa de Orçamento e Bloqueio | Recusa de orçamento conclui a OS com `cancelledAt` e bloqueia novas mutações com `WORK_ORDER_LOCKED` |
 | 09 - Cross-cutting Security | 401 sem token, 404 para recurso inexistente |
 
 ## Como rodar

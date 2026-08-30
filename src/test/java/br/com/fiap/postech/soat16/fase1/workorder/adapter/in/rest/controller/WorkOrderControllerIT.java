@@ -452,6 +452,23 @@ class WorkOrderControllerIT {
         }
 
         @Test
+        @DisplayName("deve rejeitar pular de RECEIVED para IN_PROGRESS")
+        void shouldRejectSkippingCanonicalStages() {
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+
+            ApiErrorResponseDto error = extractError(given()
+                    .contentType("application/json")
+                    .body("{\"status\":\"IN_PROGRESS\"}")
+            .when()
+                    .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/status")
+            .then()
+                    .statusCode(422)
+                    .extract().response());
+
+            assertEquals("INVALID_STATUS_TRANSITION", error.code());
+        }
+
+        @Test
         @DisplayName("deve rejeitar ir direto para COMPLETED pelo endpoint genérico")
         void shouldRejectCompletedViaGenericEndpoint() {
             UUID workOrderId = createWorkOrderInProgress(new BigDecimal("100.00"), 1);
@@ -543,7 +560,7 @@ class WorkOrderControllerIT {
     class ApproveEstimate {
 
         @Test
-        @DisplayName("deve aprovar o orçamento e avançar a ordem para APPROVED")
+        @DisplayName("deve aprovar o orçamento e avançar a ordem para IN_PROGRESS")
         void shouldApproveAndAdvanceStatus() {
             UUID partId = seedPart(new BigDecimal("80.00"));
             UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
@@ -749,6 +766,37 @@ class WorkOrderControllerIT {
         }
 
         @Test
+        @DisplayName("deve bloquear alterações e entrega depois da recusa do orçamento")
+        void shouldLockWorkOrderAfterEstimateRejection() {
+            UUID partId = seedPart(new BigDecimal("50.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
+            rejectEstimate(workOrderId, estimate.estimateId());
+
+            ApiErrorResponseDto serviceError = extractError(given()
+                    .contentType("application/json")
+                    .body("{\"description\":\"Tentativa bloqueada\",\"price\":10.00}")
+            .when()
+                    .post(WORK_ORDERS_PATH + "/" + workOrderId + "/services")
+            .then()
+                    .statusCode(422)
+                    .extract().response());
+
+            ApiErrorResponseDto deliveryError = extractError(given()
+                    .contentType("application/json")
+                    .body("{\"status\":\"DELIVERED\"}")
+            .when()
+                    .patch(WORK_ORDERS_PATH + "/" + workOrderId + "/status")
+            .then()
+                    .statusCode(422)
+                    .extract().response());
+
+            assertEquals("WORK_ORDER_LOCKED", serviceError.code());
+            assertEquals("WORK_ORDER_LOCKED", deliveryError.code());
+        }
+
+        @Test
         @DisplayName("deve retornar 422 ao aprovar com estoque insuficiente")
         void shouldReturn422WhenInsufficientStock() {
             Part part = new Part("Peça rara", "estoque baixo", new BigDecimal("50.00"), 1, "UN");
@@ -800,6 +848,27 @@ class WorkOrderControllerIT {
 
             assertEquals(EstimateStatus.APPROVED, approved.status());
             assertEquals(WorkOrderStatus.IN_PROGRESS, getWorkOrder(workOrderId).status());
+        }
+
+        @Test
+        @DisplayName("cliente deve recusar o orçamento e concluir a OS com cancelamento")
+        void shouldRejectAsClient() {
+            UUID partId = seedPart(new BigDecimal("80.00"));
+            UUID workOrderId = createWorkOrder(seedCustomer(), seedVehicle());
+            updateStatus(workOrderId, WorkOrderStatus.DIAGNOSIS);
+            EstimateResponseDto estimate = createEstimate(workOrderId, partId, 1);
+
+            EstimateResponseDto rejected = given()
+            .when()
+                    .patch(PUBLIC_PATH + "/" + workOrderId + "/estimate/" + estimate.estimateId() + "/reject")
+            .then()
+                    .statusCode(200)
+                    .extract().as(EstimateResponseDto.class);
+
+            WorkOrderResponseDto workOrder = getWorkOrder(workOrderId);
+            assertEquals(EstimateStatus.REJECTED, rejected.status());
+            assertEquals(WorkOrderStatus.COMPLETED, workOrder.status());
+            assertNotNull(workOrder.cancelledAt());
         }
     }
 

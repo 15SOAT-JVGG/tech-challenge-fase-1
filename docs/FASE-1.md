@@ -25,12 +25,12 @@ arquitetura, infraestrutura, deploy e escalabilidade, ver o [README](../README.m
 
 - **Ordem de Serviço (OS):** abertura, inclusão de serviços e de peças/insumos, **orçamento gerado
   automaticamente** (peças + mão de obra) e envio ao cliente para aprovação.
-- **Acompanhamento:** ciclo de status `RECEIVED → DIAGNOSIS → WAITING_APPROVAL → APPROVED →
-  IN_PROGRESS → COMPLETED → DELIVERED` (+ `CANCELLED`), com **transições automáticas** conforme as
-  ações (gerar orçamento, aprovar/rejeitar, fechar).
+- **Acompanhamento:** ciclo de status `RECEIVED → DIAGNOSIS → WAITING_APPROVAL → IN_PROGRESS →
+  COMPLETED → DELIVERED`, com **transições automáticas** conforme as ações. A recusa conclui a OS e
+  preenche `cancelledAt`, sem criar um status adicional.
 - **Canal público do cliente:** consulta da OS e **aprovação/rejeição do orçamento** via API, sem login.
 - **Gestão administrativa:** CRUD de clientes, veículos, serviços e peças; **controle de estoque**
-  (baixa na aprovação, restauração no cancelamento, alerta de estoque mínimo).
+  (baixa na aprovação, recusa quando o saldo é insuficiente e alerta de estoque mínimo).
 - **Métrica:** tempo médio de execução das OS concluídas.
 - **Segurança:** autenticação JWT (RS256) e RBAC nas APIs administrativas; validação de CPF/CNPJ e placa.
 
@@ -236,16 +236,18 @@ A collection que exercita todos eles em ordem está em [postman/](../postman/REA
 ## Ciclo de vida da Ordem de Serviço
 
 ```
-RECEIVED ─► DIAGNOSIS ─► WAITING_APPROVAL ─► APPROVED ─► IN_PROGRESS ─► COMPLETED ─► DELIVERED
+RECEIVED ─► DIAGNOSIS ─► WAITING_APPROVAL ─► IN_PROGRESS ─► COMPLETED ─► DELIVERED
                                    │
-                                   └─(rejeição)─► DIAGNOSIS     (qualquer não-terminal) ─► CANCELLED
+                                   └─(rejeição)─► COMPLETED + cancelledAt
 ```
 
 - A OS nasce em **`RECEIVED`** (status definido automaticamente na criação).
-- Gerar o orçamento move `DIAGNOSIS → WAITING_APPROVAL`; aprovar move `→ APPROVED` (e dá baixa no
-  estoque); rejeitar volta para `DIAGNOSIS`.
-- `COMPLETED` só via `PATCH /{id}/close` (exige OS `IN_PROGRESS` e orçamento aprovado).
-- `CANCELLED` em `APPROVED` restaura o estoque reservado. OS `DELIVERED`/`CANCELLED` ficam bloqueadas.
+- Gerar o orçamento move `DIAGNOSIS → WAITING_APPROVAL`; aprovar move `→ IN_PROGRESS` e dá baixa no
+  estoque.
+- `COMPLETED` é alcançado por `PATCH /{id}/close` ou pela recusa de um orçamento pendente.
+- A recusa preenche `closedAt` e `cancelledAt`; não existe cancelamento manual nem status
+  `CANCELLED`.
+- OS `DELIVERED` ou concluída por recusa ficam bloqueadas.
 
 Detalhes em [WORKORDER.md](../WORKORDER.md); o modelo de dados, em
 [MODELO-RELACIONAL.md](MODELO-RELACIONAL.md).

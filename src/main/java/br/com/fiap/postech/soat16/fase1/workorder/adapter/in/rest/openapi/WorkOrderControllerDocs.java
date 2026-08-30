@@ -109,7 +109,8 @@ public interface WorkOrderControllerDocs {
                     schema = @Schema(implementation = EstimateResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid request body")
     @APIResponse(responseCode = "404", description = "Work order or part not found")
-    @APIResponse(responseCode = "422", description = "Work order is delivered or cancelled")
+    @APIResponse(responseCode = "422",
+            description = "Ordem entregue ou concluída por recusa do orçamento")
     Uni<Response> createEstimate(
             @Parameter(name = "id", description = "Work order identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,
@@ -158,7 +159,8 @@ public interface WorkOrderControllerDocs {
                     schema = @Schema(implementation = WorkOrderServiceResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid request body")
     @APIResponse(responseCode = "404", description = "Work order not found")
-    @APIResponse(responseCode = "422", description = "Work order is delivered or cancelled")
+    @APIResponse(responseCode = "422",
+            description = "Ordem entregue ou concluída por recusa do orçamento")
     Uni<Response> addService(
             @Parameter(name = "id", description = "Work order identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,

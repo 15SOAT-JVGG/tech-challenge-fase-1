@@ -124,7 +124,7 @@ public class WorkOrder extends AuditableEntity {
     }
 
     public void ensureMutable() {
-        if (status == WorkOrderStatus.DELIVERED) {
+        if (status == WorkOrderStatus.DELIVERED || cancelledAt != null) {
             throw new WorkOrderLockedException();
         }
     }

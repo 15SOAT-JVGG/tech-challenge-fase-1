@@ -405,7 +405,7 @@ class WorkOrderServiceTest {
     class ApproveEstimate {
 
         @Test
-        @DisplayName("should approve estimate, set estimatedValue and advance WAITING_APPROVAL to APPROVED")
+        @DisplayName("deve aprovar o orçamento, atualizar o valor estimado e iniciar a execução")
         void shouldApproveAndAdvanceStatus() {
             entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
             UUID estimateId = UUID.randomUUID();
@@ -491,7 +491,7 @@ class WorkOrderServiceTest {
     class RejectEstimate {
 
         @Test
-        @DisplayName("should reject a pending estimate, complete the work order and record cancellation")
+        @DisplayName("deve recusar o orçamento, concluir a OS e persistir o histórico")
         void shouldRejectAndCompleteWorkOrder() {
             entity.setStatus(WorkOrderStatus.WAITING_APPROVAL);
             UUID estimateId = UUID.randomUUID();
@@ -517,6 +517,11 @@ class WorkOrderServiceTest {
             assertEquals(WorkOrderStatus.COMPLETED, entity.getStatus());
             assertNotNull(entity.getClosedAt());
             assertNotNull(entity.getCancelledAt());
+
+            ArgumentCaptor<WorkOrderHistory> historyCaptor = ArgumentCaptor.forClass(WorkOrderHistory.class);
+            verify(repository).saveWithHistory(any(WorkOrder.class), historyCaptor.capture());
+            assertEquals(WorkOrderStatus.WAITING_APPROVAL, historyCaptor.getValue().getPreviousStatus());
+            assertEquals(WorkOrderStatus.COMPLETED, historyCaptor.getValue().getNewStatus());
         }
 
         @Test

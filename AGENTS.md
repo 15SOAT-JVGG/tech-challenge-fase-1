@@ -138,6 +138,9 @@ Cubra, para cada classe nova ou alterada:
 Espelhe o pacote da classe sob teste, use JUnit 5 com `@Nested` para agrupar cenários e
 `@DisplayName` em português para descrever o comportamento.
 
+Testes de migração que precisam preparar um schema legado antes da inicialização do Quarkus usam
+Testcontainers e Flyway diretamente, mantêm o sufixo `*IT` e agrupam os cenários com `@Nested`.
+
 ### Testes de integração nos fluxos críticos
 
 Todo fluxo crítico tem cobertura ponta a ponta via HTTP com REST-assured e banco real
@@ -147,12 +150,11 @@ service, domínio, persistência e migrations juntos. `WorkOrderControllerIT` é
 Fluxos que exigem teste de integração:
 
 1. **Ciclo de vida da OS:** abertura, inclusão de serviços e peças, e as transições
-   `RECEIVED → DIAGNOSIS → WAITING_APPROVAL → APPROVED → IN_PROGRESS → COMPLETED → DELIVERED`,
-   incluindo `CANCELLED` e a rejeição de transições inválidas.
+   `RECEIVED → DIAGNOSIS → WAITING_APPROVAL → IN_PROGRESS → COMPLETED → DELIVERED`, incluindo
+   conclusão com `cancelledAt` por recusa do orçamento e rejeição de transições inválidas.
 2. **Orçamento:** geração automática (peças + mão de obra), aprovação e rejeição pelo canal público,
    e o bloqueio de nova decisão sobre orçamento já decidido.
-3. **Estoque de peças:** baixa na aprovação, restauração no cancelamento e recusa quando o saldo
-   é insuficiente.
+3. **Estoque de peças:** baixa na aprovação e recusa quando o saldo é insuficiente.
 4. **Autenticação e autorização:** login, emissão de JWT RS256 e RBAC nas rotas administrativas
    (`AuthControllerIT`, `SecurityIT`).
 5. **Persistência de cada contexto:** os `*RepositoryIT` validam mapeamento JPA, constraints de

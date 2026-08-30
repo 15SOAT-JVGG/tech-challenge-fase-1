@@ -72,6 +72,7 @@ erDiagram
         enum status
         datetime opened_at
         datetime closed_at
+        datetime cancelled_at
         decimal estimated_value
         decimal final_value
     }
@@ -136,7 +137,7 @@ Nenhuma — todas as entidades possuem ao menos um relacionamento.
 | `WorkerProfile` | MECHANIC, ATTENDANT |
 | `PartType` | PART, SUPPLY |
 | `WorkOrderPriority` | LOW, MEDIUM, HIGH, URGENT |
-| `WorkOrderStatus` | RECEIVED, DIAGNOSIS, WAITING_APPROVAL, APPROVED, IN_PROGRESS, COMPLETED, DELIVERED, CANCELLED |
+| `WorkOrderStatus` | RECEIVED, DIAGNOSIS, WAITING_APPROVAL, IN_PROGRESS, COMPLETED, DELIVERED |
 | `EstimateStatus` | PENDING, APPROVED, REJECTED |
 
 ## Cardinalidades

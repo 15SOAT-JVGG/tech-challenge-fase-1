@@ -85,12 +85,13 @@ class WorkOrderPersistenceMapperTest {
     }
 
     @Test
-    @DisplayName("copyState carries status and closing data but keeps identity")
+    @DisplayName("copyState copia o cancelamento sem alterar a identidade")
     void copyStateCarriesStatusChanges() {
         WorkOrderJpaEntity entity = WorkOrderPersistenceMapper.toJpaEntity(domain());
         WorkOrder updated = domain();
         updated.setStatus(WorkOrderStatus.COMPLETED);
         updated.setClosedAt(OPENED_AT.plusHours(3));
+        updated.setCancelledAt(OPENED_AT.plusHours(3));
         updated.setFinalValue(new BigDecimal("300.00"));
 
         WorkOrderPersistenceMapper.copyState(updated, entity);
@@ -98,7 +99,22 @@ class WorkOrderPersistenceMapperTest {
         assertEquals(WORK_ORDER_ID, entity.getId());
         assertEquals(WorkOrderStatus.COMPLETED, entity.getStatus());
         assertEquals(OPENED_AT.plusHours(3), entity.getClosedAt());
+        assertEquals(OPENED_AT.plusHours(3), entity.getCancelledAt());
         assertEquals(new BigDecimal("300.00"), entity.getFinalValue());
+    }
+
+    @Test
+    @DisplayName("conversão de ida e volta preserva a data do cancelamento")
+    void roundTripPreservesCancellationTime() {
+        WorkOrder cancelled = domain();
+        cancelled.setStatus(WorkOrderStatus.COMPLETED);
+        cancelled.setClosedAt(OPENED_AT.plusHours(1));
+        cancelled.setCancelledAt(OPENED_AT.plusHours(1));
+
+        WorkOrder result = WorkOrderPersistenceMapper.toDomain(
+                WorkOrderPersistenceMapper.toJpaEntity(cancelled));
+
+        assertEquals(cancelled.getCancelledAt(), result.getCancelledAt());
     }
 
     @Test

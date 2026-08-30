@@ -69,14 +69,13 @@ public interface PublicWorkOrderControllerDocs {
 
     @PATCH
     @Path("/{id}/estimate/{estimateId}/reject")
-    @Operation(summary = "Reject estimate (client)",
-            description = "Client declines the estimate. The work order returns to DIAGNOSIS for a revised "
-                    + "estimate. No stock is reserved.")
-    @APIResponse(responseCode = "200", description = "Estimate rejected successfully",
+    @Operation(summary = "Recusar orçamento pelo canal do cliente",
+            description = "A recusa conclui a ordem de serviço, preenche cancelledAt e bloqueia novas alterações.")
+    @APIResponse(responseCode = "200", description = "Orçamento recusado com sucesso",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = EstimateResponseDto.class)))
-    @APIResponse(responseCode = "404", description = "Work order or estimate not found")
-    @APIResponse(responseCode = "409", description = "Estimate already approved or rejected")
+    @APIResponse(responseCode = "404", description = "Ordem de serviço ou orçamento não encontrado")
+    @APIResponse(responseCode = "409", description = "Orçamento já aprovado ou recusado")
     Uni<EstimateResponseDto> rejectEstimate(
             @Parameter(name = "id", description = "Work order identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,

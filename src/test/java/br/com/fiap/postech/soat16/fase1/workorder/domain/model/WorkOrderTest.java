@@ -149,6 +149,21 @@ class WorkOrderTest {
             assertThrows(WorkOrderLockedException.class,
                     () -> order.transitionTo(WorkOrderStatus.DIAGNOSIS, false, CHANGED_AT));
         }
+
+        @Test
+        @DisplayName("entrega uma OS concluída e registra o histórico")
+        void deliversCompletedOrder() {
+            WorkOrder order = workOrder(UUID.randomUUID(), WorkOrderStatus.COMPLETED);
+
+            WorkOrderHistory history = order.transitionTo(
+                    WorkOrderStatus.DELIVERED,
+                    true,
+                    CHANGED_AT);
+
+            assertEquals(WorkOrderStatus.DELIVERED, order.getStatus());
+            assertEquals(WorkOrderStatus.COMPLETED, history.getPreviousStatus());
+            assertEquals(WorkOrderStatus.DELIVERED, history.getNewStatus());
+        }
     }
 
     @Nested
@@ -195,6 +210,17 @@ class WorkOrderTest {
             assertEquals(CHANGED_AT, order.getClosedAt());
             assertEquals(CHANGED_AT, order.getCancelledAt());
             assertTrue(history.isPresent());
+        }
+
+        @Test
+        @DisplayName("OS concluída por recusa não pode ser entregue")
+        void rejectsDeliveryAfterEstimateRejection() {
+            WorkOrder order = workOrder(UUID.randomUUID(), WorkOrderStatus.WAITING_APPROVAL);
+            order.registerEstimateRejection(CHANGED_AT);
+
+            assertThrows(
+                    WorkOrderLockedException.class,
+                    () -> order.transitionTo(WorkOrderStatus.DELIVERED, false, CHANGED_AT.plusMinutes(1)));
         }
     }
 

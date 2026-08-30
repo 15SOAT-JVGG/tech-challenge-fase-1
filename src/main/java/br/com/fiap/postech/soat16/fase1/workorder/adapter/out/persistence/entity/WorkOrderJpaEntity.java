@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -26,10 +27,16 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity(name = "WorkOrder")
-@Table(name = "work_order", schema = "oficina_mecanica")
+@Table(name = "work_order", schema = "oficina_mecanica",
+        check = @CheckConstraint(name = "ck_work_order_status_canonical",
+                constraint = WorkOrderJpaEntity.STATUS_CONSTRAINT))
 @Getter
 @Setter
 public class WorkOrderJpaEntity extends AuditableJpaEntity {
+
+    static final String CANONICAL_STATUS_VALUES =
+            "('RECEIVED', 'DIAGNOSIS', 'WAITING_APPROVAL', 'IN_PROGRESS', 'COMPLETED', 'DELIVERED')";
+    static final String STATUS_CONSTRAINT = "status in " + CANONICAL_STATUS_VALUES;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
