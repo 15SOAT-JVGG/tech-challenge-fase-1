@@ -496,9 +496,10 @@ provisionamento e o schema é aplicado pelo Flyway no de entrega
 ## Collection das APIs
 
 **[`postman/Oficina-Mecanica-E2E.postman_collection.json`](postman/Oficina-Mecanica-E2E.postman_collection.json)**
-— 98 requisições em 10 pastas, em ordem executável (auth → CRUDs → ciclo completo da OS → canal
-público → segurança), cobrindo tanto o caminho de sucesso quanto os erros de RBAC e validação. É
-auto-contida: gera tokens, CPFs e placas válidos dinamicamente. Instruções de uso em
+— 103 requisições em 10 pastas, em ordem executável (auth → CRUDs → ciclo completo da OS → canal do
+cliente → segurança), cobrindo tanto o caminho de sucesso quanto os erros de RBAC e validação. É
+auto-contida: gera tokens, CPFs e placas válidos dinamicamente. Os links assinados que o cliente
+recebe por e-mail são a única parte que exige um passo manual. Instruções de uso em
 [postman/README.md](postman/README.md).
 
 Aponte a variável `base_url` para o ambiente que quer exercitar — `http://localhost:8080` no local, ou

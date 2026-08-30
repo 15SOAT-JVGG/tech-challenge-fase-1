@@ -43,6 +43,9 @@ import br.com.fiap.postech.soat16.fase1.shared.test.infrastructure.PostgresTestR
 import br.com.fiap.postech.soat16.fase1.vehicle.adapter.out.persistence.VehicleRepository;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.Vehicle;
 import br.com.fiap.postech.soat16.fase1.vehicle.domain.model.enums.VehicleType;
+import br.com.fiap.postech.soat16.fase1.worker.adapter.out.persistence.WorkerRepository;
+import br.com.fiap.postech.soat16.fase1.worker.domain.model.Worker;
+import br.com.fiap.postech.soat16.fase1.worker.domain.model.enums.WorkerProfile;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.EstimateResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.OpenedWorkOrderResponseDto;
 import br.com.fiap.postech.soat16.fase1.workorder.adapter.in.rest.dto.response.WorkOrderMetricsResponseDto;
@@ -92,6 +95,9 @@ class WorkOrderControllerIT {
 
     @Inject
     ServiceItemRepository serviceItemRepository;
+
+    @Inject
+    WorkerRepository workerRepository;
 
     @Inject
     WorkOrderRepository workOrderRepository;
@@ -181,6 +187,12 @@ class WorkOrderControllerIT {
         vehicle.setKmDriven(50_000L);
         vehicle.setType(VehicleType.CAR);
         return persistInTransaction(() -> vehicleRepository.save(vehicle)).getId();
+    }
+
+    private UUID seedWorker() {
+        Worker worker = Worker.create(WorkerProfile.MECHANIC, "João", "Mecânico",
+                "joao." + UUID.randomUUID() + "@example.com", "+5511988888888", "hash");
+        return persistInTransaction(() -> workerRepository.save(worker)).getId();
     }
 
     private UUID seedPart(BigDecimal unitPrice) {
@@ -686,6 +698,43 @@ class WorkOrderControllerIT {
                     .statusCode(404)
                     .extract().response());
             assertEquals("VEHICLE_NOT_FOUND", error.code());
+        }
+
+        @Test
+        @DisplayName("deve registrar o mecânico responsável informado na abertura")
+        void shouldAssignTheRequestedWorker() {
+            UUID workerId = seedWorker();
+            String body = """
+                    {"customerId":"%s","vehicleId":"%s","description":"Revisão",
+                     "assignedWorkerId":"%s"}
+                    """.formatted(seedCustomer(), seedVehicle(), workerId);
+
+            OpenedWorkOrderResponseDto opened = openWorkOrder(body);
+
+            assertEquals(workerId, opened.workOrder().assignedWorkerId());
+            assertEquals(workerId, getWorkOrder(opened.workOrder().workOrderId()).assignedWorkerId());
+        }
+
+        @Test
+        @DisplayName("deve retornar 404 e não abrir a ordem quando o mecânico responsável não existe")
+        void shouldReturn404WhenAssignedWorkerNotFound() {
+            UUID vehicleId = seedVehicle();
+            String body = """
+                    {"customerId":"%s","vehicleId":"%s","description":"Revisão",
+                     "assignedWorkerId":"%s"}
+                    """.formatted(seedCustomer(), vehicleId, UUID.randomUUID());
+
+            ApiErrorResponseDto error = extractError(given()
+                    .contentType("application/json")
+                    .body(body)
+            .when()
+                    .post(WORK_ORDERS_PATH)
+            .then()
+                    .statusCode(404)
+                    .extract().response());
+
+            assertEquals("WORKER_NOT_FOUND", error.code());
+            assertFalse(workOrderExistsForVehicle(vehicleId));
         }
 
         @Test

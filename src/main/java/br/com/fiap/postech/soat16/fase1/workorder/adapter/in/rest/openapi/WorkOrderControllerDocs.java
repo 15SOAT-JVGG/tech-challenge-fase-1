@@ -41,7 +41,8 @@ import io.smallrye.mutiny.Uni;
 @Path("/v1/work-orders")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@Tag(name = "Work Orders", description = "Work order lifecycle: estimates, services and status management")
+@Tag(name = "Work Orders", description = "Work order lifecycle: estimates, services and status management. "
+        + "Operated by ADMIN and MECHANIC, except the average execution time metric, which is ADMIN only.")
 public interface WorkOrderControllerDocs {
 
     @GET
@@ -59,7 +60,7 @@ public interface WorkOrderControllerDocs {
     @Path("/metrics/average-execution-time")
     @Operation(summary = "Average execution time",
             description = "Returns the average execution time (between opening and completion) across all "
-                    + "closed work orders, in minutes, plus the sample size.")
+                    + "closed work orders, in minutes, plus the sample size. Restricted to ADMIN.")
     @APIResponse(responseCode = "200", description = "Metric computed successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = WorkOrderMetricsResponseDto.class)))
@@ -81,7 +82,8 @@ public interface WorkOrderControllerDocs {
             description = "Creates a new work order for an existing customer and vehicle. Initial status is "
                     + "RECEIVED, default priority is MEDIUM, openedAt is set automatically. When the initial "
                     + "request carries catalog services or parts, the matching pending estimate is created in "
-                    + "the same transaction, with prices snapshotted from the catalog.")
+                    + "the same transaction, with prices snapshotted from the catalog. The customer is emailed "
+                    + "a signed tracking link.")
     @APIResponse(responseCode = "201", description = "Work order opened successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = OpenedWorkOrderResponseDto.class)))
@@ -95,13 +97,16 @@ public interface WorkOrderControllerDocs {
     @Path("/{id}/status")
     @Operation(summary = "Update work order status",
             description = "Moves the work order to the next status in the lifecycle. Use /close to reach "
-                    + "COMPLETED. Moving to IN_PROGRESS requires an approved estimate. DELIVERED blocks "
-                    + "further changes.")
+                    + "COMPLETED. Moving to WAITING_APPROVAL reserves every part of the pending estimate and "
+                    + "emails the customer the approval and rejection links; when any part lacks stock nothing "
+                    + "is reserved, no email is sent and the work order stays in DIAGNOSIS. Moving to "
+                    + "IN_PROGRESS requires an approved estimate. DELIVERED blocks further changes.")
     @APIResponse(responseCode = "200", description = "Status updated successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = WorkOrderResponseDto.class)))
     @APIResponse(responseCode = "404", description = "Work order not found")
-    @APIResponse(responseCode = "422", description = "Invalid status transition or missing approved estimate")
+    @APIResponse(responseCode = "422", description = "Invalid status transition, missing approved estimate or "
+            + "insufficient part stock to reserve the pending estimate")
     Uni<WorkOrderResponseDto> updateStatus(
             @Parameter(name = "id", description = "Work order identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,
@@ -111,14 +116,17 @@ public interface WorkOrderControllerDocs {
     @POST
     @Path("/{id}/estimate")
     @Operation(summary = "Create estimate", description = "Creates a new estimate with items priced from the "
-            + "parts catalog. totalAmount is the sum of (quantity * unitPrice) for every item.")
+            + "parts catalog. totalAmount is the sum of (quantity * unitPrice) for every item. A work order in "
+            + "DIAGNOSIS moves to WAITING_APPROVAL, which reserves the estimate parts and emails the customer "
+            + "the decision links.")
     @APIResponse(responseCode = "201", description = "Estimate created successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = EstimateResponseDto.class)))
     @APIResponse(responseCode = "400", description = "Invalid request body")
     @APIResponse(responseCode = "404", description = "Work order or part not found")
     @APIResponse(responseCode = "422",
-            description = "Ordem entregue ou concluída por recusa do orçamento")
+            description = "Ordem entregue ou concluída por recusa do orçamento, ou saldo insuficiente para "
+                    + "reservar uma das peças")
     Uni<Response> createEstimate(
             @Parameter(name = "id", description = "Work order identifier", required = true, in = ParameterIn.PATH)
             @PathParam("id") UUID id,
@@ -129,7 +137,8 @@ public interface WorkOrderControllerDocs {
     @Path("/{id}/estimate/{estimateId}/approve")
     @Operation(summary = "Approve estimate",
             description = "Approves a pending estimate. Sets the work order's estimatedValue to the estimate's "
-                    + "totalAmount and, if the work order is WAITING_APPROVAL, advances it to IN_PROGRESS.")
+                    + "totalAmount and, if the work order is WAITING_APPROVAL, advances it to IN_PROGRESS. The "
+                    + "stock reserved on entering WAITING_APPROVAL is kept.")
     @APIResponse(responseCode = "200", description = "Estimate approved successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = EstimateResponseDto.class)))
@@ -145,8 +154,8 @@ public interface WorkOrderControllerDocs {
     @PATCH
     @Path("/{id}/estimate/{estimateId}/reject")
     @Operation(summary = "Reject estimate",
-            description = "Rejects a pending estimate. If the work order is WAITING_APPROVAL it is completed and "
-                    + "records cancelledAt. No stock is reserved on rejection.")
+            description = "Rejects a pending estimate, returning its reserved parts to stock. If the work order "
+                    + "is WAITING_APPROVAL it is completed and records cancelledAt.")
     @APIResponse(responseCode = "200", description = "Estimate rejected successfully",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = EstimateResponseDto.class)))

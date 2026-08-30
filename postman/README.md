@@ -1,6 +1,6 @@
 # Collection Postman — Oficina Mecânica API (E2E)
 
-`Oficina-Mecanica-E2E.postman_collection.json` reúne 99 requisições em 10 pastas, executadas em ordem:
+`Oficina-Mecanica-E2E.postman_collection.json` reúne 103 requisições em 10 pastas, executadas em ordem:
 
 | Pasta | Cobertura |
 |---|---|
@@ -11,7 +11,7 @@
 | 04 - Parts and Supplies | CRUD, ajuste de estoque, low-stock, RBAC (mutação só ADMIN) |
 | 05 - Service Catalog | CRUD, RBAC (mutação só ADMIN) |
 | 06 - Work Orders - Happy Path | Abertura com solicitação inicial (orçamento pendente atômico) e ciclo completo: RECEIVED → DIAGNOSIS → orçamento → aprovação → IN_PROGRESS → fechamento → DELIVERED, métricas |
-| 07 - Ordens de Serviço - Canal Público | Acompanhamento e aprovação de orçamento pelo canal público (sem auth) |
+| 07 - Ordens de Serviço - Canal Público | Canal do cliente por link assinado: não há acesso por id (404), links forjados são recusados (`TRACKING_TOKEN_INVALID` / `DECISION_TOKEN_INVALID`, 400) e a OS segue aguardando decisão. As três requisições com os links reais são opcionais — ver [Exercitando os links do cliente](#exercitando-os-links-do-cliente) |
 | 08 - Ordens de Serviço - Recusa de Orçamento e Bloqueio | Recusa de orçamento conclui a OS com `cancelledAt` e bloqueia novas mutações com `WORK_ORDER_LOCKED` |
 | 09 - Cross-cutting Security | 401 sem token, 404 para recurso inexistente |
 
@@ -41,6 +41,26 @@ docker run --rm --network=tech-challenge_oficina_mecanica_net \
   run /etc/newman/Oficina-Mecanica-E2E.postman_collection.json \
   --env-var base_url=http://srv-oficina-mecanica:8080
 ```
+
+## Exercitando os links do cliente
+
+Os links de acompanhamento e de decisão só existem dentro do e-mail que a aplicação envia ao
+cliente, então a collection não consegue capturá-los sozinha. Sem servidor SMTP configurado o mailer
+opera em modo simulado e imprime a mensagem no log, que é de onde o token sai:
+
+```shell
+docker compose logs app | grep -o 'work-orders/tracking/[^ ]*'
+docker compose logs app | grep -o 'work-orders/estimate-decisions/[^ ]*'
+```
+
+Cole o token (o trecho depois da última barra) nas variáveis de coleção `tracking_token` e
+`estimate_decision_token` e rode de novo a pasta 07: as três requisições que dependem deles deixam
+de ser puladas e passam a exercitar o acompanhamento, a decisão e o `410` do link reapresentado. A
+pasta 07 encerra com o orçamento ainda pendente justamente para que os links continuem válidos.
+
+Enquanto as variáveis estiverem vazias, essas requisições se pulam sozinhas
+(`pm.execution.skipRequest()`, exige Postman 10.12+ ou Newman 5.3.2+) e o restante da pasta roda
+normalmente.
 
 ## Notas
 

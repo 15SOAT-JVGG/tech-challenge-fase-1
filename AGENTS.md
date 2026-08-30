@@ -152,9 +152,10 @@ Fluxos que exigem teste de integração:
 1. **Ciclo de vida da OS:** abertura, inclusão de serviços e peças, e as transições
    `RECEIVED → DIAGNOSIS → WAITING_APPROVAL → IN_PROGRESS → COMPLETED → DELIVERED`, incluindo
    conclusão com `cancelledAt` por recusa do orçamento e rejeição de transições inválidas.
-2. **Orçamento:** geração automática (peças + mão de obra), aprovação e rejeição pelo canal público,
-   e o bloqueio de nova decisão sobre orçamento já decidido.
-3. **Estoque de peças:** baixa na aprovação e recusa quando o saldo é insuficiente.
+2. **Orçamento:** geração automática (peças + mão de obra), aprovação e recusa pelos links assinados
+   do canal do cliente, e o bloqueio de nova decisão sobre orçamento já decidido.
+3. **Estoque de peças:** reserva ao levar a OS a `WAITING_APPROVAL`, devolução na recusa do
+   orçamento e recusa da operação quando o saldo é insuficiente.
 4. **Autenticação e autorização:** login, emissão de JWT RS256 e RBAC nas rotas administrativas
    (`AuthControllerIT`, `SecurityIT`).
 5. **Persistência de cada contexto:** os `*RepositoryIT` validam mapeamento JPA, constraints de

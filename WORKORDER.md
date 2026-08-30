@@ -59,7 +59,9 @@ por ela:
   concluídas por recusa do orçamento;
 - os grupos aparecem na ordem `IN_PROGRESS`, `WAITING_APPROVAL`, `DIAGNOSIS` e `RECEIVED`;
 - dentro do mesmo status, a OS aberta há mais tempo vem primeiro;
-- a contagem e a paginação (`page`, `size`) consideram exatamente esse conjunto filtrado.
+- a contagem e a paginação (`page`, `size`) consideram exatamente esse conjunto filtrado;
+- a ordenação é a da fila, então os parâmetros `q` e `sort` do contrato de paginação compartilhado
+  são aceitos e ignorados nesta rota.
 
 ---
 
@@ -124,19 +126,24 @@ mailer opera em modo simulado e apenas registra a mensagem em log.
 
 ## Endpoints
 
-| Método | Caminho | Descrição |
-|---|---|---|
-| `POST` | `/v1/work-orders` | Abre uma nova ordem de serviço e, junto dela, o orçamento pendente da solicitação inicial. |
-| `GET` | `/v1/work-orders/{id}` | Busca uma ordem por id. |
-| `GET` | `/v1/work-orders` | Lista a fila operacional: apenas OS em atendimento, paginadas e ordenadas por estágio de trabalho. |
-| `PATCH` | `/v1/work-orders/{id}/status` | Avança o status da ordem (exceto para `COMPLETED`). |
-| `POST` | `/v1/work-orders/{id}/estimate` | Cria um orçamento com itens do catálogo de peças. |
-| `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/approve` | Aprova um orçamento pendente. |
-| `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/reject` | Recusa o orçamento, devolve as peças ao estoque e conclui a OS com `cancelledAt`. |
-| `GET` | `/v1/public/work-orders/tracking/{token}` | Canal do cliente: acompanha a OS pelo link recebido por e-mail. |
-| `POST` | `/v1/public/work-orders/estimate-decisions/{token}` | Canal do cliente: registra a decisão pelo link recebido por e-mail. |
-| `POST` | `/v1/work-orders/{id}/services` | Registra uma linha de mão de obra executada. |
-| `PATCH` | `/v1/work-orders/{id}/close` | Finaliza a ordem (`IN_PROGRESS` → `COMPLETED`). |
+Acesso, na notação do [modelo de acesso](docs/FASE-1.md#mapa-de-endpoints): 🔓 público (só o link
+assinado) · 🔧 `ADMIN` e `MECHANIC` · 🛡️ só `ADMIN`. Sem token, as rotas administrativas respondem
+`401`; a métrica de tempo médio, a única restrita por papel aqui, responde `403` ao `MECHANIC`.
+
+| Método | Caminho | Acesso | Descrição |
+|---|---|---|---|
+| `POST` | `/v1/work-orders` | 🔧 | Abre uma nova ordem de serviço e, junto dela, o orçamento pendente da solicitação inicial. |
+| `GET` | `/v1/work-orders/{id}` | 🔧 | Busca uma ordem por id. |
+| `GET` | `/v1/work-orders` | 🔧 | Lista a fila operacional: apenas OS em atendimento, paginadas e ordenadas por estágio de trabalho. |
+| `GET` | `/v1/work-orders/metrics/average-execution-time` | 🛡️ | Tempo médio de execução (abertura → conclusão) das OS já encerradas, em minutos, e o tamanho da amostra. |
+| `PATCH` | `/v1/work-orders/{id}/status` | 🔧 | Avança o status da ordem (exceto para `COMPLETED`). |
+| `POST` | `/v1/work-orders/{id}/estimate` | 🔧 | Cria um orçamento com itens do catálogo de peças. |
+| `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/approve` | 🔧 | Aprova um orçamento pendente. |
+| `PATCH` | `/v1/work-orders/{id}/estimate/{estimateId}/reject` | 🔧 | Recusa o orçamento, devolve as peças ao estoque e conclui a OS com `cancelledAt`. |
+| `GET` | `/v1/public/work-orders/tracking/{token}` | 🔓 | Canal do cliente: acompanha a OS pelo link recebido por e-mail. |
+| `POST` | `/v1/public/work-orders/estimate-decisions/{token}` | 🔓 | Canal do cliente: registra a decisão pelo link recebido por e-mail. |
+| `POST` | `/v1/work-orders/{id}/services` | 🔧 | Registra uma linha de mão de obra executada. |
+| `PATCH` | `/v1/work-orders/{id}/close` | 🔧 | Finaliza a ordem (`IN_PROGRESS` → `COMPLETED`). |
 
 ---
 
@@ -292,7 +299,10 @@ As peças reservadas voltam ao estoque, a OS passa para `COMPLETED`, recebe `clo
 |---|---|---|
 | 400 | `DECISION_TOKEN_INVALID` | Link de decisão adulterado, malformado ou não emitido para decidir orçamento. |
 | 400 | `TRACKING_TOKEN_INVALID` | Link de acompanhamento adulterado, malformado ou não emitido para acompanhar uma OS. |
+| 401 | — | Rota administrativa chamada sem `Authorization: Bearer`. |
+| 403 | — | `MECHANIC` pedindo a métrica de tempo médio, restrita ao `ADMIN`. |
 | 404 | `WORK_ORDER_NOT_FOUND` | Id de ordem inexistente. |
+| 404 | `WORKER_NOT_FOUND` | `assignedWorkerId` informado na abertura não existe. |
 | 404 | `ESTIMATE_PART_NOT_FOUND` | `partId` informado no orçamento não existe no catálogo. |
 | 404 | `ESTIMATE_NOT_FOUND` | `estimateId` não existe ou não pertence à ordem informada. |
 | 409 | `ESTIMATE_ALREADY_DECIDED` | Tentativa de aprovar um orçamento já aprovado/rejeitado. |
@@ -316,6 +326,12 @@ O fluxo é validado em duas camadas, ambas no pacote `br.com.fiap.postech.soat16
   contra um PostgreSQL via Testcontainers (`./mvnw test -Pitest`, requer Docker) — valida
   serialização JSON, mapeamento JPA/Hibernate Reactive e Bean Validation de ponta a ponta.
 
+Dois `*IT` cobrem o que cerca o fluxo: `auth.adapter.in.rest.SecurityIT` guarda o `401` sem token e o
+`403` do `MECHANIC` na métrica restrita ao `ADMIN`, e
+`workorder.adapter.in.rest.openapi.WorkOrderOpenApiContractIT` confere o documento servido em
+`/q/openapi` — as respostas declaradas em cada operação, incluindo `401` e `403`, e os efeitos de
+estoque descritos no orçamento.
+
 A tabela liga cada regra já descrita neste documento ao teste que a exercita (nomes abreviados
 como `Classe.método`; todas vivem dentro de uma classe `@Nested` com o mesmo nome do endpoint):
 
@@ -327,6 +343,7 @@ como `Classe.método`; todas vivem dentro de uma classe `@Nested` com o mesmo no
 | Preços do orçamento são snapshot do catálogo | `Create.shouldKeepEstimatePricesAfterCatalogUpdate` | `Create.shouldSnapshotServicePrice` |
 | Item de serviço ou peça inválido na abertura → 404 sem dados parciais | `Create.shouldReturn404WhenServiceItemNotFound` / `...RequestedPartNotFound` | `Create.shouldThrowWhenRequestedServiceItemMissing` / `...RequestedPartMissing` |
 | Cliente/veículo inexistente ao criar → 404 | `Create.shouldReturn404WhenCustomerNotFound` / `...VehicleNotFound` | `Create.shouldThrow...NotFoundException` |
+| Mecânico responsável é registrado na abertura; se não existir → 404 sem dados parciais | `Create.shouldAssignTheRequestedWorker`, `...shouldReturn404WhenAssignedWorkerNotFound` | — (exercitado ponta a ponta) |
 | Não é permitido pular etapas (ex.: `RECEIVED` → `IN_PROGRESS` direto) | `UpdateStatus.shouldRejectSkippingCanonicalStages` | `UpdateStatus.shouldRejectSkippingStages` |
 | `COMPLETED` só via `/close`, nunca pelo `/status` | `UpdateStatus.shouldRejectCompletedViaGenericEndpoint` | `UpdateStatus.shouldRejectJumpingDirectlyToCompleted` |
 | A recusa conclui a OS e preenche `cancelledAt` | `EstimateDecisionAndStock.shouldRejectEstimateAndCompleteWorkOrder` | `RejectEstimate.shouldRejectAndCompleteWorkOrder` |

@@ -28,9 +28,11 @@ arquitetura, infraestrutura, deploy e escalabilidade, ver o [README](../README.m
 - **Acompanhamento:** ciclo de status `RECEIVED → DIAGNOSIS → WAITING_APPROVAL → IN_PROGRESS →
   COMPLETED → DELIVERED`, com **transições automáticas** conforme as ações. A recusa conclui a OS e
   preenche `cancelledAt`, sem criar um status adicional.
-- **Canal público do cliente:** consulta da OS e **aprovação/rejeição do orçamento** via API, sem login.
+- **Canal público do cliente:** acompanhamento da OS e **aprovação/recusa do orçamento** por links
+  assinados enviados por e-mail, sem login e sem consulta por id.
 - **Gestão administrativa:** CRUD de clientes, veículos, serviços e peças; **controle de estoque**
-  (baixa na aprovação, recusa quando o saldo é insuficiente e alerta de estoque mínimo).
+  (reserva ao levar a OS a `WAITING_APPROVAL`, devolução na recusa do orçamento, recusa da operação
+  quando o saldo é insuficiente e alerta de estoque mínimo).
 - **Métrica:** tempo médio de execução das OS concluídas.
 - **Segurança:** autenticação JWT (RS256) e RBAC nas APIs administrativas; validação de CPF/CNPJ e placa.
 
@@ -56,6 +58,12 @@ está em [Executando localmente](../README.md#executando-localmente).
 | `JWT_PRIVATE_KEY_LOCATION` | Chave privada de assinatura RS256 | `.local-jwt/privateKey.pem` |
 | `JWT_PUBLIC_KEY_LOCATION` | Chave pública de validação RS256 | `.local-jwt/publicKey.pem` |
 | `SWAGGER_UI_ENABLED` | Publica o Swagger UI no artefato empacotado | `true` |
+| `APP_PUBLIC_BASE_URL` | Base dos links enviados ao cliente por e-mail | `http://localhost:8080` |
+| `MAIL_FROM` | Remetente dos e-mails ao cliente | `oficina@localhost` |
+| `MAIL_HOST` / `MAIL_PORT` | Servidor SMTP | `localhost` / `1025` |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | Credenciais SMTP | vazio |
+| `MAIL_START_TLS` | Política de STARTTLS na conexão SMTP | `DISABLED` |
+| `MAIL_MOCK` | Só registra a mensagem em log, sem entregá-la | `true` |
 
 Alguns desses padrões só valem quando a aplicação roda solta:
 
@@ -63,6 +71,8 @@ Alguns desses padrões só valem quando a aplicação roda solta:
   (`oficina-mecanica-postgres`) e é o único valor que o `.env` não sobrescreve; as duas
   `JWT_*_KEY_LOCATION` passam a apontar para `/etc/jwt`, onde o volume do serviço `jwt-keys` é
   montado; e a senha do banco vira `admin`, não o `changeme` da tabela.
+- **Sem servidor SMTP,** o padrão `MAIL_MOCK=true` mantém o fluxo utilizável: os e-mails ao cliente,
+  com os links de acompanhamento e de decisão, só aparecem no log da aplicação.
 - **No cluster,** quem entrega tudo são o `ConfigMap` e os dois `Secret` descritos em
   [Implantando no cluster](../README.md#implantando-no-cluster). Lá o RDS exige TLS, então
   `POSTGRES_SSLMODE` é `require` e `POSTGRES_TRUST_ALL` é `true` — a CA da AWS não está no truststore
@@ -205,7 +215,7 @@ Base local: `http://localhost:8080`. No cluster, o hostname do ELB. Papéis: �
 ### Ordens de serviço — `/v1/work-orders`
 | Método | Path | Acesso |
 |---|---|---|
-| GET | `/v1/work-orders` (`q`, `page`, `size`) | 🔧 |
+| GET | `/v1/work-orders` (`page`, `size`; `q` e `sort` do contrato de paginação são ignorados aqui) | 🔧 |
 | GET | `/v1/work-orders/{id}` | 🔧 |
 | GET | `/v1/work-orders/metrics/average-execution-time` | 🛡️ |
 | POST | `/v1/work-orders` | 🔧 |
@@ -241,8 +251,9 @@ RECEIVED ─► DIAGNOSIS ─► WAITING_APPROVAL ─► IN_PROGRESS ─► COMP
 ```
 
 - A OS nasce em **`RECEIVED`** (status definido automaticamente na criação).
-- Gerar o orçamento move `DIAGNOSIS → WAITING_APPROVAL`; aprovar move `→ IN_PROGRESS` e dá baixa no
-  estoque.
+- Gerar o orçamento move `DIAGNOSIS → WAITING_APPROVAL` — é essa entrada que **reserva as peças no
+  estoque** e envia ao cliente os links de decisão. Aprovar move `→ IN_PROGRESS` e mantém a reserva;
+  recusar devolve as peças.
 - `COMPLETED` é alcançado por `PATCH /{id}/close` ou pela recusa de um orçamento pendente.
 - A recusa preenche `closedAt` e `cancelledAt`; não existe cancelamento manual nem status
   `CANCELLED`.
