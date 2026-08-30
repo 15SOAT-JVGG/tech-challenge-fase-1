@@ -2,6 +2,23 @@ name: Workflow CI
 
 # Pipeline de validação para PRs — roda apenas CI, sem deploy.
 # Usado para validar qualidade antes do merge na main.
+#
+# Todos os jobs são locais, de propósito. A versão anterior deste arquivo chamava
+# workflows compartilhados de 15SOAT-JVGG/reusable-workflows, que é privado e cujo acesso
+# não está liberado para este repositório: `uses` de workflow inacessível reprova a
+# execução inteira em segundos, antes de qualquer job começar, e por isso nenhum PR desta
+# fase chegou a ser validado. O deploy.yml já havia trilhado esse caminho para o gate de
+# qualidade; aqui o resto acompanha.
+#
+# Dois jobs da versão anterior não sobreviveram à mudança, e é uma perda consciente:
+#
+#   SonarQube      já vinha com `sonar_enabled: false` e aponta para um servidor de
+#                  homelab alcançável só por Tailscale — fora deste repositório, não
+#                  havia o que executar.
+#   Dependency-Check  a varredura de dependências precisa da base da NVD, e sem chave de
+#                  API nem cache entre execuções ela leva dezenas de minutos e é limitada
+#                  por taxa. O retrato mais recente está em
+#                  docs/RELATORIO-VULNERABILIDADES.md.
 
 on:
   workflow_dispatch:
@@ -18,12 +35,7 @@ on:
       - "**/*.md"
 
 permissions:
-  actions: read
   contents: read
-  packages: read
-  security-events: write
-  issues: write
-  pull-requests: write
 
 concurrency:
   group: ${{ github.event.repository.name }}-sandbox-${{ github.ref }}
@@ -32,36 +44,70 @@ concurrency:
 jobs:
 
   # ── 1. Detecção de secrets no histórico do repositório ──────────────────────
+  #
+  # `--no-git` ficaria só na árvore de trabalho; o valor está justamente em varrer o
+  # histórico, onde um segredo removido continua recuperável. Por isso fetch-depth: 0.
   secrets_gitleaks:
     name: Secrets Scan (Gitleaks)
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-gitleaks.yml@main
-    with:
-      gitleaks_version: "8.24.3"
-      fetch_depth: 0
-      block_on_manual: false
-      upload_sarif: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Varre o histórico
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.3 \
+            detect --source=/repo --redact --verbose
 
   # ── 2. SAST — análise estática de segurança ──────────────────────────────────
   sast_semgrep:
     name: SAST (Semgrep)
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-semgrep.yml@main
-    secrets: inherit
-    with:
-      config: p/ci
-      fail_on_findings: true
-      upload_sarif: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # `scan` em vez de `ci`: o segundo espera uma conta no Semgrep Cloud para buscar a
+      # política do projeto. `--error` é o que transforma achado em reprovação.
+      - name: Analisa o código
+        run: |
+          docker run --rm -v "$PWD:/src" semgrep/semgrep:1.175.0 \
+            semgrep scan --config p/ci --error --metrics=off
 
   # ── 3. Build & Testes — Quarkus JVM ──────────────────────────────────────────
+  #
+  # `verify` é o gate inteiro num comando: compila, roda os testes, Checkstyle, PMD,
+  # SpotBugs, Spotless e o mínimo de cobertura do JaCoCo. É o mesmo comando do job de
+  # build do deploy.yml, para que o PR reprove pelo que a entrega reprovaria.
   build:
     name: Build & Tests (Quarkus JVM)
     needs: [secrets_gitleaks, sast_semgrep]
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/build-java-quarkus-jvm.yml@main
-    with:
-      java_version: "21"
-      use_tailscale: false
-      upload_coverage: ${{ inputs.skip_tests != true }}
-      maven_goals: "verify"
-      maven_args: ${{ inputs.skip_tests == true && '-DskipTests -Dstyle.color=always' || '-Dstyle.color=always' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala o Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build, testes e gates de qualidade
+        run: ./mvnw --batch-mode verify ${{ inputs.skip_tests && '-DskipTests' || '' }}
+
+      # O relatório é o que permite conferir a cobertura de um PR sem rodar nada local.
+      - name: Publica o relatório de cobertura
+        if: ${{ !cancelled() && !inputs.skip_tests }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: target/jacoco-report
+          retention-days: 7
+          if-no-files-found: warn
 
   # ── 4. IaC — sintaxe da infraestrutura e dos manifestos, sem tocar em nuvem ──
   iac_validate:
@@ -108,36 +154,3 @@ jobs:
         run: |
           docker run --rm -i ghcr.io/yannh/kubeconform:v0.8.0 \
             -strict -summary -kubernetes-version "$KUBERNETES_VERSION" - < rendered-manifests.yaml
-
-  # ── 5. SCA — varredura de dependências com OWASP Dependency-Check ────────────
-  sca_dependency_check:
-    name: SCA (OWASP Dependency-Check)
-    needs: [build]
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/security-sca-dependency-check.yml@main
-    with:
-      project_name: ${{ github.event.repository.name }}
-      scan_path: .
-      fail_cvss: "8"
-      format: "HTML"
-      upload_artifact: true
-
-  # ── 6. Qualidade de código — SonarQube (via Tailscale) ───────────────────────
-  sonar:
-    name: SonarQube Scan
-    needs: [sca_dependency_check]
-    if: ${{ inputs.skip_tests != true }}
-    uses: 15SOAT-JVGG/reusable-workflows/.github/workflows/quality-sonarqube-scan.yml@main
-    with:
-      environment_name: homelab
-      fetch_depth: 0
-      coverage_artifact: ${{ inputs.skip_tests == true && '' || 'coverage-xml' }}
-      coverage_path: target/jacoco-report
-      sonar_enabled: false
-      sonar_project_key: ${{ github.event.repository.name }}
-      wait_quality_gate: true
-      tailscale_tags: tag:github-actions-homelab
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      TS_OAUTH_CLIENT_SECRET: ${{ secrets.TS_OAUTH_CLIENT_SECRET }}
