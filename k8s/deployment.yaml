@@ -3,10 +3,11 @@ kind: Deployment
 metadata:
   name: oficina-mecanica
 spec:
-  # Uma réplica no primeiro deploy é o que deixa o Flyway migrar sem concorrência. O
-  # HPA passa a mandar no número de réplicas depois (#35), e o lock da tabela de
-  # histórico cobre os deploys seguintes.
-  replicas: 1
+  # O número de réplicas é omitido de propósito: quem manda nele é o HPA de
+  # k8s/hpa.yaml. Declará-lo aqui faria cada `kubectl apply` devolver o Deployment ao
+  # valor fixo e desfazer a escala em curso. Sem o campo, o Deployment nasce com uma
+  # réplica — o que deixa o Flyway migrar sem concorrência no primeiro deploy — e o
+  # autoscaler assume a partir daí.
   selector:
     matchLabels:
       app.kubernetes.io/name: oficina-mecanica
@@ -52,35 +53,45 @@ spec:
             capabilities:
               drop:
                 - ALL
-          # Sem requests o HPA não tem base de cálculo. Os valores cabem duas réplicas
-          # com folga num t3.medium (2 vCPU, 4 GiB).
+          # Sem requests o HPA não tem base de cálculo: é sobre elas que ele calcula a
+          # utilização. O request de memória fica acima do que o pod consome ocioso
+          # (cerca de 250Mi), senão a aplicação já nasceria acima do alvo de 80% e o
+          # autoscaler manteria réplicas de pé sem carga alguma.
           resources:
             requests:
               cpu: 250m
-              memory: 384Mi
+              memory: 512Mi
             limits:
               cpu: "1"
-              memory: 768Mi
+              memory: 1Gi
           # A JVM leva alguns segundos para subir, e a readiness inclui a checagem do
           # Postgres. O startupProbe dá até 2 minutos para isso sem que a liveness
           # comece a matar o pod no meio da inicialização.
+          #
+          # O timeout default de um segundo é curto demais para um pod no teto da sua
+          # cota de CPU: sob carga o pod ficava intermitentemente não-pronto, saía do
+          # balanceador e — pior — sumia da conta do HPA, que ignora pod não-pronto e
+          # ficava sem métrica justamente quando precisava escalar.
           startupProbe:
             httpGet:
               path: /q/health/started
               port: http
             periodSeconds: 5
+            timeoutSeconds: 5
             failureThreshold: 24
           readinessProbe:
             httpGet:
               path: /q/health/ready
               port: http
             periodSeconds: 5
+            timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /q/health/live
               port: http
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 3
       volumes:
         - name: jwt-keys

@@ -1,0 +1,54 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: oficina-mecanica
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: oficina-mecanica
+  # Uma réplica no vale é o que mantém o primeiro deploy migrando sem concorrência. O
+  # teto de 6 cabe já no piso do node group, dois nós t3.medium: 6 x 250m de CPU e
+  # 6 x 512Mi de memória de request ficam abaixo do que esse par aloca, então escalar
+  # nunca depende de um nó novo nascer no meio da demonstração.
+  minReplicas: 1
+  maxReplicas: 6
+  metrics:
+    # O autoscaler toma o maior número de réplicas que as duas métricas pedem. A CPU é
+    # quem manda na prática — a verificação BCrypt do login é cara em processador —, e
+    # a memória é a rede de segurança para uma carga que pese no heap em vez de no
+    # processador.
+    #
+    # Uma métrica de memória só não trava a descida porque a imagem base afina a JVM
+    # para devolver heap (MinHeapFreeRatio=10, MaxHeapFreeRatio=20): sob carga o pod
+    # mediu cerca de 240Mi, contra os 410Mi do alvo. Sem esse ajuste, um heap que
+    # cresceu ficaria grande e seguraria as réplicas de pé depois da carga.
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    # Os defaults do Kubernetes esperam 5 minutos antes de encolher, o que não cabe
+    # num vídeo de 15 minutos. Subir é imediato e agressivo, descer é deliberado: um
+    # pod por vez, depois de um minuto de carga baixa, para que uma pausa entre duas
+    # rajadas não derrube capacidade que voltará a ser necessária.
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 30

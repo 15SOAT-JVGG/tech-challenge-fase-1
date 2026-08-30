@@ -10,7 +10,8 @@ que decorrem disso estão em [ADR-0001](../docs/adr/0001-eks-provisionado-com-ro
 ```
 infra/
 ├── docker/     Dockerfile da aplicação
-├── scripts/    bootstrap do state, verificação do lab, publicação da imagem, chaves, credenciais e smoke test
+├── scripts/    bootstrap do state, verificação do lab, publicação da imagem, chaves, credenciais, smoke test e carga
+│   └── lib/    o que smoke test e carga compartilham: ferramentas, credencial e endereço do ambiente
 └── terraform/  a IaC propriamente dita
 k8s/            os manifestos da aplicação, no diretório que o enunciado exige
 ```
@@ -25,6 +26,7 @@ Tudo abaixo nasce e morre com o Terraform em `infra/terraform`.
 | — | `aws_ecr_lifecycle_policy` | Expira imagens além das 10 mais recentes |
 | `oficina-mecanica` | `aws_eks_cluster` | Control plane do Kubernetes 1.33, endpoint público e privado |
 | `oficina-mecanica-nodes` | `aws_eks_node_group` | Nós gerenciados `t3.medium` (AL2023), de 2 a 4 instâncias |
+| `metrics-server` | `aws_eks_addon` | Fonte de métricas de recurso do cluster, sem a qual o HPA não escala |
 | `oficina-mecanica-db` | `aws_db_instance` | Postgres 16 em `db.t3.micro`, disco gp3 criptografado, sem acesso público |
 | `oficina-mecanica-db` | `aws_db_subnet_group` | Subnets onde a instância pode nascer |
 | `oficina-mecanica-db` | `aws_security_group` | Fecha o banco; a única entrada é a regra abaixo |
@@ -130,8 +132,9 @@ Os manifestos vivem em `k8s/`, fora de `infra/`, porque é onde o enunciado da f
 | `ConfigMap` `oficina-mecanica-config` | `k8s/configmap.yaml` | Host e nome do banco, modo TLS, porta, issuer e expiração do JWT, caminho das chaves, usuários de seed, flag do Swagger |
 | `Secret` `oficina-mecanica-env` | criado por script | Usuário e senha do banco, senhas de seed |
 | `Secret` `oficina-mecanica-jwt` | criado por script | O par RS256, montado como arquivo em `/etc/jwt` |
-| `Deployment` `oficina-mecanica` | `k8s/deployment.yaml` | Uma réplica, probes, requests e limits, container non-root |
+| `Deployment` `oficina-mecanica` | `k8s/deployment.yaml` | Probes, requests e limits, container non-root; o número de réplicas é do HPA |
 | `Service` `oficina-mecanica` | `k8s/service.yaml` | `LoadBalancer`, que o EKS materializa como ELB clássico |
+| `HorizontalPodAutoscaler` `oficina-mecanica` | `k8s/hpa.yaml` | De 1 a 6 réplicas, por CPU e memória |
 
 Os dois `Secret` não estão em `k8s/` de propósito — senha do banco, credenciais de seed e chave
 privada não entram no repositório. `infra/scripts/create-app-credentials.sh` os monta a partir dos
@@ -195,6 +198,64 @@ Duas coisas que só aparecem contra o RDS e valem lembrar:
 - **As migrations sobem sozinhas.** `V1__create_schema.sql` cria o schema `oficina_mecanica` e o
   Flyway roda na inicialização, então o primeiro deploy converge contra um banco vazio. Uma réplica
   no primeiro rollout é o que evita duas instâncias migrando ao mesmo tempo.
+
+## Escalabilidade automática
+
+A aplicação ganha réplicas quando a carga sobe e as devolve quando a carga cai, sem intervenção. Quem
+decide é o `HorizontalPodAutoscaler` de `k8s/hpa.yaml`, que compara o consumo dos pods com os
+`requests` declarados no `Deployment` — daí a exigência de declará-los.
+
+| Ajuste | Valor | Por quê |
+|---|---|---|
+| Réplicas | de 1 a 6 | Uma no vale deixa o Flyway migrar sem concorrência; seis cabem nos dois nós `t3.medium` sem depender de nós novos |
+| CPU | 60% do request de 250m | É a métrica que manda na prática: a verificação BCrypt do login é cara em processador |
+| Memória | 80% do request de 512Mi | Rede de segurança para carga que pese no heap; o pod ocioso fica perto de 250Mi, bem abaixo do alvo |
+| Subida | imediata, até 2 pods a cada 15s | O default já é imediato; o passo maior encurta a demonstração |
+| Descida | 1 pod a cada 30s, após 1 min de calmaria | O default espera 5 minutos, o que não cabe num vídeo de 15 |
+
+A fonte das métricas é o `metrics-server`, instalado pelo Terraform como addon gerenciado do EKS. Um
+cluster nasce sem ele, e sem ele o HPA lê `<unknown>` e nunca escala:
+
+```bash
+kubectl top pods    # se isto responder, o HPA tem base de cálculo
+```
+
+### Reproduzindo a demonstração
+
+Dois terminais. No primeiro, o observador:
+
+```bash
+kubectl get hpa,pods -w
+```
+
+No segundo, a carga — uma rajada de logins, o endpoint mais caro em CPU da API:
+
+```bash
+export APP_SEED_ADMIN_PASSWORD=...       # a mesma senha entregue no Secret
+infra/scripts/load-test.sh               # 40 conexões por 5 minutos
+```
+
+Duração e concorrência saem de `LOAD_DURATION_SECONDS` e `LOAD_CONCURRENCY`. Na medição de
+referência, `LOAD_CONCURRENCY=30` já levou o pod a 138% do seu request de CPU, e o autoscaler criou
+réplicas em menos de um minuto:
+
+```
+SuccessfulRescale   New size: 3; reason: cpu resource utilization (percentage of request) above target
+SuccessfulRescale   New size: 2; reason: All metrics below target
+```
+
+O segundo evento é o do fim da carga: passado o minuto de calmaria, as réplicas caem uma a uma até
+voltar a uma. O ciclo inteiro leva cerca de dez minutos.
+
+Aplique os manifestos **antes** de começar a carga, nunca durante. Um `kubectl apply -k k8s/` no meio
+da rajada devolve o `Deployment` a uma réplica por um instante — é o efeito de remover o campo
+`replicas`, que o apply poda do objeto vivo — e a demonstração dá um solavanco que não é do
+autoscaler.
+
+Se o HPA insistir em `<unknown>` **sob carga**, olhe as probes antes do autoscaler. Um pod no teto da
+sua cota de CPU demora a responder, e o HPA ignora pod não-pronto: com o timeout default de um
+segundo, o único pod saía da conta justamente quando havia carga para medir. É por isso que as três
+probes do `Deployment` declaram `timeoutSeconds: 5`.
 
 ## Variáveis
 

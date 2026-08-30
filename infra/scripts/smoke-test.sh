@@ -26,37 +26,16 @@
 # (default: admin), e READY_TIMEOUT_SECONDS ajusta a espera pelo readiness.
 set -euo pipefail
 
-SERVICE_NAME="oficina-mecanica"
-ADMIN_USERNAME="${APP_SEED_ADMIN_USERNAME:-admin}"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/environment.sh"
+
 READY_TIMEOUT_SECONDS="${READY_TIMEOUT_SECONDS:-180}"
 READY_RETRY_SECONDS=5
 REQUEST_TIMEOUT_SECONDS=30
 WORK_ORDERS_PAGE_SIZE=100
 
-for tool in curl jq; do
-    command -v "$tool" >/dev/null || { echo "$tool não encontrado" >&2; exit 1; }
-done
-
-if [[ -z "${APP_SEED_ADMIN_PASSWORD:-}" ]]; then
-    echo "APP_SEED_ADMIN_PASSWORD não definida." >&2
-    echo "É a senha do usuário de seed entregue ao cluster no Secret oficina-mecanica-env:" >&2
-    echo "  export APP_SEED_ADMIN_PASSWORD=..." >&2
-    exit 1
-fi
-
-BASE_URL="${1:-}"
-if [[ -z "$BASE_URL" ]]; then
-    command -v kubectl >/dev/null || { echo "kubectl não encontrado, e nenhum endereço informado" >&2; exit 1; }
-    ELB_HOSTNAME="$(kubectl get svc "$SERVICE_NAME" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
-    if [[ -z "$ELB_HOSTNAME" ]]; then
-        echo "O Service $SERVICE_NAME ainda não tem endereço de balanceador." >&2
-        echo "Aguarde o provisionamento do ELB (cerca de um minuto) ou informe o endereço:" >&2
-        echo "  infra/scripts/smoke-test.sh http://meu-endereco" >&2
-        exit 1
-    fi
-    BASE_URL="http://$ELB_HOSTNAME"
-fi
-BASE_URL="${BASE_URL%/}"
+require_tools curl jq
+require_seed_admin_password
+resolve_base_url "${1:-}"
 
 RESPONSE_BODY_FILE="$(mktemp)"
 trap 'rm -f "$RESPONSE_BODY_FILE"' EXIT
@@ -179,10 +158,7 @@ echo "Smoke test contra $BASE_URL"
 wait_until_ready
 echo "1/4 aplicação pronta"
 
-request POST /v1/auth/login 200 "$(jq -nc \
-    --arg username "$ADMIN_USERNAME" \
-    --arg password "$APP_SEED_ADMIN_PASSWORD" \
-    '{username: $username, password: $password}')"
+request POST /v1/auth/login 200 "$(login_payload)"
 TOKEN="$(extract '.token')"
 echo "2/4 autenticado como $ADMIN_USERNAME"
 

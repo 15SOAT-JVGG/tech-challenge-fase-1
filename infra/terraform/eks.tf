@@ -69,3 +69,25 @@ resource "aws_eks_node_group" "main" {
     }
   }
 }
+
+# Um cluster EKS nasce sem servidor de métricas de recurso, e sem ele o HPA lê
+# <unknown> e nunca escala. O addon gerenciado entrega o mesmo metrics-server do
+# upstream sem pedir IAM, e — ao contrário de um `kubectl apply` avulso — entra no
+# state, então o destroy leva o cluster inteiro junto.
+resource "aws_eks_addon" "metrics_server" {
+  cluster_name = aws_eks_cluster.main.name
+  addon_name   = "metrics-server"
+
+  # addon_version fica de fora de propósito: o default que o EKS publica acompanha a
+  # versão do control plane, e fixá-lo aqui obrigaria a revisar o HCL a cada bump de
+  # kubernetes_version.
+  #
+  # OVERWRITE é o que deixa o addon assumir uma instalação anterior feita à mão, em
+  # vez de falhar o apply por conflito de propriedade dos objetos.
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  # Os pods do addon precisam de nó onde rodar; sem isto o apply os cria em Pending e
+  # espera o timeout do addon antes de falhar.
+  depends_on = [aws_eks_node_group.main]
+}
