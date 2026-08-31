@@ -523,8 +523,9 @@ docker run --rm --network=tech-challenge_oficina_mecanica_net \
 
 ## Vídeo demonstrativo
 
-<!-- TODO: substituir pelo link do vídeo após a gravação. -->
-**Link:** _a publicar_
+**Repositório público:** https://github.com/15SOAT-JVGG/tech-challenge-fase-1
+
+**Link do vídeo:** https://youtu.be/NRhdTWcQsj4
 
 O vídeo demonstra o provisionamento da infraestrutura, a pipeline de CI/CD executando, o deploy no
 cluster, o consumo das APIs contra o ambiente implantado e a escalabilidade automática sob carga.
