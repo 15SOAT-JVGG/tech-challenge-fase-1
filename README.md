@@ -41,30 +41,30 @@ mudou aqui.
 
 ## Objetivos desta fase
 
-| Objetivo | Como é atendido |
-|---|---|
-| Rodar em Kubernetes | Cluster EKS com `Deployment`, `Service`, `ConfigMap`, `Secret` e `HorizontalPodAutoscaler` em [`k8s/`](k8s/) |
-| Infraestrutura como Código | Todo o ambiente nasce de um `terraform apply` em [`infra/terraform/`](infra/terraform/) |
-| Banco de dados gerenciado | Postgres 16 no RDS, privado, alcançável apenas pelos nós do cluster |
-| Escalabilidade automática | HPA de 1 a 6 réplicas por CPU e memória, alimentado pelo `metrics-server` |
-| Entrega automatizada | Dois workflows do GitHub Actions: provisionamento manual e entrega a cada merge |
-| Reprodutibilidade | Este README e o [`infra/README.md`](infra/README.md) levam do zero ao ambiente no ar |
+| Objetivo                   | Como é atendido                                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Rodar em Kubernetes        | Cluster EKS com `Deployment`, `Service`, `ConfigMap`, `Secret` e `HorizontalPodAutoscaler` em [`k8s/`](k8s/) |
+| Infraestrutura como Código | Todo o ambiente nasce de um `terraform apply` em [`infra/terraform/`](infra/terraform/)                      |
+| Banco de dados gerenciado  | Postgres 16 no RDS, privado, alcançável apenas pelos nós do cluster                                          |
+| Escalabilidade automática  | HPA de 1 a 6 réplicas por CPU e memória, alimentado pelo `metrics-server`                                    |
+| Entrega automatizada       | Dois workflows do GitHub Actions: provisionamento manual e entrega a cada merge                              |
+| Reprodutibilidade          | Este README e o [`infra/README.md`](infra/README.md) levam do zero ao ambiente no ar                         |
 
 ### Stack
 
-| Camada | Tecnologia |
-|---|---|
-| Runtime | Java 21 + Quarkus 3.32.3 |
-| Persistência | Hibernate Reactive + Panache + PostgreSQL 16 |
-| Migrations | Flyway |
-| Segurança | SmallRye JWT (RS256) + RBAC |
-| Documentação | SmallRye OpenAPI / Swagger UI |
+| Camada          | Tecnologia                                                 |
+| --------------- | ---------------------------------------------------------- |
+| Runtime         | Java 21 + Quarkus 3.32.3                                   |
+| Persistência    | Hibernate Reactive + Panache + PostgreSQL 16               |
+| Migrations      | Flyway                                                     |
+| Segurança       | SmallRye JWT (RS256) + RBAC                                |
+| Documentação    | SmallRye OpenAPI / Swagger UI                              |
 | Observabilidade | SmallRye Health · OpenTelemetry (desabilitado por default) |
-| Testes | JUnit 5, Mockito, REST-assured, Testcontainers |
-| Container | Docker (build multistage, runtime UBI9 non-root) |
-| Orquestração | Kubernetes 1.33 (Amazon EKS) |
-| IaC | Terraform >= 1.10, provider AWS ~> 6.0, state no S3 |
-| CI/CD | GitHub Actions |
+| Testes          | JUnit 5, Mockito, REST-assured, Testcontainers             |
+| Container       | Docker (build multistage, runtime UBI9 non-root)           |
+| Orquestração    | Kubernetes 1.33 (Amazon EKS)                               |
+| IaC             | Terraform >= 1.10, provider AWS ~> 6.0, state no S3        |
+| CI/CD           | GitHub Actions                                             |
 
 ---
 
@@ -226,31 +226,31 @@ recupera na listagem contra o endereço público — se ele passa, o ELB, o pod,
 
 Todos nascem e morrem com o Terraform de [`infra/terraform/`](infra/terraform/).
 
-| Recurso | Tipo | O que é |
-|---|---|---|
-| `oficina-mecanica` | `aws_ecr_repository` | Registry da imagem da aplicação, com scan on push |
-| — | `aws_ecr_lifecycle_policy` | Expira imagens além das 10 mais recentes |
-| `oficina-mecanica` | `aws_eks_cluster` | Control plane do Kubernetes 1.33, endpoint público e privado |
-| `oficina-mecanica-nodes` | `aws_eks_node_group` | Nós gerenciados `t3.medium` (AL2023), de 2 a 4 instâncias |
-| `metrics-server` | `aws_eks_addon` | Fonte de métricas de recurso, sem a qual o HPA não escala |
-| `oficina-mecanica-db` | `aws_db_instance` | Postgres 16 em `db.t3.micro`, disco gp3 criptografado, sem acesso público |
-| `oficina-mecanica-db` | `aws_db_subnet_group` | Subnets onde a instância pode nascer |
-| `oficina-mecanica-db` | `aws_security_group` | Fecha o banco; a única entrada é a regra abaixo |
-| — | `aws_vpc_security_group_ingress_rule` | Libera a porta 5432 só para o security group dos nós do cluster |
-| — | `random_password` | Senha do banco, gerada no apply e nunca versionada |
+| Recurso                  | Tipo                                  | O que é                                                                   |
+| ------------------------ | ------------------------------------- | ------------------------------------------------------------------------- |
+| `oficina-mecanica`       | `aws_ecr_repository`                  | Registry da imagem da aplicação, com scan on push                         |
+| —                        | `aws_ecr_lifecycle_policy`            | Expira imagens além das 10 mais recentes                                  |
+| `oficina-mecanica`       | `aws_eks_cluster`                     | Control plane do Kubernetes 1.33, endpoint público e privado              |
+| `oficina-mecanica-nodes` | `aws_eks_node_group`                  | Nós gerenciados `t3.medium` (AL2023), de 2 a 4 instâncias                 |
+| `metrics-server`         | `aws_eks_addon`                       | Fonte de métricas de recurso, sem a qual o HPA não escala                 |
+| `oficina-mecanica-db`    | `aws_db_instance`                     | Postgres 16 em `db.t3.micro`, disco gp3 criptografado, sem acesso público |
+| `oficina-mecanica-db`    | `aws_db_subnet_group`                 | Subnets onde a instância pode nascer                                      |
+| `oficina-mecanica-db`    | `aws_security_group`                  | Fecha o banco; a única entrada é a regra abaixo                           |
+| —                        | `aws_vpc_security_group_ingress_rule` | Libera a porta 5432 só para o security group dos nós do cluster           |
+| —                        | `random_password`                     | Senha do banco, gerada no apply e nunca versionada                        |
 
 Criados fora do `terraform apply`:
 
-| Recurso | Origem |
-|---|---|
+| Recurso            | Origem                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------ |
 | Bucket S3 do state | `infra/scripts/bootstrap-tf-state.sh` — o backend precisa existir antes do primeiro `init` |
-| ELB clássico | Materializado pelo EKS a partir do `Service type=LoadBalancer`; não está no state |
+| ELB clássico       | Materializado pelo EKS a partir do `Service type=LoadBalancer`; não está no state          |
 
 Não criados, por escolha ou por restrição da conta:
 
-| Recurso | Origem |
-|---|---|
-| VPC default e subnets | Já existem na conta; resolvidos por data source |
+| Recurso                                       | Origem                                                       |
+| --------------------------------------------- | ------------------------------------------------------------ |
+| VPC default e subnets                         | Já existem na conta; resolvidos por data source              |
 | `*-LabEksClusterRole-*`, `*-LabEksNodeRole-*` | Provisionadas pela stack do lab; resolvidas por `name_regex` |
 
 ---
@@ -273,12 +273,12 @@ dependências e leva alguns minutos; nas próximas é quase instantâneo (cache)
 - Swagger UI: `http://localhost:8080/q/swagger-ui`
 - Login: **`admin` / `admin123`** (ver [Autenticação JWT](docs/FASE-1.md#autenticação-jwt))
 
-| Ação | Comando |
-|---|---|
-| Subir em segundo plano | `docker compose up -d` |
-| Acompanhar os logs | `docker compose logs -f app` |
-| Derrubar | `docker compose down` |
-| Derrubar e apagar o banco | `docker compose down -v` |
+| Ação                      | Comando                      |
+| ------------------------- | ---------------------------- |
+| Subir em segundo plano    | `docker compose up -d`       |
+| Acompanhar os logs        | `docker compose logs -f app` |
+| Derrubar                  | `docker compose down`        |
+| Derrubar e apagar o banco | `docker compose down -v`     |
 
 O `.env` é **opcional**: o `docker-compose.yml` já preenche o que a aplicação precisa. Crie um `.env`
 (a partir de `.env.example`) **somente** se quiser sobrescrever senhas ou nomes padrão — a tabela
@@ -359,14 +359,14 @@ Variáveis, saídas, o que fazer quando o lab é reiniciado e como acessar o ban
 
 Os manifestos vivem em [`k8s/`](k8s/), fora de `infra/`, porque é onde o enunciado da fase os exige.
 
-| Objeto | Arquivo | O que carrega |
-|---|---|---|
-| `ConfigMap` `oficina-mecanica-config` | `k8s/configmap.yaml` | Host e nome do banco, modo TLS, porta, issuer e expiração do JWT, caminho das chaves, usuários de seed, flag do Swagger |
-| `Secret` `oficina-mecanica-env` | criado por script | Usuário e senha do banco, senhas de seed |
-| `Secret` `oficina-mecanica-jwt` | criado por script | O par RS256, montado como arquivo em `/etc/jwt` |
-| `Deployment` `oficina-mecanica` | `k8s/deployment.yaml` | Probes, requests e limits, container non-root; o número de réplicas é do HPA |
-| `Service` `oficina-mecanica` | `k8s/service.yaml` | `LoadBalancer`, que o EKS materializa como ELB clássico |
-| `HorizontalPodAutoscaler` `oficina-mecanica` | `k8s/hpa.yaml` | De 1 a 6 réplicas, por CPU e memória |
+| Objeto                                       | Arquivo               | O que carrega                                                                                                           |
+| -------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `ConfigMap` `oficina-mecanica-config`        | `k8s/configmap.yaml`  | Host e nome do banco, modo TLS, porta, issuer e expiração do JWT, caminho das chaves, usuários de seed, flag do Swagger |
+| `Secret` `oficina-mecanica-env`              | criado por script     | Usuário e senha do banco, senhas de seed                                                                                |
+| `Secret` `oficina-mecanica-jwt`              | criado por script     | O par RS256, montado como arquivo em `/etc/jwt`                                                                         |
+| `Deployment` `oficina-mecanica`              | `k8s/deployment.yaml` | Probes, requests e limits, container non-root; o número de réplicas é do HPA                                            |
+| `Service` `oficina-mecanica`                 | `k8s/service.yaml`    | `LoadBalancer`, que o EKS materializa como ELB clássico                                                                 |
+| `HorizontalPodAutoscaler` `oficina-mecanica` | `k8s/hpa.yaml`        | De 1 a 6 réplicas, por CPU e memória                                                                                    |
 
 Os dois `Secret` **não** estão em `k8s/` de propósito: senha do banco, credenciais de seed e chave
 privada não entram no repositório.
@@ -374,10 +374,10 @@ privada não entram no repositório.
 Numa conta nova, dois valores dos manifestos dependem do apply e precisam bater com o que o Terraform
 produziu:
 
-| Onde | Chave | De onde vem |
-|---|---|---|
-| `k8s/configmap.yaml` | `INFRA_HOST_POSTGRES` | `terraform -chdir=infra/terraform output -raw database_host` |
-| `k8s/kustomization.yaml` | `images[0].newName` | `terraform -chdir=infra/terraform output -raw ecr_repository_url` |
+| Onde                     | Chave                 | De onde vem                                                       |
+| ------------------------ | --------------------- | ----------------------------------------------------------------- |
+| `k8s/configmap.yaml`     | `INFRA_HOST_POSTGRES` | `terraform -chdir=infra/terraform output -raw database_host`      |
+| `k8s/kustomization.yaml` | `images[0].newName`   | `terraform -chdir=infra/terraform output -raw ecr_repository_url` |
 
 ### Da máquina do operador
 
@@ -421,13 +421,13 @@ horas e o deploy ficaria vermelho por motivo alheio ao código. Ele autentica co
 
 Habilitar a pipeline num cluster novo é gravar os secrets do repositório:
 
-| Secret | De onde vem |
-|---|---|
-| `KUBE_CONFIG_B64` | `infra/scripts/create-deploy-kubeconfig.sh` |
-| `POSTGRES_USERNAME` / `POSTGRES_PASSWORD` | `terraform output -raw database_username` / `database_password` |
-| `APP_SEED_ADMIN_PASSWORD` / `APP_SEED_MECHANIC_PASSWORD` | Escolhidas pelo operador; são as credenciais de acesso à API |
-| `JWT_PRIVATE_KEY_B64` / `JWT_PUBLIC_KEY_B64` | `infra/scripts/generate-jwt-pair.sh` |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | Painel *AWS Details* do lab; só o job da imagem os usa |
+| Secret                                                            | De onde vem                                                     |
+| ----------------------------------------------------------------- | --------------------------------------------------------------- |
+| `KUBE_CONFIG_B64`                                                 | `infra/scripts/create-deploy-kubeconfig.sh`                     |
+| `POSTGRES_USERNAME` / `POSTGRES_PASSWORD`                         | `terraform output -raw database_username` / `database_password` |
+| `APP_SEED_ADMIN_PASSWORD` / `APP_SEED_MECHANIC_PASSWORD`          | Escolhidas pelo operador; são as credenciais de acesso à API    |
+| `JWT_PRIVATE_KEY_B64` / `JWT_PUBLIC_KEY_B64`                      | `infra/scripts/generate-jwt-pair.sh`                            |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | Painel _AWS Details_ do lab; só o job da imagem os usa          |
 
 O par RS256 vai para os secrets em base64:
 
@@ -448,13 +448,13 @@ A aplicação ganha réplicas quando a carga sobe e as devolve quando a carga ca
 decide é o `HorizontalPodAutoscaler`, que compara o consumo dos pods com os `requests` declarados no
 `Deployment` — daí a exigência de declará-los.
 
-| Ajuste | Valor |
-|---|---|
-| Réplicas | de 1 a 6 |
-| CPU | 60% do request de 250m |
-| Memória | 80% do request de 512Mi |
-| Subida | imediata, até 2 pods a cada 15s |
-| Descida | 1 pod a cada 30s, após 1 min de calmaria |
+| Ajuste   | Valor                                    |
+| -------- | ---------------------------------------- |
+| Réplicas | de 1 a 6                                 |
+| CPU      | 60% do request de 250m                   |
+| Memória  | 80% do request de 512Mi                  |
+| Subida   | imediata, até 2 pods a cada 15s          |
+| Descida  | 1 pod a cada 30s, após 1 min de calmaria |
 
 A fonte das métricas é o `metrics-server`, instalado pelo Terraform como addon gerenciado do EKS. Um
 cluster nasce sem ele, e sem ele o HPA lê `<unknown>` e nunca escala.
@@ -555,18 +555,18 @@ criptografado; nenhuma chave privada na imagem ou no repositório.
 
 ## Documentação e decisões
 
-| Documento | Conteúdo |
-|---|---|
-| [docs/FASE-1.md](docs/FASE-1.md) | A aplicação: funcionalidades, configuração, autenticação JWT, mapa de endpoints, ciclo de vida da OS, testes e build |
-| [`infra/README.md`](infra/README.md) | Runbook completo da infraestrutura: recursos, variáveis, reset do lab, segredos, smoke test e demonstração do HPA |
-| [ADR-0001](docs/adr/0001-eks-provisionado-com-roles-do-lab-na-vpc-default.md) | Por que o EKS usa recursos Terraform diretos, as roles do lab e a VPC default |
-| [ADR-0002](docs/adr/0002-deploy-no-cluster-via-kubeconfig-de-serviceaccount.md) | Por que o deploy autentica por `ServiceAccount` e não por credencial da AWS |
-| [ADR-0003](docs/adr/0003-pipeline-dividida-entre-provisionamento-e-entrega.md) | Por que provisionamento e entrega são workflows separados |
-| [WORKORDER.md](WORKORDER.md) | Fluxo detalhado da Ordem de Serviço |
-| [docs/MODELO-RELACIONAL.md](docs/MODELO-RELACIONAL.md) | Modelo relacional do schema `oficina_mecanica` |
-| [docs/RELATORIO-VULNERABILIDADES.md](docs/RELATORIO-VULNERABILIDADES.md) | Relatório de segurança consolidado |
-| [postman/README.md](postman/README.md) | Uso da collection E2E |
-| [AGENTS.md](AGENTS.md) | Convenções de arquitetura, DDD, clean code e testes do repositório |
+| Documento                                                                       | Conteúdo                                                                                                             |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [docs/FASE-1.md](docs/FASE-1.md)                                                | A aplicação: funcionalidades, configuração, autenticação JWT, mapa de endpoints, ciclo de vida da OS, testes e build |
+| [`infra/README.md`](infra/README.md)                                            | Runbook completo da infraestrutura: recursos, variáveis, reset do lab, segredos, smoke test e demonstração do HPA    |
+| [ADR-0001](docs/adr/0001-eks-provisionado-com-roles-do-lab-na-vpc-default.md)   | Por que o EKS usa recursos Terraform diretos, as roles do lab e a VPC default                                        |
+| [ADR-0002](docs/adr/0002-deploy-no-cluster-via-kubeconfig-de-serviceaccount.md) | Por que o deploy autentica por `ServiceAccount` e não por credencial da AWS                                          |
+| [ADR-0003](docs/adr/0003-pipeline-dividida-entre-provisionamento-e-entrega.md)  | Por que provisionamento e entrega são workflows separados                                                            |
+| [WORKORDER.md](WORKORDER.md)                                                    | Fluxo detalhado da Ordem de Serviço                                                                                  |
+| [docs/MODELO-RELACIONAL.md](docs/MODELO-RELACIONAL.md)                          | Modelo relacional do schema `oficina_mecanica`                                                                       |
+| [docs/RELATORIO-VULNERABILIDADES.md](docs/RELATORIO-VULNERABILIDADES.md)        | Relatório de segurança consolidado                                                                                   |
+| [postman/README.md](postman/README.md)                                          | Uso da collection E2E                                                                                                |
+| [AGENTS.md](AGENTS.md)                                                          | Convenções de arquitetura, DDD, clean code e testes do repositório                                                   |
 
 **Event Storming, Bounded Contexts, Linguagem Ubíqua e Modelo de Dados:** board no
 [Miro](https://miro.com/app/board/uXjVHbbU2eE=/?share_link_id=577612273301).
