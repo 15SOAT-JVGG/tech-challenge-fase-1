@@ -1,0 +1,157 @@
+name: Workflow Lambda
+
+# Entrega da função de autenticação por CPF (lambda/customer-auth). Vive aqui enquanto a
+# função divide o repositório com a API; quando ela ganhar repositório próprio, este
+# arquivo vai junto, trocando os caminhos `lambda/customer-auth/` pela raiz.
+#
+# O PR valida código e Terraform sem tocar na nuvem. O merge na main empacota, aplica a
+# stack da função e fecha com um smoke test contra o endereço público do API Gateway.
+#
+# A stack da plataforma (infra/terraform, Workflow Infra) precisa ter sido aplicada antes:
+# a função lê dela a rede, o banco e o id do API Gateway.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "lambda/customer-auth/**"
+      - ".github/workflows/lambda.yml"
+  push:
+    branches: [main]
+    paths:
+      - "lambda/customer-auth/**"
+      - ".github/workflows/lambda.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lambda-customer-auth-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "0"
+  TERRAFORM_VERSION: "1.16.0"
+
+defaults:
+  run:
+    working-directory: lambda/customer-auth
+
+jobs:
+
+  # ── 1. Testes, cobertura e o JAR que vai para a Lambda ───────────────────────
+  #
+  # `-Pitest` inclui o teste contra Postgres real (Testcontainers), que é o que prova o
+  # contrato com a tabela que a API grava. O runner do GitHub já traz Docker.
+  build:
+    name: Build & Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala o Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: lambda/customer-auth/pom.xml
+
+      - name: Testes, gate de cobertura e empacotamento
+        run: ./mvnw --batch-mode verify -Pitest
+
+      - name: Publica o pacote da função
+        uses: actions/upload-artifact@v4
+        with:
+          name: customer-auth-jar
+          path: lambda/customer-auth/target/customer-auth.jar
+          retention-days: 7
+          if-no-files-found: error
+
+  # ── 2. Terraform da função, sem nuvem ────────────────────────────────────────
+  terraform_validate:
+    name: Terraform (fmt + validate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala o Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Formatação e sintaxe
+        working-directory: lambda/customer-auth/terraform
+        run: |
+          terraform fmt -check -diff
+          terraform init -backend=false
+          terraform validate
+
+  # ── 3. Deploy na AWS e smoke test ────────────────────────────────────────────
+  deploy:
+    name: Deploy da função
+    if: github.event_name != 'pull_request'
+    needs: [build, terraform_validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      # A mesma chave que a pipeline da API monta no pod: a função assina, a API valida.
+      TF_VAR_jwt_private_key_b64: ${{ secrets.JWT_PRIVATE_KEY_B64 }}
+    defaults:
+      run:
+        working-directory: lambda/customer-auth/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Baixa o pacote testado
+        uses: actions/download-artifact@v4
+        with:
+          name: customer-auth-jar
+          path: lambda/customer-auth/target
+
+      - name: Confere a sessão do lab
+        run: aws sts get-caller-identity
+
+      - name: Instala o Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Aplica a stack da função
+        run: |
+          terraform init
+          terraform apply -lock-timeout=5m -auto-approve
+
+      # CPF inválido prova que o API Gateway chega à função (400 da validação). Um CPF válido
+      # sem cadastro prova que a função alcança o RDS: 401 só sai depois da consulta, e um
+      # banco inalcançável responderia 500. 200 também passa, se o CPF de teste existir.
+      - name: Smoke test pelo API Gateway
+        run: |
+          url="$(terraform output -raw customer_auth_url)"
+          echo "Endpoint: $url"
+
+          invalid="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$url" \
+            -H 'Content-Type: application/json' -d '{"cpf":"123"}')"
+          echo "CPF inválido -> $invalid"
+          [[ "$invalid" == "400" ]] || { echo "Esperado 400 do API Gateway até a função." >&2; exit 1; }
+
+          lookup="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$url" \
+            -H 'Content-Type: application/json' -d '{"cpf":"111.444.777-35"}')"
+          echo "CPF válido -> $lookup"
+          [[ "$lookup" == "401" || "$lookup" == "200" ]] || { echo "A função não consultou o banco." >&2; exit 1; }
+
+      - name: Diagnóstico da falha
+        if: failure()
+        run: |
+          name="$(terraform output -raw function_name 2>/dev/null || true)"
+          [[ -n "$name" ]] && aws logs tail "/aws/lambda/$name" --since 15m || true

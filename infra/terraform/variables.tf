@@ -83,6 +83,35 @@ variable "database_name" {
   default     = "oficina"
 }
 
+variable "app_upstream_url" {
+  description = "Endereço do ELB do Service da aplicação (http://...elb.amazonaws.com). Vazio mantém o API Gateway sem o proxy para o cluster."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.app_upstream_url == "" || can(regex("^https?://", var.app_upstream_url))
+    error_message = "app_upstream_url precisa começar com http:// ou https://."
+  }
+}
+
+variable "api_throttling_burst_limit" {
+  description = "Rajada máxima de requisições aceitas pelo API Gateway antes de responder 429."
+  type        = number
+  default     = 100
+}
+
+variable "api_throttling_rate_limit" {
+  description = "Requisições por segundo sustentadas pelo API Gateway."
+  type        = number
+  default     = 50
+}
+
+variable "log_retention_days" {
+  description = "Retenção dos log groups criados por esta stack, em dias."
+  type        = number
+  default     = 7
+}
+
 variable "database_username" {
   description = "Usuário master do banco, lido pela aplicação em POSTGRES_USERNAME."
   type        = string

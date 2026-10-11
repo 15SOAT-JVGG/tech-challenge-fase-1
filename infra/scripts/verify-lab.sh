@@ -90,7 +90,7 @@ line "que decidem o que a IaC consegue provisionar."
 # --- Roles -------------------------------------------------------------------
 section "Roles utilizáveis"
 # A LabRole confia em ~50 serviços; só os desta fase são relevantes no relatório.
-RELEVANT_SERVICES='eks|ec2|rds|elasticloadbalancing'
+RELEVANT_SERVICES='eks|ec2|rds|elasticloadbalancing|lambda|apigateway'
 describe_role() {
     local role="$1" policies services
     # As VocLabPolicy* entram com nome gerado pela stack do lab e têm leitura negada,

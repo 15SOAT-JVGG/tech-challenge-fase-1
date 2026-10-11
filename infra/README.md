@@ -86,6 +86,30 @@ Tudo abaixo nasce e morre com o Terraform em `infra/terraform`.
 | `oficina-mecanica-db` | `aws_security_group` | Fecha o banco; a única entrada é a regra abaixo |
 | — | `aws_vpc_security_group_ingress_rule` | Libera a porta 5432 só para o security group dos nós do cluster |
 | — | `random_password` | Senha do banco, gerada no apply e nunca versionada |
+| `oficina-mecanica` | `aws_apigatewayv2_api` | HTTP API, a porta de entrada: autenticação por CPF e proxy para o cluster |
+| `$default` | `aws_apigatewayv2_stage` | Publica as rotas sem deploy à parte; throttling e access log em JSON |
+| `/aws/apigateway/oficina-mecanica` | `aws_cloudwatch_log_group` | Access log do API Gateway, retenção de 7 dias |
+| `ANY /{proxy+}` | `aws_apigatewayv2_route` | Proxy para o ELB do cluster; só existe com `app_upstream_url` preenchida |
+
+A função de autenticação por CPF e a rota `POST /v1/auth/customer` têm stack própria, em
+`lambda/customer-auth/terraform`, que lê deste state a rede, o banco e o id do API Gateway. Ver
+[o README da função](../lambda/customer-auth/README.md).
+
+### API Gateway em dois passos
+
+O ELB nasce do `Service` do Kubernetes, não do Terraform, então o primeiro `apply` cria o API Gateway
+só com o que já dá para ligar. Depois do primeiro deploy da aplicação, um segundo `apply` liga o
+proxy para o cluster:
+
+```bash
+elb="http://$(kubectl get svc oficina-mecanica -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+terraform -chdir=infra/terraform apply -var "app_upstream_url=$elb"
+terraform -chdir=infra/terraform output -raw api_gateway_url
+```
+
+Recriar o `Service` troca o endereço do ELB, e aí o `apply` precisa ser repetido. O ELB continua
+público: o gateway é a entrada documentada, mas não a única — a autenticação continua valendo porque
+quem valida o token é a própria API.
 
 Não são criados pelo Terraform, por escolha ou por restrição da conta:
 
@@ -433,3 +457,6 @@ Todas têm default e nenhuma é obrigatória. As que mais importam:
 | `node_desired_size` / `node_min_size` / `node_max_size` | `2` / `2` / `4` | Tamanho do node group |
 | `database_instance_class` | `db.t3.micro` | A conta nega `db.t3.large` para cima; a validação da variável recusa classes bloqueadas |
 | `database_name` / `database_username` | `oficina` / `oficina` | O que a aplicação lê em `POSTGRES_DB` e `POSTGRES_USERNAME` |
+| `app_upstream_url` | vazio | Endereço do ELB da aplicação; liga o proxy do API Gateway para o cluster |
+| `api_throttling_burst_limit` / `api_throttling_rate_limit` | `100` / `50` | Teto do API Gateway antes de responder 429 |
+| `log_retention_days` | `7` | Retenção do access log do API Gateway |
