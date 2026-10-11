@@ -562,6 +562,8 @@ criptografado; nenhuma chave privada na imagem ou no repositório.
 | [ADR-0001](docs/adr/0001-eks-provisionado-com-roles-do-lab-na-vpc-default.md)   | Por que o EKS usa recursos Terraform diretos, as roles do lab e a VPC default                                        |
 | [ADR-0002](docs/adr/0002-deploy-no-cluster-via-kubeconfig-de-serviceaccount.md) | Por que o deploy autentica por `ServiceAccount` e não por credencial da AWS                                          |
 | [ADR-0003](docs/adr/0003-pipeline-dividida-entre-provisionamento-e-entrega.md)  | Por que provisionamento e entrega são workflows separados                                                            |
+| [ADR-0007](docs/adr/0007-autenticacao-do-cliente-por-cpf-em-funcao-serverless.md) | Por que o cliente se autentica pelo CPF numa Lambda que emite o mesmo JWT que a API valida                          |
+| [`lambda/customer-auth/README.md`](lambda/customer-auth/README.md)              | Função de autenticação por CPF: contrato, configuração, testes e deploy                                              |
 | [WORKORDER.md](WORKORDER.md)                                                    | Fluxo detalhado da Ordem de Serviço                                                                                  |
 | [docs/MODELO-RELACIONAL.md](docs/MODELO-RELACIONAL.md)                          | Modelo relacional do schema `oficina_mecanica`                                                                       |
 | [docs/RELATORIO-VULNERABILIDADES.md](docs/RELATORIO-VULNERABILIDADES.md)        | Relatório de segurança consolidado                                                                                   |
