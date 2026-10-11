@@ -74,6 +74,26 @@ output "database_username" {
   value       = aws_db_instance.database.username
 }
 
+output "database_security_group_id" {
+  description = "Security group do banco; a stack da função de autenticação libera nele a entrada da Lambda."
+  value       = aws_security_group.database.id
+}
+
+output "api_gateway_id" {
+  description = "Id do HTTP API, onde a stack da função de autenticação pendura a rota POST /v1/auth/customer."
+  value       = aws_apigatewayv2_api.main.id
+}
+
+output "api_gateway_execution_arn" {
+  description = "ARN de execução do HTTP API, usado na permissão de invocação da Lambda."
+  value       = aws_apigatewayv2_api.main.execution_arn
+}
+
+output "api_gateway_url" {
+  description = "Endereço público da API: autenticação por CPF e, com app_upstream_url, o proxy para o cluster."
+  value       = aws_apigatewayv2_stage.default.invoke_url
+}
+
 output "database_password" {
   description = "Senha gerada pelo Terraform. Leia com `terraform output -raw database_password`."
   value       = random_password.database.result
